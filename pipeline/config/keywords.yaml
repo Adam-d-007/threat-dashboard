@@ -1,0 +1,6 @@
+# GDELT DOC 2.0 queries. Phase 1 has one; Phase 2 adds the rest and the
+# prefilter terms in EN, SK, CS, DE, HU, PL, FR and UK.
+gdelt_doc:
+  queries:
+    - id: terror_sk_sources
+      query: "theme:TERROR sourcecountry:slovakia"

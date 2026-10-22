@@ -1,0 +1,360 @@
+{
+  "$defs": {
+    "GdeltInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "tone": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tone"
+        },
+        "themes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Themes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "tone",
+        "themes"
+      ],
+      "title": "GdeltInfo",
+      "type": "object"
+    },
+    "Item": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "sha1 of the canonical URL",
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        },
+        "published_at": {
+          "format": "date-time",
+          "title": "Published At",
+          "type": "string"
+        },
+        "published_estimated": {
+          "default": false,
+          "description": "True when the source gave no date; published_at is then when the item was first seen",
+          "title": "Published Estimated",
+          "type": "boolean"
+        },
+        "fetched_at": {
+          "format": "date-time",
+          "title": "Fetched At",
+          "type": "string"
+        },
+        "snippet": {
+          "maxLength": 300,
+          "title": "Snippet",
+          "type": "string"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "also_reported_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Also Reported By",
+          "type": "array"
+        },
+        "gdelt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GdeltInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "source_id",
+        "tier",
+        "url",
+        "title",
+        "lang",
+        "published_at",
+        "published_estimated",
+        "fetched_at",
+        "snippet",
+        "domain",
+        "also_reported_by",
+        "gdelt"
+      ],
+      "title": "Item",
+      "type": "object"
+    },
+    "RunCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "fetched": {
+          "title": "Fetched",
+          "type": "integer"
+        },
+        "after_dedupe": {
+          "title": "After Dedupe",
+          "type": "integer"
+        },
+        "in_window": {
+          "title": "In Window",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fetched",
+        "after_dedupe",
+        "in_window"
+      ],
+      "title": "RunCounts",
+      "type": "object"
+    },
+    "RunInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "partial",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "window_start": {
+          "format": "date-time",
+          "title": "Window Start",
+          "type": "string"
+        },
+        "git_sha": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Git Sha"
+        },
+        "counts": {
+          "$ref": "#/$defs/RunCounts"
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "started_at",
+        "finished_at",
+        "window_start",
+        "git_sha",
+        "counts"
+      ],
+      "title": "RunInfo",
+      "type": "object"
+    },
+    "SourceHealth": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "group": {
+          "title": "Group",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "stale",
+            "failed",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "last_success": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Success"
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Error"
+        },
+        "items": {
+          "title": "Items",
+          "type": "integer"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Http Status"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "tier",
+        "group",
+        "status",
+        "last_success",
+        "last_error",
+        "items",
+        "http_status",
+        "error",
+        "note"
+      ],
+      "title": "SourceHealth",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "run": {
+      "$ref": "#/$defs/RunInfo"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceHealth"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/Item"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run",
+    "sources",
+    "items"
+  ],
+  "title": "Run",
+  "type": "object"
+}

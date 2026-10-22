@@ -1,0 +1,82 @@
+# Source registry. Every URL here was found on the source's own site and
+# fetched successfully on the date in verified_on. Never add a guessed URL.
+#
+# Fields:
+#   id, name      stable id used in data files, display name
+#   group         backbone | official | anchor | slovak_press | regional_press | eu_press | analysis | context
+#   tier          A official body, B wire/quality outlet/institute, C GDELT aggregation only
+#   adapter       module in pipeline/adapters
+#   urls          one or more feed URLs (some entries bundle several feeds of one outlet)
+#   lang          ISO 639-1 language of the feed
+#   regions       SK and/or EU
+#   enabled       false turns the source off; give the reason in notes
+#   llm_allowed   false means items from this source are never sent to an LLM
+#   verified_on   date the URLs were last fetched and parsed successfully
+#   notes         anything a maintainer needs to know
+
+sources:
+  - id: gdelt_doc
+    name: GDELT DOC 2.0
+    group: backbone
+    tier: C
+    adapter: gdelt_doc
+    urls: ["https://api.gdeltproject.org/api/v2/doc/doc"]
+    lang: multi
+    regions: [SK, EU]
+    enabled: true
+    llm_allowed: true
+    verified_on: null
+    notes: >-
+      Queries live in keywords.yaml. Max 1 request per 5 s. Returned HTTP 429 to every
+      request from a home connection on 2026-10-22, even 8 s apart; still to be checked
+      from GitHub Actions.
+
+  - id: tasr
+    name: TASR (teraz.sk)
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.teraz.sk/rss/slovensko.rss
+      - https://www.teraz.sk/rss/zahranicie.rss
+    lang: sk
+    regions: [SK, EU]
+    enabled: true
+    llm_allowed: true
+    verified_on: 2026-10-22
+    notes: >-
+      teraz.sk is TASR's public news portal (tasr.sk itself publishes no feed). Each feed
+      holds only the newest 15 items: on 2026-10-22 slovensko covered about 17 h and
+      zahranicie about 3 h, so a twice-daily fetch misses part of the output.
+
+  - id: sme
+    name: SME
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls: ["https://www.sme.sk/rss-title"]
+    lang: sk
+    regions: [SK]
+    enabled: true
+    llm_allowed: false
+    verified_on: 2026-10-22
+    notes: >-
+      Front-page feed, about 22 items. sme.sk/robots.txt sets "Content-signal: ai-input=no",
+      so SME items are classified by keyword rules only and never sent to an LLM. The
+      homepage and rss.sme.sk answer automated requests with a 403 bot check; this feed
+      URL does not.
+
+  - id: europol
+    name: Europol newsroom
+    group: official
+    tier: A
+    adapter: rss
+    urls: ["https://www.europol.europa.eu/rss.xml"]
+    lang: en
+    regions: [SK, EU]
+    enabled: true
+    llm_allowed: true
+    verified_on: 2026-10-22
+    notes: >-
+      Linked from the newsroom footer. Items carry no publication date, so the pipeline
+      dates each one by when it first saw it (published_estimated: true).

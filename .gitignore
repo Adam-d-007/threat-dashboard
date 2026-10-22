@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+web/dist/
+
+# Pipeline working copy of the data branch
+/state/
+
+# Raw GTD download: licence forbids redistribution, only aggregates are committed
+*gtd*.csv
+*gtd*.xlsx
+*GTD*.zip
+
+# Local secrets, never committed
+.env.local
+*.env.local
+
+.DS_Store

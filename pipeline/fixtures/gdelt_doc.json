@@ -1,0 +1,4 @@
+{"articles": [
+ {"url": "https://www.example-news.sk/clanok/fixture-1/amp", "url_mobile": "", "title": "Fixture GDELT article about a security incident", "seendate": "20261022T071500Z", "socialimage": "", "domain": "example-news.sk", "language": "Slovak", "sourcecountry": "Slovakia"},
+ {"url": "https://www.example-news.cz/fixture-2", "url_mobile": "", "title": "Second fixture GDELT article", "seendate": "20261022T051500Z", "socialimage": "", "domain": "example-news.cz", "language": "Klingon", "sourcecountry": "Czech Republic"}
+]}
