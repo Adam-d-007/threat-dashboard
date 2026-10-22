@@ -159,3 +159,44 @@ describe("App with sample scores", () => {
     expect(within(chips).getByText("OCAM/CUTA")).toBeInTheDocument();
   });
 });
+
+
+describe("Phase 5: every panel renders in each special case", () => {
+  const base = sample as unknown as Record<string, any>;
+  const withSK = (patch: Record<string, unknown>) => ({
+    ...base,
+    terrorism: { ...base.terrorism, SK: { ...base.terrorism.SK, ...patch } },
+  });
+
+  it("no events", async () => {
+    mockFetch({ ...base, events: [], items: [] });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("Dashboard indicator")).toBeInTheDocument();
+    expect(screen.getAllByText("No events in this period.").length).toBeGreaterThan(0);
+  });
+
+  it("LLM fallback", async () => {
+    mockFetch(withSK({ llm: { ...base.terrorism.SK.llm, status: "fallback", level: null, drivers: [] } }));
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText(/language model was unavailable/)).toBeInTheDocument();
+  });
+
+  it("disagreement", async () => {
+    mockFetch(withSK({ disagreement: true }));
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText(/disagree by more than one level/)).toBeInTheDocument();
+  });
+
+  it("a failed source", async () => {
+    mockFetch(base);
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText(/1 source failed in this run/)).toBeInTheDocument();
+  });
+
+  it("an official level change", async () => {
+    mockFetch(base);
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("Official level changes")).toBeInTheDocument();
+    expect(screen.getByText(/OCAM\/CUTA: 2 → 3/)).toBeInTheDocument();
+  });
+});
