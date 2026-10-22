@@ -26,7 +26,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 | 5 | A failing source never breaks a run | Done and tested |
 | 6 | No secrets in repo or frontend | Done (gitleaks in CI; keys only as Actions secrets) |
 | 7 | LLM output schema-validated, rules fallback | Done and tested |
-| 8 | Events and organisations, not private individuals | Done: every LLM prompt forbids naming private individuals (added 2026-10-22; cached labels from before expire within 7 days); the SIS summary names nobody. News headlines are shown as their publishers wrote them |
+| 8 | Events and organisations, not private individuals | Dropped by Adam on 2026-10-22, accepting the GDPR risk: the LLM may name people its sources name. The SIS summary names nobody |
 
 ## Phase 1, heartbeat
 
