@@ -7,6 +7,9 @@ from datetime import UTC, datetime
 from .base import FetchError, FetchResult, RawItem, get
 
 MIN_SPACING_S = 5.5
+# GitHub runners share IPs with other GDELT users, so 429s are common: back off 20, 40, 80 s.
+RETRIES = 3
+BACKOFF_S = 20.0
 _last_call = 0.0
 
 # GDELT reports languages by English name.
@@ -23,7 +26,7 @@ def _call(params: dict, url: str) -> dict:
     if wait > 0:
         time.sleep(wait)
     try:
-        r = get(url, params=params, backoff_s=MIN_SPACING_S * 2)
+        r = get(url, params=params, retries=RETRIES, backoff_s=BACKOFF_S)
     finally:
         _last_call = time.monotonic()
     try:

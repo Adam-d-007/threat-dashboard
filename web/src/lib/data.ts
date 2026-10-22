@@ -14,7 +14,11 @@ export function dataBaseUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-/** The most recent run slot at or before `now`, e.g. "2026-10-22T13". Used to bust caches. */
+/**
+ * The most recent run slot at or before `now`, e.g. "2026-10-22T13". Sent as ?v= so the
+ * browser's own cache misses after each run. raw.githubusercontent.com's CDN ignores query
+ * strings (checked 2026-10-22), so new data can still take up to its 5-minute max-age to appear.
+ */
 export function slotKey(now: Date): string {
   const candidates: Date[] = [];
   for (const dayOffset of [0, -1]) {
