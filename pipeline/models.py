@@ -173,6 +173,10 @@ class RegionAssessment(Strict):
     region: Region
     level: Level
     index: int = Field(ge=0, le=100)
+    provisional: bool = Field(default=False, description="True while the event history is "
+                              "shorter than two weeks: computed and recorded, but not shown "
+                              "as a level")
+    available_from: date | None = None
     index_prev: int | None = None
     level_prev: Level | None = None
     rules_level: Level

@@ -23,7 +23,9 @@ function regionEvents(events: Event[], region: Region): Event[] {
 
 export function TerrorismPage({ run, region, timeseries }: { run: Run; region: Region; timeseries: Timeseries | null }) {
   const { t } = useLang();
-  const assess = run.terrorism?.[region] ?? null;
+  // A provisional score (less than two weeks of history) is recorded but never shown as a level.
+  const raw = run.terrorism?.[region] ?? null;
+  const assess = raw && !raw.provisional ? raw : null;
   const sis = run.anchors.find((a) => a.id === "anchor_sk_sis") ?? null;
   const events = regionEvents(run.events, region);
   const failing = run.sources.filter((s) => s.status === "failed" || s.status === "stale").length;
@@ -62,7 +64,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         </div>
 
         <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
-          {assess ? <IndicatorCard a={assess} /> : <NotComputedCard />}
+          {assess ? <IndicatorCard a={assess} /> : <NotComputedCard availableFrom={raw?.available_from ?? null} />}
           <OfficialCard region={region} sis={sis} />
         </div>
 
@@ -163,13 +165,15 @@ function IndicatorCard({ a }: { a: RegionAssessment }) {
   );
 }
 
-function NotComputedCard() {
-  const { t } = useLang();
+function NotComputedCard({ availableFrom }: { availableFrom: string | null }) {
+  const { t, locale } = useLang();
   return (
     <div className="rounded-2xl border border-dashed border-line bg-surface p-5 sm:p-6">
       <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">{t.indicator}</p>
-      <p className="text-xl font-semibold">{t.notComputedTitle}</p>
-      <p className="mt-2 text-sm text-ink-2">{t.notComputedBody}</p>
+      <p className="text-xl font-semibold">{availableFrom ? t.warmingTitle : t.notComputedTitle}</p>
+      <p className="mt-2 text-sm text-ink-2">
+        {availableFrom ? t.warmingBody(fmtDate(availableFrom, locale)) : t.notComputedBody}
+      </p>
     </div>
   );
 }

@@ -1361,6 +1361,25 @@
           "title": "Index",
           "type": "integer"
         },
+        "provisional": {
+          "default": false,
+          "description": "True while the event history is shorter than two weeks: computed and recorded, but not shown as a level",
+          "title": "Provisional",
+          "type": "boolean"
+        },
+        "available_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Available From"
+        },
         "index_prev": {
           "anyOf": [
             {
@@ -1446,6 +1465,8 @@
         "region",
         "level",
         "index",
+        "provisional",
+        "available_from",
         "index_prev",
         "level_prev",
         "rules_level",

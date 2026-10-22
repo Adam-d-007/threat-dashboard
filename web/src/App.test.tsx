@@ -123,6 +123,22 @@ describe("App with real data and no scores yet", () => {
   });
 });
 
+describe("App with a provisional score", () => {
+  it("shows the warming-up card and no level until two weeks of history exist", async () => {
+    const terrorism = {
+      SK: { ...sample.terrorism.SK, provisional: true, available_from: "2026-11-05" },
+      EU: { ...sample.terrorism.EU, provisional: true, available_from: "2026-11-05" },
+    };
+    mockFetch({ ...realRun, terrorism });
+    renderAt("2026-10-22T13:00:00Z");
+    expect(await screen.findByText("The indicator is warming up")).toBeInTheDocument();
+    expect(screen.getByText(/expected on 5 Nov 2026/)).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard indicator")).toBeInTheDocument(); // card label only
+    expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
+    expect(screen.queryByText("What makes up the index")).not.toBeInTheDocument();
+  });
+});
+
 describe("App with sample scores", () => {
   it("labels sample data on the page and shows level, index and components", async () => {
     mockFetch(sample);

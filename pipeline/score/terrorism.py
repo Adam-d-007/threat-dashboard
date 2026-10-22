@@ -3,7 +3,7 @@ smoothing. One RegionAssessment and one timeseries row per region per run."""
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from pydantic import ValidationError
 
@@ -86,7 +86,7 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     contribs = event_contributions(events, region, now, cfg)
     window = (now - timedelta(days=cfg["events"]["baseline_days"])).isoformat()
     region_rows = [r for r in rows if r["region"] == region]
-    history = [r["components"]["events_raw"] for r in region_rows
+    history = [(r["at"], r["components"]["events_raw"]) for r in region_rows
                if r["at"] >= window and r["components"].get("events_raw") is not None]
     e_comp = events_component(contribs, history, region, cfg)
     m_comp = media_component(baselines, region, now, cfg)
@@ -142,8 +142,15 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
                                      checked_at=sis.as_of, url=sis.url,
                                      label_sk="zvýšený stupeň ohrozenia" if sis.level == 2
                                      else None)
+    # Until E has its two weeks of history the level is not meaningful (the 30-day gates and
+    # the LLM both see only the first days of events), so it is provisional and not shown.
+    first = min((r["at"] for r in region_rows), default=now.isoformat())[:10]
+    provisional = e_comp.value is None
     assessment = RegionAssessment(
-        region=region, level=level, index=index,
+        region=region, level=level, index=index, provisional=provisional,
+        available_from=(date.fromisoformat(first)
+                        + timedelta(days=cfg["events"]["min_history_days"]))
+        if provisional else None,
         index_prev=prev["index"] if prev else None, level_prev=prev["level"] if prev else None,
         rules_level=rules_level, components=[e_comp, m_comp, a_comp, l_comp], gates=shown,
         llm=llm, disagreement=disagreement, official=official,

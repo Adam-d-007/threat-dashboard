@@ -103,9 +103,16 @@ This happens when:
 
 - **the language model fails** (the page says so), and
 - **E or M is warming up.** Both compare today with their own history, and that history only
-  starts with the first live runs (22 October 2026). Until E has 28 runs (14 days) and M has 14
-  complete days, they are shown as "warming up" and left out. Showing them earlier would compare
-  today with a baseline that does not exist yet.
+  starts with the first live runs (22 October 2026). Until E has 14 distinct days of history and
+  M has 14 complete days, they are shown as "warming up" and left out. Showing them earlier would
+  compare today with a baseline that does not exist yet.
+
+**The whole indicator is provisional while E warms up.** The first live run showed why: with
+only a few hours of events, the language model judged the evidence thin and the 30-day attack
+floor had nothing to fire on, so the EU came out at level 1, which Europol's 45 attacks in 2025
+contradict. For the first 14 days the scores are computed and recorded, but the page shows
+"warming up" with the expected date, not a level. History is counted in days, not runs, so a
+burst of manual runs cannot shorten it.
 
 If no component has a value at all, the page shows no level, rather than an invented one.
 

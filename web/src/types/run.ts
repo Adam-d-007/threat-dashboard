@@ -213,6 +213,11 @@ export type Url3 = string;
 export type Region1 = "SK" | "EU";
 export type Level3 = 1 | 2 | 3 | 4;
 export type Index = number;
+/**
+ * True while the event history is shorter than two weeks: computed and recorded, but not shown as a level
+ */
+export type Provisional = boolean;
+export type AvailableFrom = string | null;
 export type IndexPrev = number | null;
 export type LevelPrev = (1 | 2 | 3 | 4) | null;
 export type RulesLevel = 1 | 2 | 3 | 4;
@@ -592,6 +597,8 @@ export interface RegionAssessment {
   region: Region1;
   level: Level3;
   index: Index;
+  provisional: Provisional;
+  available_from: AvailableFrom;
   index_prev: IndexPrev;
   level_prev: LevelPrev;
   rules_level: RulesLevel;

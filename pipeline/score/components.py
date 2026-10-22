@@ -57,19 +57,21 @@ def event_contributions(events: list[Event], region: str, now: datetime,
     return sorted(out, key=lambda x: -x[1])
 
 
-def events_component(contribs: list[tuple[Event, float]], history: list[float], region: str,
-                     cfg: dict) -> Component:
-    """history: E_raw of earlier runs in the 180-day baseline window."""
+def events_component(contribs: list[tuple[Event, float]], history: list[tuple[str, float]],
+                     region: str, cfg: dict) -> Component:
+    """history: (run time, E_raw) of earlier runs in the 180-day baseline window. Warm-up counts
+    distinct days, so a burst of manual runs cannot fake two weeks of history."""
     ec = cfg["events"]
     raw = round(sum(w for _, w in contribs), 3)
-    inputs: dict = {"weighted_sum": raw, "events": len(contribs), "history_runs": len(history),
+    days = len({at[:10] for at, _ in history})
+    inputs: dict = {"weighted_sum": raw, "events": len(contribs), "history_days": days,
                     "floor": ec["floor"][region]}
     ids = [e.id for e, _ in contribs[:10]]
-    if len(history) < ec["min_history_runs"]:
+    if days < ec["min_history_days"]:
         inputs["status"] = "warming_up"
         return Component(id="events", weight=cfg["weights"]["events"], value=None,
                          inputs=inputs, event_ids=ids)
-    base = median(history)
+    base = median(v for _, v in history)
     r = raw / max(base, ec["floor"][region])
     inputs |= {"baseline_median": round(base, 3), "ratio": round(r, 3)}
     return Component(id="events", weight=cfg["weights"]["events"],

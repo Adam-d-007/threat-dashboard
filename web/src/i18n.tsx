@@ -31,6 +31,9 @@ const en = {
   noChange: "no change since last run",
   anchors: "Official levels elsewhere",
   notComputedTitle: "The indicator is not computed yet",
+  warmingTitle: "The indicator is warming up",
+  warmingBody: (d: string) =>
+    `It compares today with the normal level of the last weeks, and that history started recently. The first indicator is expected on ${d}. Until then this page shows the official level, incidents and reports only, never an estimate.`,
   notComputedBody:
     "Scoring is still being built. Until it runs, this page shows the official level and the latest reports only, never an estimate.",
   sampleBanner:
@@ -226,6 +229,9 @@ const sk: Strings = {
   noChange: "bez zmeny od poslednej aktualizácie",
   anchors: "Oficiálne úrovne v iných krajinách",
   notComputedTitle: "Ukazovateľ sa zatiaľ nepočíta",
+  warmingTitle: "Ukazovateľ sa zbieha",
+  warmingBody: (d: string) =>
+    `Porovnáva dnešok s bežnou úrovňou posledných týždňov a táto história sa začala zbierať len nedávno. Prvý ukazovateľ očakávame ${d}. Dovtedy táto stránka zobrazuje len oficiálnu úroveň, incidenty a správy, nikdy odhad.`,
   notComputedBody:
     "Hodnotenie je ešte vo vývoji. Kým nebude spustené, táto stránka zobrazuje len oficiálnu úroveň a najnovšie správy, nikdy odhad.",
   sampleBanner:

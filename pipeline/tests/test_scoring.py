@@ -128,6 +128,17 @@ def quiet_events(now):
     return evs + [ev("FR", sev=3, days_ago=18, now=now, eid=f"qfr{now:%m%d}")]
 
 
+def test_indicator_is_provisional_until_two_weeks_of_history():
+    rows, state = [], {"regions": {}, "anchor_history": {}}
+    a, row = score_region("SK", "r0", quiet_events(NOW), ANCHORS, {}, rows, state, None, NOW, CFG, 0)
+    assert a.provisional and a.available_from == (NOW + timedelta(days=14)).date()
+    # Thirty runs on the same day are still one day of history.
+    for n in range(30):
+        rows.append(row | {"run_id": f"r{n}"})
+    a2, _ = score_region("SK", "r9", quiet_events(NOW), ANCHORS, {}, rows, state, None, NOW, CFG, 0)
+    assert a2.provisional
+
+
 def simulate(incident_days: int, incident=None, quiet_days=30):
     """Run scoring twice a day: quiet_days of quiet, then the incident on its day. Returns
     the scoring per run for each region: [(run time, assessment)]."""

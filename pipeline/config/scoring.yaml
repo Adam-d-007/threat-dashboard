@@ -31,7 +31,8 @@ events:
   corroboration: {corroborated: 1.0, B: 0.6, C: 0.3}
   baseline_days: 180        # median of E_raw over the runs in this window
   floor: {SK: 1.0, EU: 4.0}
-  min_history_runs: 28      # 14 days; until then E is "warming up" and left out of P
+  min_history_days: 14      # distinct days of E history; until then E is "warming up" and the
+                            # whole indicator is provisional (not shown as a level)
 
 media:
   theme: TERROR             # GDELT GKG theme counted
