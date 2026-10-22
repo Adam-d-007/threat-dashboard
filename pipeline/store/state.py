@@ -74,3 +74,37 @@ def write_acled(state_dir: Path, records: list[dict], now: datetime) -> None:
     events. Called only after a successful fetch, so a failure keeps the previous file."""
     _write(state_dir / "acled.json", {"schema_version": 1, "fetched_at": now.isoformat(),
                                       "events": records})
+
+
+BASELINE_DAYS = 120
+PROCESSED_KEEP = 4 * 24 * 4  # four days of 15-minute GKG file stamps
+
+
+def load_baselines(state_dir: Path) -> dict:
+    return _read(state_dir / "baselines.json") or {"schema_version": 1,
+                                                   "gkg": {"processed": [], "daily": {}}}
+
+
+def merge_gkg(baselines: dict, records: list[dict], now: datetime) -> dict:
+    """Add per-file counts to the daily totals, once per file; prune to 120 days."""
+    gkg = baselines["gkg"]
+    done = set(gkg["processed"])
+    for rec in records:
+        if rec["file"] in done:
+            continue
+        done.add(rec["file"])
+        for day, themes in rec["counts"].items():
+            d = gkg["daily"].setdefault(day, {})
+            for theme, countries in themes.items():
+                t = d.setdefault(theme, {})
+                for cc, n in countries.items():
+                    t[cc] = t.get(cc, 0) + n
+    cutoff = (now - timedelta(days=BASELINE_DAYS)).strftime("%Y-%m-%d")
+    gkg["daily"] = {k: v for k, v in sorted(gkg["daily"].items()) if k >= cutoff}
+    gkg["processed"] = sorted(done)[-PROCESSED_KEEP:]
+    baselines["updated_at"] = now.isoformat()
+    return baselines
+
+
+def write_baselines(state_dir: Path, baselines: dict) -> None:
+    _write(state_dir / "baselines.json", baselines)

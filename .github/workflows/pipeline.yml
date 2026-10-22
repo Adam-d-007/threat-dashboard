@@ -3,6 +3,10 @@ name: pipeline
 on:
   schedule:
     - cron: "5 4,13 * * *" # 04:05 and 13:05 UTC; the offset avoids the top-of-hour peak
+    # Backups: GitHub may delay or drop scheduled runs under load. A backup exits at once
+    # when its slot already has a run (--skip-if-slot-done), so it never runs twice.
+    - cron: "35 4,13 * * *"
+    - cron: "5 5,14 * * *"
   workflow_dispatch:
 
 permissions:
@@ -34,11 +38,13 @@ jobs:
           # Empty until Adam adds them; the acled source stays disabled until then.
           ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
           ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
+          RELIEFWEB_APPNAME: ${{ vars.RELIEFWEB_APPNAME }}
         run: |
           slot=""
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            # A delayed scheduled run still gets its slot's id.
+            # A delayed or backup run still gets its slot's id, and skips a slot already done.
             if [ "$(date -u +%H)" -lt 13 ]; then slot="--slot 04"; else slot="--slot 13"; fi
+            slot="$slot --skip-if-slot-done"
           fi
           uv run python -m pipeline.main --state-dir state --git-sha "${{ github.sha }}" \
             --commit-msg-file "$RUNNER_TEMP/commit_msg.txt" $slot

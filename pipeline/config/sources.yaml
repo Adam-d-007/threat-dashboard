@@ -683,9 +683,16 @@ sources:
     regions: [EU]
     enabled: false
     verified_on: null
+    reliefweb:
+      limit: 100
+      # Ukraine, Russia; Israel, Palestine, Lebanon, Syria, Iran, Iraq, Jordan, Yemen;
+      # Serbia, Bosnia and Herzegovina, Montenegro, North Macedonia, Albania, Kosovo
+      countries: [UKR, RUS, ISR, PSE, LBN, SYR, IRN, IRQ, JOR, YEM, SRB, BIH, MNE, MKD, ALB, XKX]
     notes: >-
-      Waiting for an approved appname (Google form linked from apidoc.reliefweb.int); unapproved
-      names get HTTP 403. Adapter not written until the API can be called.
+      appname requested by Adam on 2026-10-22 (form linked from apidoc.reliefweb.int). To switch
+      on: add the approved name as the Actions variable RELIEFWEB_APPNAME, then set enabled: true.
+      The adapter follows ReliefWeb's documentation but has not been run against the API yet;
+      Kosovo's code (XKX) is unverified.
 
   - id: gdelt_gkg
     name: GDELT 2.0 GKG files
@@ -695,8 +702,23 @@ sources:
     urls: ["https://data.gdeltproject.org/gdeltv2/lastupdate.txt"]
     lang: multi
     regions: [SK, EU]
-    enabled: false
+    enabled: true
     verified_on: 2026-10-22
+    gkg:
+      max_hours: 16          # runs are at most 15 h apart; about 5 s per file
+      themes: [TERROR, ARMEDCONFLICT, SECURITY_SERVICES, MILITARY, PROTEST, CYBER_ATTACK,
+               KILL, ARREST, EXTREMISM, SURVEILLANCE, BORDER, REBELLION]
+      # GDELT FIPS code -> ISO 3166-1 alpha-2, checked against GDELT's LOOKUP-COUNTRIES.TXT
+      # on 2026-10-22 (it still labels LO, Slovakia, "Czechoslovakia").
+      countries: {AU: AT, BE: BE, BU: BG, HR: HR, CY: CY, EZ: CZ, DA: DK, EN: EE, FI: FI,
+                  FR: FR, GM: DE, GR: GR, HU: HU, EI: IE, IT: IT, LG: LV, LH: LT, LU: LU,
+                  MT: MT, NL: NL, PL: PL, PO: PT, RO: RO, LO: SK, SI: SI, SP: ES, SW: SE,
+                  UK: GB, UP: UA, RS: RU, BO: BY, MD: MD, RI: RS, BK: BA, MJ: ME, MK: MK,
+                  AL: AL, KV: XK, TU: TR, IS: IL, LE: LB, SY: SY, IR: IR, IZ: IQ, GZ: PS,
+                  WE: PS}
+      eu: [AT, BE, BG, HR, CY, CZ, DK, EE, FI, FR, DE, GR, HU, IE, IT, LV, LT, LU, MT, NL,
+           PL, PT, RO, SK, SI, ES, SE]
     notes: >-
-      Theme and location counts for the media baselines. About 200 MB per 12 h of files. Built
-      with the scoring in Phase 4, which is the only consumer.
+      Daily article counts per theme and country, kept 120 days in baselines.json, for the
+      media baselines. Each run reads only the 15-minute files it has not processed yet
+      (about 4 MB each). Themes checked against LOOKUP-GKGTHEMES.TXT on 2026-10-22.

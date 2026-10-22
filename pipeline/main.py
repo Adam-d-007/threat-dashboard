@@ -16,8 +16,8 @@ import yaml
 from pydantic import ValidationError
 
 from . import anchors as anchor_reader
-from .adapters import acled, gdelt_doc, html_scrape, json_api, rss
-from .adapters.base import FetchResult
+from .adapters import acled, gdelt_doc, gdelt_gkg, html_scrape, json_api, reliefweb, rss
+from .adapters.base import FetchError, FetchResult
 from .health import run_status, source_health
 from .models import (
     SCHEMA_VERSION,
@@ -71,6 +71,8 @@ def fetch_all(sources: list[dict], queries: list[dict], since: datetime, now: da
             return json_api.fetch(src)
         if src["adapter"] == "acled":
             return acled.fetch(src, now)
+        if src["adapter"] == "reliefweb":
+            return reliefweb.fetch(src, since)
         raise ValueError(f"unknown adapter {src['adapter']!r} for {src['id']}")
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -164,6 +166,19 @@ def load_tesat() -> Tesat | None:
                  previous=TesatYear(**prev) if prev else None)
 
 
+def run_gkg(src: dict, baselines: dict, now: datetime) -> FetchResult:
+    """Read new GKG files into baselines (in place). Missing files make the source failed only
+    when nothing could be read at all."""
+    try:
+        records, missing, error = gdelt_gkg.fetch(src, set(baselines["gkg"]["processed"]))
+    except FetchError as e:
+        return FetchResult(source_id=src["id"], ok=False, error=str(e))
+    state.merge_gkg(baselines, records, now)
+    log.info("gdelt_gkg  files=%d missing=%d", len(records), len(missing))
+    return FetchResult(source_id=src["id"], ok=bool(records) or not missing,
+                       error=error, http_status=200)
+
+
 def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
     """Fixture runs make no network calls, so they carry the previous anchors forward."""
     return [AnchorReading.model_validate(a) for a in previous]
@@ -181,18 +196,30 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--state-dir", type=Path, default=Path("state"))
     p.add_argument("--git-sha")
     p.add_argument("--commit-msg-file", type=Path)
+    p.add_argument("--skip-if-slot-done", action="store_true",
+                   help="exit without writing when this slot already has a successful run "
+                        "(backup cron entries use this, because GitHub can drop scheduled runs)")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     started = FIXTURE_NOW if args.fixtures else datetime.now(UTC).replace(microsecond=0)
     prev = state.load(args.state_dir)
+    this_run = run_id(started, args.slot)
+    if args.skip_if_slot_done and prev["latest"] and prev["latest"]["run"]["id"] == this_run:
+        log.info("slot %s already has a %s run; nothing to do", this_run,
+                 prev["latest"]["run"]["status"])
+        return 0
     since = window_start(prev["latest"], started)
     sources, queries = load_config()
-    enabled = [s for s in sources if s["enabled"]]
+    enabled = [s for s in sources if s["enabled"] and s["adapter"] != "gdelt_gkg"]
+    gkg_src = next((s for s in sources if s["enabled"] and s["adapter"] == "gdelt_gkg"), None)
     log.info("run %s window from %s, %d sources enabled",
              run_id(started, args.slot), since.isoformat(), len(enabled))
 
     results = fetch_all(enabled, queries, since, started, args.fixtures)
+    baselines = state.load_baselines(args.state_dir)
+    if gkg_src and not args.fixtures:
+        results[gkg_src["id"]] = run_gkg(gkg_src, baselines, started)
     prev_anchors = (prev["latest"] or {}).get("anchors", [])
     anchors = prev_anchors_as_models(prev_anchors) if args.fixtures else \
         anchor_reader.read_all(prev_anchors, started)
@@ -231,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         state.write(args.state_dir, run, seen, finished)
+        if gkg_src and not args.fixtures:
+            state.write_baselines(args.state_dir, baselines)
         if (res := results.get("acled")) and res.ok:
             state.write_acled(args.state_dir, res.records, finished)
     except ValidationError:

@@ -6,7 +6,17 @@ import pytest
 
 from pipeline import anchors, collect
 from pipeline import main as pipeline_main
-from pipeline.adapters import acled, base, dates, gdelt_doc, html_scrape, json_api, rss
+from pipeline.adapters import (
+    acled,
+    base,
+    dates,
+    gdelt_doc,
+    gdelt_gkg,
+    html_scrape,
+    json_api,
+    reliefweb,
+    rss,
+)
 from pipeline.adapters.base import FetchError, FetchResult, RawItem
 from pipeline.health import run_status, source_health
 from pipeline.main import FIXTURE_NOW, FIXTURES, window_start
@@ -471,3 +481,100 @@ def test_manual_anchor_dated_by_entry_and_goes_stale():
     assert fresh.status == "ok" and fresh.manual and fresh.as_of == datetime(2026, 10, 22, tzinfo=UTC)
     later = anchors._read_one(cfg, NOW + timedelta(days=181), entry)
     assert later.status == "stale" and "entered by hand on 2026-10-22" in later.error
+
+
+def test_backup_run_skips_a_slot_already_done(tmp_path):
+    pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path)])
+    first = (tmp_path / "latest.json").read_text()
+    msg = tmp_path / "msg.txt"
+    assert pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path), "--skip-if-slot-done",
+                               "--commit-msg-file", str(msg)]) == 0
+    assert (tmp_path / "latest.json").read_text() == first and not msg.exists()
+
+
+# --- GDELT GKG -------------------------------------------------------------------------
+
+def _gkg_zip(rows):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        lines = []
+        for date, themes, locs in rows:
+            cols = [""] * 27
+            cols[1], cols[8], cols[10] = date, themes, locs
+            lines.append("\t".join(cols))
+        z.writestr("x.gkg.csv", "\n".join(lines))
+    return buf.getvalue()
+
+
+def test_gkg_counts_each_article_once_per_theme_and_country():
+    raw = _gkg_zip([
+        ("20261022091500", "TERROR,10;TERROR,99;KILL,5;TAX_X,1",
+         "1#Slovakia#LO#LO#...#48.6#19.6#LO#5;4#Vienna, Austria#AU#AU09#...#48.2#16.3#-1#9"),
+        ("20261022091500", "PROTEST,3", "1#Germany#GM#GM#...#51#9#GM#2"),
+        ("20261022091500", "TAX_ONLY,1", "1#France#FR#FR#...#46#2#FR#1"),  # no listed theme
+    ])
+    c = gdelt_gkg.count_file(raw, {"TERROR", "KILL", "PROTEST"}, {"LO": "SK", "AU": "AT", "GM": "DE"},
+                             {"SK", "AT", "DE"})["2026-10-22"]
+    assert c["TERROR"] == {"SK": 1, "AT": 1, "EU": 1, "ALL": 1}  # theme listed twice, counted once
+    assert c["PROTEST"] == {"DE": 1, "EU": 1, "ALL": 1}
+    assert "TAX_ONLY" not in c
+
+
+def test_gkg_pending_files_stop_at_processed():
+    newest = datetime(2026, 10, 22, 10, 0, tzinfo=UTC)
+    done = {"20261022093000"}
+    assert gdelt_gkg.pending_files(newest, done, timedelta(hours=16)) == ["20261022094500", "20261022100000"]
+    assert len(gdelt_gkg.pending_files(newest, set(), timedelta(hours=1))) == 4
+
+
+def test_merge_gkg_is_idempotent_and_prunes():
+    from pipeline.store import state
+    rec = {"file": "20261022091500", "counts": {"2026-10-22": {"TERROR": {"SK": 2}},
+                                                "2026-05-01": {"TERROR": {"SK": 9}}}}
+    b = state.merge_gkg({"schema_version": 1, "gkg": {"processed": [], "daily": {}}}, [rec], NOW)
+    b = state.merge_gkg(b, [rec], NOW)
+    assert b["gkg"]["daily"] == {"2026-10-22": {"TERROR": {"SK": 2}}}  # once; May pruned (>120 d)
+
+
+# --- ReliefWeb -------------------------------------------------------------------------
+
+RW_SRC = {"id": "reliefweb", "urls": ["https://api.reliefweb.int/v2/reports"],
+          "reliefweb": {"limit": 100, "countries": ["UKR"]}}
+
+
+def test_reliefweb_needs_appname(monkeypatch):
+    monkeypatch.delenv("RELIEFWEB_APPNAME", raising=False)
+    res = reliefweb.fetch(RW_SRC, NOW)
+    assert not res.ok and "RELIEFWEB_APPNAME" in res.error
+
+
+def test_reliefweb_posts_query_and_parses(monkeypatch):
+    monkeypatch.setenv("RELIEFWEB_APPNAME", "MCSlovakia-threatresearch-x")
+    seen = {}
+
+    def fake_post(url, params=None, json=None, **kw):
+        seen.update(params=params, json=json)
+        body = {"count": 1, "data": [{"id": 1, "href": "h", "fields": {
+            "title": "Ukraine: Flash Update", "url": "https://reliefweb.int/report/ukraine/x",
+            "date": {"created": "2026-10-22T08:00:00+00:00"},
+            "primary_country": {"name": "Ukraine", "iso3": "ukr"},
+            "source": [{"name": "OCHA"}]}}]}
+        return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    res = reliefweb.fetch(RW_SRC, NOW - timedelta(hours=12))
+    assert res.ok and res.items[0].title == "Ukraine: Flash Update"
+    assert res.items[0].snippet == "Ukraine · OCHA" and res.items[0].published_at.hour == 8
+    assert seen["params"] == {"appname": "MCSlovakia-threatresearch-x"}
+    assert seen["json"]["filter"]["conditions"][1]["value"] == ["UKR"]
+
+
+def test_reliefweb_unapproved_name_is_a_clear_failure(monkeypatch):
+    monkeypatch.setenv("RELIEFWEB_APPNAME", "x")
+    monkeypatch.setattr(httpx, "post", lambda url, **kw: httpx.Response(
+        403, text='{"error":{"message":"You are not using an approved appname."}}',
+        request=httpx.Request("POST", url)))
+    res = reliefweb.fetch(RW_SRC, NOW)
+    assert not res.ok and res.http_status == 403 and "approved appname" in res.error
