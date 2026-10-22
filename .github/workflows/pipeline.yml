@@ -25,7 +25,7 @@ jobs:
           ref: data
           path: state
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
 
       - run: uv sync --frozen --no-dev
 
