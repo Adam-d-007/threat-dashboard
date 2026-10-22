@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Sparkline } from "../charts/Sparkline";
 import { ArticleLink, Banner, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { Item, Run, Theatre } from "../types/run";
 import { LatestReports } from "./LatestReports";
+
+const ReportMap = lazy(() => import("../map/ReportMap"));
 
 // f(1) = 0.375 is a normal day on the shared curve; f(0.5) ≈ 0.21 and f(2) ≈ 0.61.
 const NORMAL = 0.375;
@@ -55,6 +57,8 @@ export function GeopoliticsPage({ run }: { run: Run }) {
             </div>
           </section>
 
+          <TheatreMap theatres={g.theatres} items={run.items} />
+
           {g.watchlist.length > 0 && (
             <Card title={t.watchlist}>
               <ul className="divide-y divide-line">
@@ -73,6 +77,48 @@ export function GeopoliticsPage({ run }: { run: Run }) {
         </>
       )}
     </div>
+  );
+}
+
+/** Reports with a named place, outside terrorism (which has its own map), filtered to one
+ * theatre: a report belongs to every theatre whose countries it names. */
+function TheatreMap({ theatres, items }: { theatres: Theatre[]; items: Item[] }) {
+  const { t, pick } = useLang();
+  const [id, setId] = useState("");
+  const placed = items.filter(
+    (i) => i.classification?.relevant && i.classification.domain !== "terrorism" && i.classification.places.length > 0,
+  );
+  // Runs written before theatres carried their countries have none; the picker then hides.
+  const pickable = theatres.filter((th) => (th.countries ?? []).length > 0);
+  const theatre = pickable.find((th) => th.id === id);
+  const shown = theatre
+    ? placed.filter((i) => i.classification!.countries.some((c) => theatre.countries.includes(c)))
+    : placed;
+  return (
+    <Card title={t.geoMap.title}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        {pickable.length > 0 && (
+          <select
+            aria-label={t.geoMap.pick}
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-sm text-ink"
+          >
+            <option value="">{t.geoMap.all}</option>
+            {pickable.map((th) => (
+              <option key={th.id} value={th.id}>
+                {pick(th.name_en, th.name_sk)}
+              </option>
+            ))}
+          </select>
+        )}
+        <span className="text-sm text-ink-2">{t.geoMap.count(shown.length)}</span>
+      </div>
+      <Suspense fallback={<div className="h-80 rounded-lg bg-surface-2 sm:h-96" />}>
+        <ReportMap items={shown} />
+      </Suspense>
+      <p className="mt-2 text-xs text-muted">{t.geoMap.note}</p>
+    </Card>
   );
 }
 

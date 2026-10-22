@@ -130,10 +130,20 @@ def watchlist(path, out: BriefOut | None, known: set[str], now: datetime) -> lis
     return sorted(entries, key=lambda e: e.date)[:15]
 
 
+def theatre_countries(config_dir) -> dict[str, list[str]]:
+    """Theatre id -> its ISO countries, with EU expanded to the member states listed for GKG."""
+    sources = yaml.safe_load((config_dir / "sources.yaml").read_text())["sources"]
+    eu = next(s["gkg"]["eu"] for s in sources if s["adapter"] == "gdelt_gkg")
+    theatres = yaml.safe_load((config_dir / "theatres.yaml").read_text())["theatres"]
+    return {t["id"]: sorted({m for c in t["activity"]["countries"]
+                             for m in (eu if c == "EU" else [c])}) for t in theatres}
+
+
 def build(items: list[Item], prev_items: list[dict], prev_brief: list[str], baselines: dict,
           client: LlmClient | None, now: datetime, cfg: dict, config_dir, call_limit: int,
           ) -> Geopolitics:
     theatres_cfg = yaml.safe_load((config_dir / "theatres.yaml").read_text())["theatres"]
+    countries = theatre_countries(config_dir)
     pool = [i for i in items if i.classification and i.classification.relevant]
     out = write_brief(pool, theatres_cfg, prev_brief, client, now, call_limit)
     known = {i.id for i in pool} | {p["id"] for p in prev_items}
@@ -144,6 +154,7 @@ def build(items: list[Item], prev_items: list[dict], prev_brief: list[str], base
         got = by_theatre.get(t["id"])
         theatres.append(Theatre(
             id=t["id"], name_en=t["name_en"], name_sk=t["name_sk"], activity=act,
+            countries=countries[t["id"]],
             tone=tone(baselines, t["activity"], now, cfg), sparkline=spark,
             top_items=[TopItem(item_id=x.item_id, summary_en=x.summary_en,
                                summary_sk=x.summary_sk)

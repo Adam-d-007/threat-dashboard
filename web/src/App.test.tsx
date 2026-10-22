@@ -186,6 +186,15 @@ describe("Phase 5: every panel renders in each special case", () => {
     expect(screen.getByText("TE-SAT 2026, EU 2025 (486)")).toBeInTheDocument();
   });
 
+  it("filters the geopolitics map by theatre", async () => {
+    window.location.hash = "#geopolitics";
+    mockFetch(base);
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("8 reports with a place")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Theatre" }), "middle_east");
+    expect(screen.getByText("1 report with a place")).toBeInTheDocument();
+  });
+
   it("no events", async () => {
     mockFetch({ ...base, events: [], items: [] });
     renderAt("2026-10-22T14:00:00Z");

@@ -878,6 +878,8 @@ def test_brief_drops_lines_and_items_citing_unknown_ids(tmp_path):
     assert [x.text_en for x in geo.brief.lines] == ["Real line"]
     eu = next(t for t in geo.theatres if t.id == "eu_defence")
     assert [x.item_id for x in eu.top_items] == ["1"]
+    assert len(eu.countries) == 27 and "SK" in eu.countries
+    assert next(t for t in geo.theatres if t.id == "russia_ukraine").countries == ["RU", "UA"]
     news = [w for w in geo.watchlist if w.origin == "news"]
     assert [w.title_en for w in news] == ["Summit"] and not news[0].verified
 

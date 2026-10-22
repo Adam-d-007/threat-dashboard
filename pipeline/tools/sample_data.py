@@ -48,6 +48,7 @@ from ..models import (
     ValueChange,
     WatchlistEntry,
 )
+from ..score.geopolitics import theatre_countries
 
 NOW = datetime(2026, 10, 22, 13, 9, tzinfo=UTC)
 CONFIG = Path(__file__).parents[1] / "config"
@@ -96,6 +97,19 @@ EVENTS = [
      "Nefunkčné výbušné zariadenie nájdené pri maďarskej vládnej budove",
      "attempted_attack", "unknown", 2, 27, "HU", "Budapest", 47.497, 19.040, "indirect",
      ["telex.hu", "index.hu"], False),
+]
+
+# Geopolitics reports with a place, for the map: (title_en, domain, country, place, lat, lon)
+GEO_ITEMS = [
+    ("Drone strikes hit energy sites near Kharkiv", "geopolitics", "UA", "Kharkiv", 49.993,
+     36.231),
+    ("EU foreign ministers agree a new sanctions package in Brussels", "geopolitics", "BE",
+     "Brussels", 50.850, 4.352),
+    ("Slovak defence minister meets NATO counterparts in Bratislava", "geopolitics", "SK",
+     "Bratislava", 48.148, 17.107),
+    ("Cyber attack disrupts a Czech hospital network", "cyber", "CZ", "Prague", 50.088, 14.421),
+    ("Protests in Belgrade over election results", "unrest", "RS", "Belgrade", 44.787, 20.457),
+    ("Strikes reported in southern Lebanon", "geopolitics", "LB", "Tyre", 33.271, 35.196),
 ]
 
 THEATRES = [
@@ -153,6 +167,17 @@ def _events_and_items() -> tuple[list[Event], list[Item]]:
             severity=sev, date=when.date(), country=cc, place=p, sk_link=link,
             item_ids=item_ids, domains=domains, has_tier_a=tier_a,
             corroborated=tier_a or len(domains) >= 2, first_seen=when, last_updated=NOW))
+    for n, (t_en, dom, cc, place, lat, lon) in enumerate(GEO_ITEMS):
+        when = NOW - timedelta(hours=2 + n)
+        items.append(Item(
+            id=f"geo_s{n}", source_id="tasr", tier="B", url="", title=en(t_en), lang="en",
+            published_at=when, fetched_at=when + timedelta(minutes=30),
+            snippet="Sample item for frontend development. Not real.", domain="tasr.sk",
+            classification=Classification(
+                status="llm", relevant=True, domain=dom, event_type="other",
+                ideology="unknown", severity=0, sk_link="none", countries=[cc],
+                places=[Place(name=place, lat=lat, lon=lon, precision="city")],
+                summary_en=en(t_en), confidence=0.8)))
     return events, items
 
 
@@ -233,12 +258,13 @@ def _region(region: str, index: int, prev: int, events: list[Event]) -> RegionAs
 
 def _geopolitics(items: list[Item]) -> Geopolitics:
     rnd = random.Random(7)
+    countries = theatre_countries(CONFIG)
     theatres = []
     for tid, n_en, n_sk, value, ratio, acled7, acled_avg in THEATRES:
         wave = [value + 0.12 * math.sin(d / 4) + rnd.uniform(-.06, .06) for d in range(30)]
         spark = [round(max(0.05, min(0.95, w)), 3) for w in wave]
         theatres.append(Theatre(
-            id=tid, name_en=n_en, name_sk=n_sk,
+            id=tid, name_en=n_en, name_sk=n_sk, countries=countries[tid],
             activity=Activity(value=value, articles_24h=int(300 * ratio),
                               baseline_median=300.0),
             acled=AcledActivity(events_7d=acled7, avg_week_prev_4=acled_avg)

@@ -2007,6 +2007,14 @@
         "activity": {
           "$ref": "#/$defs/Activity"
         },
+        "countries": {
+          "description": "ISO 3166-1 alpha-2, EU expanded to its member states; the map places a report in this theatre when it names one of them",
+          "items": {
+            "type": "string"
+          },
+          "title": "Countries",
+          "type": "array"
+        },
         "acled": {
           "anyOf": [
             {
@@ -2074,6 +2082,7 @@
         "name_en",
         "name_sk",
         "activity",
+        "countries",
         "acled",
         "tone",
         "sparkline",

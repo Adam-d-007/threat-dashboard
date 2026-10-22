@@ -221,6 +221,9 @@ class Theatre(Strict):
     name_en: str
     name_sk: str
     activity: Activity
+    countries: list[str] = Field(default_factory=list, description="ISO 3166-1 alpha-2, EU "
+                                 "expanded to its member states; the map places a report in "
+                                 "this theatre when it names one of them")
     acled: AcledActivity | None = None
     tone: Tone | None = None
     sparkline: list[float] = Field(default_factory=list, description="Activity value per day, "

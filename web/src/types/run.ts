@@ -149,6 +149,10 @@ export type Themes = string[];
 export type Id5 = string;
 export type NameEn = string;
 export type NameSk = string;
+/**
+ * ISO 3166-1 alpha-2, EU expanded to its member states; the map places a report in this theatre when it names one of them
+ */
+export type Countries1 = string[];
 export type Value2 = number;
 export type BaselineMedian1 = number;
 /**
@@ -496,6 +500,7 @@ export interface Theatre {
   name_en: NameEn;
   name_sk: NameSk;
   activity: Activity;
+  countries: Countries1;
   acled: AcledActivity | null;
   tone: Tone1 | null;
   sparkline: Sparkline;
