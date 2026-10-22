@@ -8,6 +8,10 @@ export type FinishedAt = string;
 export type WindowStart = string;
 export type GitSha = string | null;
 export type Fetched = number;
+/**
+ * Items read from the hourly RSS collector's buffer
+ */
+export type FromBuffer = number;
 export type AfterDedupe = number;
 export type InWindow = number;
 export type Id1 = string;
@@ -61,6 +65,7 @@ export interface RunInfo {
 }
 export interface RunCounts {
   fetched: Fetched;
+  from_buffer: FromBuffer;
   after_dedupe: AfterDedupe;
   in_window: InWindow;
 }

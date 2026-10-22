@@ -1,7 +1,7 @@
 """One pipeline run: python -m pipeline.main [--no-llm] [--fixtures] [--slot 04|13]
 
-Phase 1 stages: load state, fetch, normalize, dedupe, window filter, write.
-The workflow commits the state directory to the data branch afterwards.
+Phase 1 stages: load state, fetch, normalize, merge the hourly RSS buffer, dedupe,
+window filter, write. The workflow commits the state directory to the data branch afterwards.
 """
 
 import argparse
@@ -65,6 +65,34 @@ def fetch_all(sources: list[dict], queries: list[dict], since: datetime, now: da
     return results
 
 
+def load_config() -> tuple[list[dict], list[dict]]:
+    """All sources from sources.yaml and the GDELT DOC queries from keywords.yaml."""
+    sources = yaml.safe_load((CONFIG / "sources.yaml").read_text())["sources"]
+    queries = yaml.safe_load((CONFIG / "keywords.yaml").read_text())["gdelt_doc"]["queries"]
+    return sources, queries
+
+
+def normalize_all(sources: list[dict], results: dict[str, FetchResult], now: datetime,
+                  seen: dict[str, str]) -> list[Item]:
+    """Normalize every fetched item. An item that fails validation is dropped and noted in
+    its source's error text, so it shows on the sources page."""
+    items: list[Item] = []
+    for src in sources:
+        res = results[src["id"]]
+        bad = []
+        for raw in res.items:
+            try:
+                items.append(normalize(raw, src, now, seen))
+            except ValidationError as e:
+                bad.append(f"{raw.url}: {e.errors()[0]['msg']}")
+        if bad:
+            log.warning("%s: %d items failed to normalize, first: %s", src["id"], len(bad), bad[0])
+            res.error = "; ".join(filter(None, [res.error,
+                                                f"{len(bad)} items failed to normalize: {bad[0]}"]))
+        log.info("%-10s ok=%s items=%d %s", src["id"], res.ok, len(res.items), res.error or "")
+    return items
+
+
 def fixture_fetch(src: dict) -> FetchResult:
     if src["adapter"] == "gdelt_doc":
         items = gdelt_doc.parse(json.loads((FIXTURES / f"{src['id']}.json").read_text()))
@@ -91,8 +119,7 @@ def main(argv: list[str] | None = None) -> int:
     started = FIXTURE_NOW if args.fixtures else datetime.now(UTC).replace(microsecond=0)
     prev = state.load(args.state_dir)
     since = window_start(prev["latest"], started)
-    sources = yaml.safe_load((CONFIG / "sources.yaml").read_text())["sources"]
-    queries = yaml.safe_load((CONFIG / "keywords.yaml").read_text())["gdelt_doc"]["queries"]
+    sources, queries = load_config()
     enabled = [s for s in sources if s["enabled"]]
     log.info("run %s window from %s, %d sources enabled",
              run_id(started, args.slot), since.isoformat(), len(enabled))
@@ -100,35 +127,34 @@ def main(argv: list[str] | None = None) -> int:
     results = fetch_all(enabled, queries, since, started, args.fixtures)
 
     seen: dict[str, str] = dict(prev["seen"])
-    items: list[Item] = []
-    for src in enabled:
-        res = results[src["id"]]
-        bad = []
-        for raw in res.items:
-            try:
-                item = normalize(raw, src, started, seen)
-            except ValidationError as e:
-                bad.append(f"{raw.url}: {e.errors()[0]['msg']}")
-                continue
-            seen.setdefault(item.id, started.isoformat())
-            items.append(item)
-        if bad:
-            log.warning("%s: %d items failed to normalize, first: %s", src["id"], len(bad), bad[0])
-            res.error = "; ".join(filter(None, [res.error,
-                                                f"{len(bad)} items failed to normalize: {bad[0]}"]))
-        log.info("%-10s ok=%s items=%d %s", src["id"], res.ok, len(res.items), res.error or "")
+    items = normalize_all(enabled, results, started, seen)
 
-    unique = dedupe(items)
+    enabled_ids = {s["id"] for s in enabled}
+    try:
+        buffered = [i for i in state.load_buffer(args.state_dir) if i.source_id in enabled_ids]
+        buffer_ok = True
+    except ValidationError:
+        # A broken buffer costs the items it holds, not the run; the run shows as partial.
+        log.exception("rss_buffer.json is invalid; continuing with this run's own fetch only")
+        buffered, buffer_ok = [], False
+    log.info("buffer     items=%d", len(buffered))
+
+    unique = dedupe(items + buffered)
+    # Remember when undated items were first seen, so later runs keep the same date.
+    for i in unique:
+        if i.published_estimated:
+            seen.setdefault(i.id, i.published_at.isoformat())
     in_window = sorted((i for i in unique if i.published_at >= since),
                        key=lambda i: i.published_at, reverse=True)
 
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]
     finished = started if args.fixtures else datetime.now(UTC).replace(microsecond=0)
-    info = RunInfo(id=run_id(started, args.slot), status=run_status(health), started_at=started,
+    status = run_status(health) if buffer_ok else "partial"
+    info = RunInfo(id=run_id(started, args.slot), status=status, started_at=started,
                    finished_at=finished, window_start=since, git_sha=args.git_sha,
-                   counts=RunCounts(fetched=len(items), after_dedupe=len(unique),
-                                    in_window=len(in_window)))
+                   counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
+                                    after_dedupe=len(unique), in_window=len(in_window)))
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=in_window)
 
     try:

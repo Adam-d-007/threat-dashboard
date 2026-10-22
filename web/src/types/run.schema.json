@@ -132,6 +132,11 @@
           "title": "Fetched",
           "type": "integer"
         },
+        "from_buffer": {
+          "description": "Items read from the hourly RSS collector's buffer",
+          "title": "From Buffer",
+          "type": "integer"
+        },
         "after_dedupe": {
           "title": "After Dedupe",
           "type": "integer"
@@ -143,6 +148,7 @@
       },
       "required": [
         "fetched",
+        "from_buffer",
         "after_dedupe",
         "in_window"
       ],

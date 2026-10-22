@@ -4,13 +4,14 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 
+from pipeline import collect
 from pipeline import main as pipeline_main
 from pipeline.adapters import base, gdelt_doc, rss
 from pipeline.adapters.base import FetchError, FetchResult
 from pipeline.health import run_status, source_health
 from pipeline.main import FIXTURE_NOW, FIXTURES, window_start
 from pipeline.models import Run
-from pipeline.process.normalize import canonical_url, clean_text
+from pipeline.process.normalize import canonical_url, clean_text, item_id
 
 NOW = datetime(2026, 10, 22, 11, 0, tzinfo=UTC)
 SRC = {"id": "x", "name": "X", "tier": "B", "group": "slovak_press"}
@@ -142,3 +143,95 @@ def test_crashing_adapter_does_not_stop_run(tmp_path, monkeypatch):
     run = Run.model_validate_json((tmp_path / "latest.json").read_text())
     europol = next(s for s in run.sources if s.id == "europol")
     assert run.run.status == "partial" and "boom" in europol.error
+
+
+def _buffer(path):
+    return json.loads((path / "rss_buffer.json").read_text())
+
+
+def test_collect_builds_and_keeps_buffer(tmp_path):
+    msg = tmp_path / "msg.txt"
+    assert collect.main(["--fixtures", "--state-dir", str(tmp_path),
+                         "--commit-msg-file", str(msg)]) == 0
+    items = _buffer(tmp_path)["items"]
+    # RSS fixtures only: TASR 3 + SME 2 + Europol 1, minus the SME copy of a TASR URL
+    assert len(items) == 5 and not any(i["source_id"] == "gdelt_doc" for i in items)
+    assert msg.read_text() == "collect 2026-10-22T11:00 +5 new, 5 buffered\n"
+    # A second collection adds nothing and keeps the first fetch time.
+    collect.main(["--fixtures", "--state-dir", str(tmp_path), "--commit-msg-file", str(msg)])
+    assert msg.read_text() == "collect 2026-10-22T11:00 +0 new, 5 buffered\n"
+    assert _buffer(tmp_path)["items"] == items
+    # The collector writes nothing but the buffer.
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["msg.txt", "rss_buffer.json"]
+
+
+def test_collect_prunes_items_older_than_48h(tmp_path):
+    collect.main(["--fixtures", "--state-dir", str(tmp_path)])
+    data = _buffer(tmp_path)
+    data["items"][0]["fetched_at"] = (FIXTURE_NOW - timedelta(hours=49)).isoformat()
+    data["items"][0]["id"] = "old-id"
+    data["items"][1]["fetched_at"] = (FIXTURE_NOW - timedelta(hours=47)).isoformat()
+    (tmp_path / "rss_buffer.json").write_text(json.dumps(data))
+    collect.main(["--fixtures", "--state-dir", str(tmp_path)])
+    ids = {i["id"] for i in _buffer(tmp_path)["items"]}
+    assert "old-id" not in ids and data["items"][1]["id"] in ids
+
+
+def test_collect_replaces_invalid_buffer(tmp_path):
+    (tmp_path / "rss_buffer.json").write_text('{"schema_version": 1, "items": "garbage"}')
+    msg = tmp_path / "msg.txt"
+    collect.main(["--fixtures", "--state-dir", str(tmp_path), "--commit-msg-file", str(msg)])
+    assert len(_buffer(tmp_path)["items"]) == 5
+    assert msg.read_text().endswith(", invalid buffer replaced\n")
+
+
+def _buffered_item(**overrides):
+    item = {
+        "id": "buffered-1", "source_id": "tasr", "tier": "B",
+        "url": "https://www.teraz.sk/slovensko/scrolled-off/1000009-clanok.html",
+        "title": "Item that scrolled off the feed before the run", "lang": "sk",
+        "published_at": "2026-10-22T02:00:00Z", "published_estimated": False,
+        "fetched_at": "2026-10-22T02:35:00Z", "snippet": "", "domain": "teraz.sk",
+        "also_reported_by": [], "gdelt": None,
+    }
+    return item | overrides
+
+
+def test_pipeline_merges_buffer(tmp_path):
+    (tmp_path / "rss_buffer.json").write_text(json.dumps({
+        "schema_version": 1, "updated_at": "2026-10-22T10:35:00Z",
+        "items": [_buffered_item(),
+                  _buffered_item(id="other", source_id="not_a_source", url="https://x.sk/a")],
+    }))
+    pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path)])
+    run = Run.model_validate_json((tmp_path / "latest.json").read_text())
+    assert run.run.counts.from_buffer == 1  # items from unknown or disabled sources are ignored
+    assert any(i.id == "buffered-1" for i in run.items)
+    assert run.run.status == "ok"
+    # The pipeline reads the buffer but never rewrites it.
+    assert _buffer(tmp_path)["updated_at"] == "2026-10-22T10:35:00Z"
+
+
+def test_pipeline_keeps_earlier_estimated_date_from_buffer(tmp_path):
+    collect_time = FIXTURE_NOW - timedelta(hours=5)
+    europol = rss.parse((FIXTURES / "europol.xml").read_bytes())[0]
+    eid = item_id(canonical_url(europol.url))
+    (tmp_path / "rss_buffer.json").write_text(json.dumps({
+        "schema_version": 1, "updated_at": collect_time.isoformat(),
+        "items": [_buffered_item(id=eid, source_id="europol", tier="A", url=europol.url,
+                                 published_at=collect_time.isoformat(),
+                                 published_estimated=True, fetched_at=collect_time.isoformat())],
+    }))
+    pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path)])
+    run = Run.model_validate_json((tmp_path / "latest.json").read_text())
+    item = next(i for i in run.items if i.id == eid)
+    assert item.published_at == collect_time
+    seen = json.loads((tmp_path / "seen.json").read_text())
+    assert seen[eid] == collect_time.isoformat()
+
+
+def test_invalid_buffer_makes_run_partial_not_failed(tmp_path):
+    (tmp_path / "rss_buffer.json").write_text('{"schema_version": 1, "items": "garbage"}')
+    pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path)])
+    run = Run.model_validate_json((tmp_path / "latest.json").read_text())
+    assert run.run.status == "partial" and run.run.counts.in_window == 6

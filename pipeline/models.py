@@ -64,6 +64,7 @@ class SourceHealth(Strict):
 
 class RunCounts(Strict):
     fetched: int
+    from_buffer: int = Field(description="Items read from the hourly RSS collector's buffer")
     after_dedupe: int
     in_window: int
 
@@ -82,4 +83,12 @@ class Run(Strict):
     schema_version: Literal[1]
     run: RunInfo
     sources: list[SourceHealth]
+    items: list[Item]
+
+
+class RssBuffer(Strict):
+    """rss_buffer.json: items the hourly collector found in the last 48 h."""
+
+    schema_version: Literal[1]
+    updated_at: datetime
     items: list[Item]

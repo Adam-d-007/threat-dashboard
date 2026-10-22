@@ -41,10 +41,4 @@ jobs:
 
       - name: Commit to the data branch
         working-directory: state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then echo "Nothing to commit"; exit 0; fi
-          git commit -q -F "$RUNNER_TEMP/commit_msg.txt"
-          git push origin HEAD:data
+        run: $GITHUB_WORKSPACE/.github/scripts/commit_data.sh "$RUNNER_TEMP/commit_msg.txt"

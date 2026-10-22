@@ -10,7 +10,6 @@
 #   lang          ISO 639-1 language of the feed
 #   regions       SK and/or EU
 #   enabled       false turns the source off; give the reason in notes
-#   llm_allowed   false means items from this source are never sent to an LLM
 #   verified_on   date the URLs were last fetched and parsed successfully
 #   notes         anything a maintainer needs to know
 
@@ -24,12 +23,11 @@ sources:
     lang: multi
     regions: [SK, EU]
     enabled: true
-    llm_allowed: true
-    verified_on: null
+    verified_on: 2026-10-22
     notes: >-
-      Queries live in keywords.yaml. Max 1 request per 5 s. Returned HTTP 429 to every
-      request from a home connection on 2026-10-22, even 8 s apart; still to be checked
-      from GitHub Actions.
+      Queries live in keywords.yaml. Max 1 request per 5 s. Slovakia is FIPS code LO.
+      Answers HTTP 429 often from GitHub runners (shared IPs) and always from Adam's home
+      connection; the adapter backs off 20, 40, 80 s.
 
   - id: tasr
     name: TASR (teraz.sk)
@@ -42,12 +40,12 @@ sources:
     lang: sk
     regions: [SK, EU]
     enabled: true
-    llm_allowed: true
     verified_on: 2026-10-22
     notes: >-
       teraz.sk is TASR's public news portal (tasr.sk itself publishes no feed). Each feed
       holds only the newest 15 items: on 2026-10-22 slovensko covered about 17 h and
-      zahranicie about 3 h, so a twice-daily fetch misses part of the output.
+      zahranicie about 3 h. The hourly collect workflow (rss_buffer.json) catches items
+      that scroll off between pipeline runs.
 
   - id: sme
     name: SME
@@ -58,11 +56,10 @@ sources:
     lang: sk
     regions: [SK]
     enabled: true
-    llm_allowed: false
     verified_on: 2026-10-22
     notes: >-
-      Front-page feed, about 22 items. sme.sk/robots.txt sets "Content-signal: ai-input=no",
-      so SME items are classified by keyword rules only and never sent to an LLM. The
+      Front-page feed, about 22 items. sme.sk/robots.txt sets "Content-signal: ai-input=no";
+      on 2026-10-22 Adam decided to send SME titles and snippets to the LLM anyway. The
       homepage and rss.sme.sk answer automated requests with a 403 bot check; this feed
       URL does not.
 
@@ -75,7 +72,6 @@ sources:
     lang: en
     regions: [SK, EU]
     enabled: true
-    llm_allowed: true
     verified_on: 2026-10-22
     notes: >-
       Linked from the newsroom footer. Items carry no publication date, so the pipeline

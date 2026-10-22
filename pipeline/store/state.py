@@ -4,10 +4,11 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ..models import Run, SourceHealth
+from ..models import Item, RssBuffer, Run, SourceHealth
 
 KEEP_RUNS = 28
 SEEN_DAYS = 30
+BUFFER_FILE = "rss_buffer.json"
 
 
 def _read(path: Path):
@@ -53,3 +54,16 @@ def write_side_files(state_dir: Path, sources: list[SourceHealth], seen: dict[st
     runs = sorted((state_dir / "runs").glob("*.json"))
     for old in runs[:-KEEP_RUNS]:
         old.unlink()
+
+
+def load_buffer(state_dir: Path) -> list[Item]:
+    """Items from the hourly RSS collector. Raises if the file exists but is invalid."""
+    data = _read(state_dir / BUFFER_FILE)
+    return RssBuffer.model_validate(data).items if data else []
+
+
+def write_buffer(state_dir: Path, items: list[Item], now: datetime) -> None:
+    """Only the collector calls this; the pipeline never writes the buffer, so the two
+    workflows' commits touch different files and can always be rebased onto each other."""
+    buf = RssBuffer(schema_version=1, updated_at=now, items=items)
+    _write(state_dir / BUFFER_FILE, buf.model_dump(mode="json"))
