@@ -33,9 +33,8 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 - [x] Pipeline, data branch, frontend shell, CI with tests and gitleaks
 - [x] Data age shown; red after 14 h (tested)
 - [x] Netlify deploy count unchanged by data commits (checked 2026-10-22)
-- [ ] **Two scheduled runs in a row.** By 16:00 UTC on 2026-10-22, GitHub had fired one
-      scheduled collector run (14:03) and no scheduled pipeline run from `main`. Backup slots
-      with a skip-if-done guard are on `dev` and reach `main` with the merge. Check after it.
+- [ ] **Two scheduled runs in a row.** Merged to `main` on 2026-10-22 at 17:00 UTC; the first
+      scheduled pipeline slots are 04:05 and 13:05 UTC on 2026-10-23. Check them then.
 
 ## Phase 2, sources
 
@@ -123,15 +122,17 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 ## Phase 6, hardening
 
 - [x] `pipeline-failure` issue on failure or two partial runs (issue #1 opened on its own)
-- [ ] The next fully ok run comments on and closes it: not seen yet; check after the merge
+- [ ] The next fully ok run comments on and closes it: not seen yet. The first run on `main`
+      showed the alert step crashing on `runs/index.json` (fixed), and runs stay partial until
+      GDELT's rate limit lets the `gdelt_outlets` query through once
 - [x] `sis-change` issue when the SIS level paragraph changes
 - [x] `squash-data.yml` monthly rewrite of the data branch (dry run by default by hand)
-- [ ] Squash run once as a dry run and once for real: GitHub only allows starting it by hand
-      once it is on `main`, so after the merge
+- [x] Squash run once as a dry run and once for real (2026-10-22): 20 commits became 1, the
+      file tree identical before and after
 - [x] `docs/RUNBOOK.md`, including the 60-day inactivity rule for scheduled workflows
 - [x] Source "stale" after 6 empty runs, if it has delivered items before
 - [x] Run-status rule (every source, GDELT DOC within 6 h, the LLM, 10 press sources)
-- [ ] 14 days (28 runs) without manual fixes (waiting on time; starts with the merge)
+- [ ] 14 days (28 runs) without manual fixes (waiting on time; counting from 2026-10-23)
 
 ## Waiting on Adam
 

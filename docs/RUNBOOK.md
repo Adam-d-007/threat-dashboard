@@ -37,8 +37,9 @@ that were not ok. It closes itself when a run is fully ok.
 - **Partial runs:** a run is partial when any source failed, the language model fell back to
   rules, fewer than 10 press sources succeeded, or GDELT DOC has not succeeded in the last six
   hours. GDELT DOC is queried by the hourly **collect** workflow, not by the pipeline, because
-  GDELT answers GitHub's servers with HTTP 429 (too many requests) about every second call; the
-  collector retries every hour, so one or two 429s need no action. If GDELT DOC stays failed for
+  GDELT answers GitHub's servers with HTTP 429 (too many requests) about every second call. Each
+  query's last success is kept separately, and GDELT counts as ok once every query has got
+  through at least once in those six hours, so single 429s need no action. If GDELT DOC stays failed for
   a day, open the latest collect run and read the `gdelt_doc` lines in its log.
 
 ## A source shows failed or stale
