@@ -3,6 +3,18 @@
 Do the steps in order and tell Claude when each one is finished. Secrets are typed into
 Terminal prompts that hide what you type; Claude never sees them.
 
+Where things stand (2026-10-22):
+
+| Step | State |
+|---|---|
+| 1. Gemini key | Done |
+| 2. Groq key | Done |
+| 3. ACLED | Secrets set; waiting for ACLED to grant API access (you emailed them) |
+| 4. ReliefWeb | Waiting for the approved appname |
+| 5. GTD | Optional; not started |
+| 6. Permission requests | Optional; not sent |
+| 7. Keyword review | **Ready for you now** |
+
 All Terminal commands are run from the project folder:
 
 ```bash
@@ -134,7 +146,13 @@ address on each site. Claude can adapt these texts to each recipient.
 > Kind regards,
 > Adam, Model Conferences Slovakia
 
-## Step 7. Later: review the keyword lists
+## Step 7. Review the Slovak and Czech keywords
 
-When phase 3 adds the prefilter keyword lists, Claude will ask you to check the Slovak and
-Czech terms.
+The prefilter keeps an item only if its title or snippet contains one of the terms in
+`pipeline/config/keywords.yaml` (under `prefilter`, the `sk` and `cs` lists). Terms are word
+beginnings without diacritics: `terori` matches "teroristický", "terorizmus" and so on. A term
+ending in `!` must match a whole word.
+
+1. Open `pipeline/config/keywords.yaml` and read the `sk` and `cs` lists.
+2. Tell Claude any word that is missing (how Slovak and Czech media write about attacks,
+   arrests, extremism, sabotage, espionage), and any term that catches too much.

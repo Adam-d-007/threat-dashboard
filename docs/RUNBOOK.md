@@ -34,10 +34,12 @@ that were not ok. It closes itself when a run is fully ok.
 
 - **A run failed:** open the run in Actions and read the red step's log. If the pipeline step
   crashed, the previous `latest.json` stays live; the site shows the age banner after 14 hours.
-- **Partial runs:** a run is partial when any source failed, GDELT DOC failed, the language
-  model fell back to rules, or fewer than 10 press sources succeeded. GDELT often answers
-  GitHub's servers with HTTP 429 (too many requests); one or two partial runs from that alone
-  need no action.
+- **Partial runs:** a run is partial when any source failed, the language model fell back to
+  rules, fewer than 10 press sources succeeded, or GDELT DOC has not succeeded in the last six
+  hours. GDELT DOC is queried by the hourly **collect** workflow, not by the pipeline, because
+  GDELT answers GitHub's servers with HTTP 429 (too many requests) about every second call; the
+  collector retries every hour, so one or two 429s need no action. If GDELT DOC stays failed for
+  a day, open the latest collect run and read the `gdelt_doc` lines in its log.
 
 ## A source shows failed or stale
 
@@ -67,6 +69,19 @@ The SIS NBAC page changed: either the official level or only the wording of the 
 states it. Open https://www.sis.gov.sk/o-nas/nbac-sto.html. If the level changed, the site
 already shows it. If only the wording changed, check that `parse_sis` in `pipeline/anchors.py`
 still reads the right sentence (run `uv run pytest` after any change).
+
+## Yearly figures entered by hand
+
+Two sources publish once a year as PDFs and are typed into
+`pipeline/config/manual_anchors.yaml`:
+
+- **Europol TE-SAT** (usually June): update `tesat`, moving the old figures to
+  `previous_year`. The page numbers are noted beside each figure.
+- **SIS annual report** (`sis_annual`, usually mid-year, at
+  https://www.sis.gov.sk/pre-vas/sprava-o-cinnosti.html): rewrite the four points in your own
+  words from the terrorism and extremism sections. Never name individuals.
+
+Or ask Claude to do it from the new PDF. The site shows whatever year is entered, with its link.
 
 ## France changed its Vigipirate posture
 

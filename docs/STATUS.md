@@ -1,44 +1,41 @@
 # Build status against the spec
 
 Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **partial**,
-**not started**, **waiting on Adam**, **blocked** (outside our control).
+**waiting on Adam**, **waiting on others** (outside our control), **waiting on time**.
 
 ## Summary
 
 | Area | State |
 |---|---|
-| Phase 1, heartbeat | Done, except: no scheduled run has fired yet (all runs so far were started by hand) |
-| Phase 2, sources | Mostly done: 29 of 41 live; ACLED and ReliefWeb wait on access; 7 need the publishers' permission; 3 are unreachable from GitHub and replaced |
-| Phase 3, processing (LLM classification, geocoding, clustering) | **Not started.** Needs Gemini and Groq keys |
-| Phase 4, scoring and calibration | **Not started.** The level and index do not exist yet |
-| Geopolitics computation (theatres, activity, brief) | **Not started** |
-| Phase 5, frontend | Mostly done on sample data; a few panels missing |
-| Phase 6, hardening (alerts, squash, runbook, 14 days) | **Not started** |
-
-Without phases 3 and 4 the site can show official levels, TE-SAT figures and the latest
-reports, but no dashboard indicator. That is the core of the product.
+| Phase 1, heartbeat | Done; scheduled runs not yet seen firing from `main` (see below) |
+| Phase 2, sources | Done for everything open to us: 29 of 41 live. ACLED and ReliefWeb wait on their access; 7 need the publishers' permission; 3 are unreachable from GitHub and replaced |
+| Phase 3, processing | Done |
+| Phase 4, scoring and calibration | Done; weights are reviewed after four weeks of live data |
+| Geopolitics | Done; ACLED comparison switches on with ACLED access |
+| Phase 5, frontend | Done, except GTD history (needs Adam's GTD download) |
+| Phase 6, hardening | Done, except the 14 unattended days, which can only start after the merge to `main` |
 
 ## Hard rules
 
 | # | Rule | State |
 |---|---|---|
-| 1 | Zero recurring cost | Done. Note: Netlify's 300 credits are shared with the other MCS sites |
-| 2 | Indicator labelled, next to the SIS level | Done in the frontend |
-| 3 | Every score traceable | Frontend ready; no scores exist yet |
-| 4 | Media against a rolling baseline | Not started (needs GDELT baselines) |
+| 1 | Zero recurring cost | Done. Netlify's 300 credits are shared with the other MCS sites; production deploys are capped at 12 a month |
+| 2 | Indicator labelled, next to the SIS level | Done |
+| 3 | Every score traceable | Done: components, inputs, gates and events behind each number |
+| 4 | Media against a rolling baseline | Done: GDELT GKG counts against their 90-day median |
 | 5 | A failing source never breaks a run | Done and tested |
-| 6 | No secrets in repo or frontend | Done (gitleaks in CI) |
-| 7 | LLM output schema-validated, rules fallback | Not started |
-| 8 | Events and organisations, not private individuals | Applies once classification exists |
+| 6 | No secrets in repo or frontend | Done (gitleaks in CI; keys only as Actions secrets) |
+| 7 | LLM output schema-validated, rules fallback | Done and tested |
+| 8 | Events and organisations, not private individuals | Done: every LLM prompt forbids naming private individuals (added 2026-10-22; cached labels from before expire within 7 days); the SIS summary names nobody. News headlines are shown as their publishers wrote them |
 
 ## Phase 1, heartbeat
 
 - [x] Pipeline, data branch, frontend shell, CI with tests and gitleaks
 - [x] Data age shown; red after 14 h (tested)
 - [x] Netlify deploy count unchanged by data commits (checked 2026-10-22)
-- [ ] **Two scheduled runs in a row.** Workflows are active and the cron is valid, but GitHub
-      had not fired a single scheduled run by 11:23 UTC (collector due hourly from 08:35).
-      Backup slots with a skip-if-done guard are ready on dev.
+- [ ] **Two scheduled runs in a row.** By 16:00 UTC on 2026-10-22, GitHub had fired one
+      scheduled collector run (14:03) and no scheduled pipeline run from `main`. Backup slots
+      with a skip-if-done guard are on `dev` and reach `main` with the merge. Check after it.
 
 ## Phase 2, sources
 
@@ -46,93 +43,95 @@ reports, but no dashboard indicator. That is the core of the product.
 - [x] RSS, HTML-scrape and JSON adapters; robots.txt respected; health records; sources page
 - [x] Official levels: SIS (level 2 since 23 Aug 2017), Belgium, Netherlands, Poland,
       UK FCDO for the EU-27; France entered by hand (its sites block automated reading)
-- [x] Hourly RSS collector with a 48-hour buffer
+- [x] Hourly collector with a 48-hour buffer: RSS and the GDELT DOC queries
+- [x] GDELT DOC: four queries (Slovak sources, the neighbours' media, mentions of Slovakia,
+      hybrid incidents over Europe), run hourly over 3-hour windows
+- [x] GDELT GKG files: daily counts and tone per theme and country in `baselines.json`
 - [x] TE-SAT 2026 figures entered and shown
-- [ ] **ACLED**: adapter written and switched off. Sign-in works (secrets set 2026-10-22), but
-      the read endpoint answers 403: the account has no API access. Waiting for ACLED to
-      grant access (email to access@acleddata.com)
-- [ ] **ReliefWeb**: adapter written and tested against the documented format; waiting for the
-      approved appname (requested 2026-10-22)
-- [x] **GDELT GKG files**: daily counts per theme and country in baselines.json (live on GitHub,
-      64 files in the first run)
-- [ ] **GDELT DOC TimelineVolRaw** calls for baselines: not built
-- [ ] **GDELT DOC queries**: only 1 of the planned set (SK sources, terrorism theme)
-- [ ] **SIS annual report** in manual_anchors.yaml: empty
-- [ ] **GTD aggregates** (`static/gtd_aggregates.json`): needs Adam's GTD download from START
+- [x] SIS annual report (2023, the latest published) summarised and shown on the Slovak page
+- [ ] **ACLED** (waiting on others): adapter written and switched off. Sign-in works, but the
+      read endpoint answers 403: the account has no API access yet (Adam emailed ACLED)
+- [ ] **ReliefWeb** (waiting on others): adapter written and tested; waiting for the approved
+      appname (requested 2026-10-22)
+- [ ] **GTD aggregates** (waiting on Adam, optional): needs the GTD download from START
 - Blocked and left out: MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv (bot walls; GDELT does not
   index them), DW and PAP (explicit opt-outs). Telex, EEAS and ECFR are unreachable from
-  GitHub's servers and replaced (Index.hu, Council feed, ECFR through GDELT).
-- Known weakness: GDELT answers GitHub's shared addresses with HTTP 429 in roughly every
-  second run.
-- Bug found and fixed on dev: canonical URLs broke minv.sk article links.
+  GitHub's servers and replaced (Index.hu, Council feed, ECFR through GDELT). Request texts
+  are in [SETUP.md](SETUP.md).
+- Media baselines use GKG theme counts instead of GDELT DOC TimelineVolRaw: see
+  [SCORING.md](SCORING.md), "Where the build differs from the spec".
 
-## Phase 3, processing (not started)
+## Phase 3, processing
 
-- [ ] `keywords.yaml` prefilter terms in EN, SK, CS, DE, HU, PL, FR, UK (Adam to review SK/CS)
-- [ ] GDELT theme allowlist checked against the GKG theme list
-- [ ] Prefilter stage (cap at 600 items, by tier then recency)
-- [ ] Near-duplicate dedupe (rapidfuzz, 48 h, same language) and `also_reported_by`
-- [ ] LLM client: Gemini with Groq fallback, 10 requests/min limit, model check each run
-- [ ] Classification prompts (items wrapped as data), pydantic validation, one retry,
-      rules fallback, `unclassified`; budget 30 calls
-- [ ] Language detection where a feed does not declare one
-- [ ] Geocoding with the local GeoNames cities15000 file (cached in Actions)
-- [ ] Event clustering (event_key; same type and country, 50 km, 1 day) merged with
-      `events.json`; corroboration (2 domains or 1 Tier A)
-- [ ] Acceptance: SK/CS/EN fixture event becomes one cluster with 3 domains; `--no-llm` run;
-      prompt-injection fixture; LLM calls logged and kept at 45 or fewer
+- [x] Prefilter terms in EN, SK, CS, DE, HU, PL, FR, UK (Slovak and Czech: Adam to review)
+- [x] GDELT themes checked against the GKG theme list
+- [x] Prefilter (official and backbone sources always kept; cap 600, by tier then recency)
+- [x] Near-duplicate dedupe (same language, 48 h) and `also_reported_by`
+- [x] LLM client: Gemini with Groq fallback, model chosen from the live model list each run,
+      retries and a time budget
+- [x] Classification in batches, items wrapped as data, pydantic validation, one retry,
+      keyword-rules fallback, 7-day cache, call budget
+- [x] Language: every source declares one; GDELT reports each article's language
+- [x] Geocoding from a committed GeoNames gazetteer (GeoNames' robots.txt forbids automated
+      downloads, so the file was built once and committed)
+- [x] Event clustering (event_key; same type, country and day within 50 km; similar summaries
+      when no place), merged with `events.json`; corroboration (2 domains or 1 Tier A)
+- [x] Acceptance: one incident in three languages becomes one event; `--no-llm` run;
+      prompt-injection test; LLM calls logged per run
 
-## Phase 4, scoring and calibration (not started)
+## Phase 4, scoring and calibration
 
-- [ ] `scoring.yaml` with every weight, floor, threshold and gate
-- [ ] Components E, M, A, L with the shared f(r) curve
-- [ ] Gates (floor 2, SK caps at 2 and 3, EU cap at 3), smoothing (EMA 0.5), hysteresis
-- [ ] LLM assessment per region and the disagreement rule
-- [ ] `timeseries.json`, `baselines.json`, `events.json` on the data branch
-- [ ] 180-day backfill for baselines (see the open question about measuring E consistently)
-- [ ] Replays: Bratislava 2022, Vienna 2020, Solingen 2024, Villach 2025; quiet-window check
-- [ ] `docs/SCORING.md`
+- [x] `scoring.yaml` with every weight, floor, threshold and gate
+- [x] Components E, M, A, L with the shared f(r) curve
+- [x] Gates (floor 2, SK caps at 2 and 3, EU cap at 3), smoothing (EMA 0.5), hysteresis
+- [x] LLM assessment per region and the disagreement rule
+- [x] `timeseries.json`, `baselines.json`, `events.json` on the data branch
+- [x] Provisional until 14 days of event history (instead of a 180-day backfill; see SCORING.md)
+- [x] Replays: Bratislava 2022, Vienna 2020, Solingen 2024, Villach 2025, from rebuilt
+      incidents and with real media counts from GDELT bulk files; quiet-month check
+- [x] `docs/SCORING.md`, rendered on the method page
 
-## Geopolitics (not started)
+## Geopolitics
 
-- [ ] `theatres.yaml` (six theatres) and `watchlist.yaml`
-- [ ] Activity against the 90-day median, ACLED weekly comparison, tone
-- [ ] Top developments and the Slovak angle (LLM)
-- [ ] Daily brief (one LLM call per run), dates extracted from news marked unverified
+- [x] `theatres.yaml` (six theatres) and `watchlist.yaml`
+- [x] Activity against the 90-day median, tone against its 90-day median, 30-day sparkline
+- [x] Top developments and the Slovak angle (LLM); daily brief with a source on every line;
+      dates from the news marked unverified
+- [x] Map of reports with a place, filtered by theatre
+- [ ] ACLED weekly comparison: built, shows once ACLED is on
 
 ## Phase 5, frontend
 
 - [x] Terrorism tab (SK/EU), geopolitics, sources and method pages; EN/SK; dark/light; phone
-- [x] Level strip beside the official level, banners, index history, component breakdown,
-      assessment, changes, incident map, table, ideology mix, TE-SAT base rates
+- [x] Level strip beside the official level, banners, index history with gate markers,
+      component breakdown, assessment, changes, incident map, table
+- [x] Ideology mix beside the TE-SAT distribution (attacks and arrests), TE-SAT base rates,
+      SIS annual report points
+- [x] Run picker (stored runs from `runs/`)
+- [x] Method page renders `docs/SCORING.md`
+- [x] Attribution: OpenStreetMap, GeoNames, GDELT and TE-SAT in the footer; ACLED wherever
+      ACLED figures appear
 - [x] Sample data on the dev deploy only, labelled on every page; production shows real data
-- [ ] Run picker (last 14 days from `runs/`)
-- [ ] Gate markers on the index history
-- [ ] Ideology mix side by side with the TE-SAT distribution
-- [ ] Geopolitics map (needs items tagged by theatre, phase 3)
-- [ ] Method page rendering `docs/SCORING.md` (static text for now)
-- [ ] ACLED attribution on pages that show ACLED data (required by ACLED's terms)
-- [ ] GTD history in base rates
-- [ ] Acceptance: every panel with the five fixture cases; load under 3 s on throttled 4G
+- [x] Every panel renders with the five fixture cases (tested)
+- [x] Load time on Lighthouse's mobile 4G profile (dev deploy, 2026-10-22): first paint
+      1.7 s, largest paint 1.7 to 2.6 s, interactive 2.6 to 2.7 s
+- [ ] GTD history in base rates (needs the GTD download)
 
-## Phase 6, hardening (not started)
+## Phase 6, hardening
 
-- [ ] `pipeline-failure` GitHub issue on failure or two partial runs; comment when fixed
-- [ ] Issue when the SIS level paragraph changes (the change is detected already)
-- [ ] `squash-data.yml` monthly rewrite of the data branch (must pause both workflows)
-- [ ] `docs/RUNBOOK.md`, including the 60-day inactivity rule for scheduled workflows
-- [ ] Source "stale" after 6 runs with zero items where items are normal
-- [ ] Final run-status rule (GDELT DOC, LLM and 10 Tier B sources must succeed)
-- [ ] 14 days (28 runs) without manual fixes
+- [x] `pipeline-failure` issue on failure or two partial runs; closes when a run is fully ok
+- [x] `sis-change` issue when the SIS level paragraph changes
+- [x] `squash-data.yml` monthly rewrite of the data branch (dry run by default by hand)
+- [x] `docs/RUNBOOK.md`, including the 60-day inactivity rule for scheduled workflows
+- [x] Source "stale" after 6 empty runs, if it has delivered items before
+- [x] Run-status rule (every source, GDELT DOC within 6 h, the LLM, 10 press sources)
+- [ ] 14 days (28 runs) without manual fixes (waiting on time; starts with the merge)
 
 ## Waiting on Adam
 
 Step-by-step instructions: [SETUP.md](SETUP.md).
 
-
-- [ ] Gemini API key as Actions secret `GEMINI_API_KEY`, plus its daily limit from AI Studio
-- [ ] Groq API key as Actions secret `GROQ_API_KEY`
-- [ ] ACLED: secrets `ACLED_EMAIL` and `ACLED_PASSWORD`, then the access check
-- [ ] ReliefWeb: approved appname (requested 2026-10-22)
-- [ ] GTD download from START (registration form)
-- [ ] Review of the Slovak and Czech prefilter terms once written
+- [ ] Review the Slovak and Czech prefilter terms (step 7)
+- [ ] GTD download from START (optional, step 5)
+- [ ] Permission requests to the blocked sources (optional, step 6)
+- [ ] ACLED and ReliefWeb: forward their answers when they arrive
