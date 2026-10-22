@@ -9,7 +9,7 @@ Where things stand (2026-10-22):
 |---|---|
 | 1. Gemini key | Done |
 | 2. Groq key | Done |
-| 3. ACLED | Secrets set; waiting for ACLED to grant API access (you emailed them) |
+| 3. ACLED | Not used: ACLED's terms forbid public dashboards (their answer, 2026-10-22) |
 | 4. ReliefWeb | Waiting for the approved appname |
 | 5. GTD | Optional; the tool is ready, waiting for your download |
 | 6. Permission requests | Optional; not sent |
@@ -52,34 +52,19 @@ MCS should create the key on their own Google account.
    gh secret set GROQ_API_KEY --repo Adam-d-007/threat-dashboard
    ```
 
-## Step 3. ACLED
+## Step 3. ACLED: not used
 
-ACLED's API only accepts an email and a password; there is no Google login for programs.
-API access also needs the Research, Partner or Enterprise level. Accounts with a public
-address (gmail.com) get the Open level, which has no API.
+ACLED answered on 2026-10-22 that its terms forbid dashboards built on its data from being public,
+so ACLED is not part of the dashboard. Its adapter and checks were removed. You can delete the
+two secrets, which nothing uses any more:
 
-1. Check which address your Google login used. If it was a gmail.com address, register again
-   at acleddata.com with adam@mcslovakia.com, because the level depends on the address.
-2. Give the account a password: open https://acleddata.com/user/password, enter the same
-   email address, and follow the link ACLED emails you to set a password.
-3. Store the login as GitHub secrets (each command asks for the value):
+```bash
+gh secret delete ACLED_EMAIL --repo Adam-d-007/threat-dashboard
+```
 
-   ```bash
-   gh secret set ACLED_EMAIL --repo Adam-d-007/threat-dashboard
-   ```
-
-   ```bash
-   gh secret set ACLED_PASSWORD --repo Adam-d-007/threat-dashboard
-   ```
-
-4. Check what the account can read. This asks for the password once, hidden, and prints a
-   verdict on the last line. Replace the email if you used a different one:
-
-   ```bash
-   read -rs "ACLED_PASSWORD?ACLED password: " && echo && ACLED_EMAIL="adam@mcslovakia.com" ACLED_PASSWORD="$ACLED_PASSWORD" uv run python -m pipeline.tools.acled_check
-   ```
-
-5. Tell Claude the verdict. If it says recent events are available, Claude switches ACLED on.
+```bash
+gh secret delete ACLED_PASSWORD --repo Adam-d-007/threat-dashboard
+```
 
 ## Step 4. ReliefWeb
 

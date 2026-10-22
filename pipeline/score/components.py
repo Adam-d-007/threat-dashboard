@@ -60,17 +60,21 @@ def event_contributions(events: list[Event], region: str, now: datetime,
 def events_component(contribs: list[tuple[Event, float]], history: list[tuple[str, float]],
                      region: str, cfg: dict) -> Component:
     """history: (run time, E_raw) of earlier runs in the 180-day baseline window. Warm-up counts
-    distinct days, so a burst of manual runs cannot fake two weeks of history."""
+    distinct days, so a burst of manual runs cannot fake two weeks of history. During warm-up
+    E is compared with the median of the days there are (status 'provisional'); it is only
+    empty when there is no earlier run at all."""
     ec = cfg["events"]
     raw = round(sum(w for _, w in contribs), 3)
     days = len({at[:10] for at, _ in history})
     inputs: dict = {"weighted_sum": raw, "events": len(contribs), "history_days": days,
                     "floor": ec["floor"][region]}
     ids = [e.id for e, _ in contribs[:10]]
-    if days < ec["min_history_days"]:
+    if not history:
         inputs["status"] = "warming_up"
         return Component(id="events", weight=cfg["weights"]["events"], value=None,
                          inputs=inputs, event_ids=ids)
+    if days < ec["min_history_days"]:
+        inputs["status"] = "provisional"
     base = median(v for _, v in history)
     r = raw / max(base, ec["floor"][region])
     inputs |= {"baseline_median": round(base, 3), "ratio": round(r, 3)}
@@ -126,26 +130,30 @@ def anchors_component(anchors: list[AnchorReading], region: str, history: dict, 
     ac = cfg["anchors"]
     by_id = {a.id: a for a in anchors if a.normalized is not None}
     weight = cfg["weights"]["anchors"]
+    # Travel advice: every government's reading for the region's countries, averaged.
+    travel = [a for a in by_id.values() if a.kind == "travel"
+              and (a.country == "SK" if region == "SK" else True)]
+    travel_mean = sum(a.normalized for a in travel) / len(travel) if travel else None
     if region == "SK":
         used = {aid: w for aid, w in ac["SK"].items() if aid in by_id}
-        total = sum(used.values())
-        value = sum(by_id[a].normalized * w for a, w in used.items()) / total if total else None
-        ids = list(used)
+        parts = [(by_id[a].normalized, w) for a, w in used.items()]
+        ids = list(used) + [a.id for a in travel]
         inputs: dict = {aid: by_id[aid].normalized for aid in used}
+        travel_weight = ac["SK_travel_weight"]
     else:
-        fcdo = [a.normalized for a in by_id.values() if a.id.startswith("anchor_fcdo_")]
         nat = [by_id[a].normalized for a in ac["EU"]["national"] if a in by_id]
-        parts = [(sum(fcdo) / len(fcdo), ac["EU"]["fcdo_weight"])] if fcdo else []
-        if nat:
-            parts.append((sum(nat) / len(nat), ac["EU"]["national_weight"]))
-        total = sum(w for _, w in parts)
-        value = sum(v * w for v, w in parts) / total if total else None
-        ids = [a for a in ac["EU"]["national"] if a in by_id] + \
-            [a.id for a in by_id.values() if a.id.startswith("anchor_fcdo_")]
-        inputs = {"fcdo_mean": round(sum(fcdo) / len(fcdo), 3) if fcdo else None,
-                  "fcdo_states": len(fcdo),
-                  "national_mean": round(sum(nat) / len(nat), 3) if nat else None,
+        parts = [(sum(nat) / len(nat), ac["EU"]["national_weight"])] if nat else []
+        ids = [a for a in ac["EU"]["national"] if a in by_id] + [a.id for a in travel]
+        inputs = {"national_mean": round(sum(nat) / len(nat), 3) if nat else None,
                   "national_levels": len(nat)}
+        travel_weight = ac["EU"]["travel_weight"]
+    if travel_mean is not None:
+        parts.append((travel_mean, travel_weight))
+    inputs |= {"travel_mean": round(travel_mean, 3) if travel_mean is not None else None,
+               "travel_readings": len(travel),
+               "travel_governments": len({a.issuer for a in travel})}
+    total = sum(w for _, w in parts)
+    value = sum(v * w for v, w in parts) / total if total else None
     if value is None:
         return Component(id="anchors", weight=weight, value=None, inputs={"status": "no_data"})
     rose = anchor_rose(history, ids, now, ac["rise_days"])

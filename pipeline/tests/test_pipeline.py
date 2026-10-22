@@ -7,7 +7,6 @@ import pytest
 from pipeline import anchors, collect
 from pipeline import main as pipeline_main
 from pipeline.adapters import (
-    acled,
     base,
     dates,
     gdelt_doc,
@@ -442,6 +441,75 @@ def test_fcdo_rejects_redirects_and_unknown_wording():
         anchors.parse_fcdo(_fcdo("Terrorism risk is moderate."))
 
 
+US_RSS = """<rss><channel>
+<item><title>Slovakia - Level 1: Exercise Normal Precautions</title>
+<category>Level 1: Exercise Normal Precautions</category><category>LO</category>
+<category>advisory</category></item>
+<item><title>France - Level 2: Exercise Increased Caution</title>
+<category>Level 2: Exercise Increased Caution</category><category>FR</category></item>
+</channel></rss>"""
+
+
+def test_travel_advice_parsers_read_each_format():
+    fips = {"LO": "SK", "FR": "FR"}
+    assert anchors.parse_us_state(US_RSS, fips) == {
+        "SK": {"raw": "Level 1", "detail": "Slovakia - Level 1: Exercise Normal Precautions"},
+        "FR": {"raw": "Level 2", "detail": "France - Level 2: Exercise Increased Caution"}}
+    ca = {"data": {"SK": {"advisory-state": 0,
+                          "eng": {"advisory-text": "Exercise normal security precautions"}}}}
+    assert anchors.parse_ca_gc(ca)["SK"]["raw"] == "normal precautions"
+    flags = dict.fromkeys(["warning", "partialWarning", "situationWarning",
+                           "situationPartWarning"], False)
+    de = {"response": {"lastModified": 1, "1": {"countryCode": "SK", **flags},
+                       "2": {"countryCode": "UA", **flags, "warning": True},
+                       "3": {"countryCode": "IL", **flags, "situationPartWarning": True}}}
+    assert {k: v["raw"] for k, v in anchors.parse_de_aa(de).items()} == {
+        "SK": "keine Warnung", "UA": "Reisewarnung", "IL": "Teilreisewarnung"}
+    nz = ('{&quot;code&quot;:&quot;sk&quot;,&quot;link&quot;:{&quot;title&quot;:&quot;Slovakia'
+          '&quot;},&quot;region&quot;:&quot;Europe&quot;,&quot;adviceLevel&quot;:&quot;low'
+          '&quot;},{"code":"bg","link":{"title":"Bulgaria"},"region":"Europe",'
+          '"adviceLevel":"normal"}')
+    assert anchors.parse_nz_safetravel(nz) == {
+        "SK": {"raw": "Level 1", "detail": None}, "BG": {"raw": "Level 1", "detail": "no advisory"}}
+    with pytest.raises(anchors.AnchorError, match="extreme"):
+        anchors.parse_nz_safetravel(nz.replace('"normal"', '"extreme"'))
+    nl = {"introduction": "<p>De kleurcode van het reisadvies voor Slowakije is groen. U kunt</p>"}
+    assert anchors.parse_nl_bz(nl) == {"raw": "groen"}
+    jp = ("<opendata><riskLevel4>0</riskLevel4><riskLevel3>0</riskLevel3>"
+          "<riskLevel2>1</riskLevel2><riskLevel1>1</riskLevel1></opendata>")
+    assert anchors.parse_jp_mofa(jp) == {"raw": "Level 2"}
+    assert anchors.parse_jp_mofa(jp.replace(">1<", ">0<")) == {"raw": "no warning"}
+    box = "<h2>Aktuální doporučení a varování</h2><p>{}</p><p>Celní a devizové předpisy</p>"
+    cz = anchors.parse_cz_mzv
+    assert cz(box.format("Nebylo nalezeno žádné aktuální upozornění nebo varování pro cesty."))[
+        "raw"] == "žádné"
+    assert cz(box.format("Ukrajina: Varování před cestami na celé území"))["raw"] == "varování"
+    assert cz(box.format("Francie: bezpečnostní doporučení"))["raw"] == "upozornění"
+    assert anchors.parse_dk_um("<p>Vi har ingen rejsevejledning for Slovakiet</p>") == {
+        "raw": "ingen rejsevejledning"}
+    assert anchors.parse_dk_um("<p>Gyldig: 22.10.2026 Vi fraråder alle rejser til: Hele landet")[
+        "raw"] == "Vi fraråder alle rejser"
+    with pytest.raises(anchors.AnchorError):
+        anchors.parse_dk_um("<p>Gyldig: 22.10.2026 Something new</p>")
+
+
+def test_travel_source_skips_its_own_country_and_keeps_last_values(monkeypatch):
+    cfg = {"id": "de", "issuer": "DE", "name": "Auswärtiges Amt", "parser": "de_aa",
+           "url": "https://x", "page": "https://x", "scale": ["keine Warnung",
+           "Teilreisewarnung", "Reisewarnung"], "countries": "eu"}
+
+    def down(url, **kw):
+        raise anchors.FetchError("HTTP 503", 503)
+    monkeypatch.setattr(anchors, "get", down)
+    prev = {"anchor_de_sk": {"id": "anchor_de_sk", "country": "SK", "name": "Auswärtiges Amt",
+                             "url": "https://x", "scale": cfg["scale"], "raw": "keine Warnung",
+                             "level": 1, "normalized": 0.0, "as_of": NOW.isoformat(),
+                             "status": "ok", "kind": "travel", "issuer": "DE"}}
+    out = anchors.read_travel(cfg, ["DE", "SK"], {}, prev, NOW)
+    assert [a.id for a in out] == ["anchor_de_sk"]  # never Germany on Germany
+    assert out[0].status == "failed" and out[0].raw == "keine Warnung" and out[0].kind == "travel"
+
+
 def test_failed_anchor_keeps_last_value():
     cfg = {"id": "anchor_be_ocam", "country": "BE", "name": "OCAM", "url": "https://o",
            "scale": ["faible", "moyen", "grave", "tresGrave"]}
@@ -472,46 +540,6 @@ def test_collector_skips_sources_marked_not_hourly(tmp_path, monkeypatch):
                         lambda src: fetched.append(src["id"]) or FetchResult(src["id"], ok=True))
     collect.main(["--fixtures", "--state-dir", str(tmp_path)])
     assert "minv" not in fetched and "tasr" in fetched and "eeas" not in fetched
-
-
-# --- ACLED -----------------------------------------------------------------------------
-
-ACLED_SRC = {"id": "acled", "urls": ["https://acleddata.com/api/acled/read"],
-             "acled": {"days": 30, "regions": [12]}}
-
-
-def test_acled_without_credentials_fails_clearly(monkeypatch):
-    monkeypatch.delenv("ACLED_EMAIL", raising=False)
-    monkeypatch.delenv("ACLED_PASSWORD", raising=False)
-    res = acled.fetch(ACLED_SRC, NOW)
-    assert not res.ok and "not set" in res.error
-
-
-def test_acled_signs_in_and_follows_cursor(monkeypatch):
-    monkeypatch.setenv("ACLED_EMAIL", "a@b.sk")
-    monkeypatch.setenv("ACLED_PASSWORD", "pw")
-    sent = {}
-
-    def fake_post(url, **kw):
-        sent["form"] = kw["data"]
-        return httpx.Response(200, json={"access_token": "tok"}, request=httpx.Request("POST", url))
-
-    pages = iter([{"success": True, "data": [{"event_id_cnty": "UKR1"}], "next_cursor": 99},
-                  {"success": True, "data": [{"event_id_cnty": "UKR2"}], "next_cursor": None}])
-    cursors = []
-
-    def fake_get(url, params=None, headers=None, **kw):
-        assert headers["Authorization"] == "Bearer tok"
-        assert params["event_date"] == "2026-09-22|2026-10-22" and params["event_date_where"] == "BETWEEN"
-        cursors.append(params["cursor"])
-        return httpx.Response(200, json=next(pages), request=httpx.Request("GET", url))
-
-    monkeypatch.setattr(httpx, "post", fake_post)
-    monkeypatch.setattr(httpx, "get", fake_get)
-    res = acled.fetch(ACLED_SRC, NOW)
-    assert res.ok and [r["event_id_cnty"] for r in res.records] == ["UKR1", "UKR2"]
-    assert cursors == [0, 99]
-    assert sent["form"]["grant_type"] == "password" and sent["form"]["client_id"] == "acled"
 
 
 def test_manual_anchor_dated_by_entry_and_goes_stale():

@@ -124,18 +124,16 @@ describe("App with real data and no scores yet", () => {
 });
 
 describe("App with a provisional score", () => {
-  it("shows the warming-up card and no level until two weeks of history exist", async () => {
+  it("shows a provisional score with its label until two weeks of history exist", async () => {
     const terrorism = {
       SK: { ...sample.terrorism.SK, provisional: true, available_from: "2026-11-05" },
       EU: { ...sample.terrorism.EU, provisional: true, available_from: "2026-11-05" },
     };
     mockFetch({ ...realRun, terrorism });
     renderAt("2026-10-22T13:00:00Z");
-    expect(await screen.findByText("The indicator is warming up")).toBeInTheDocument();
-    expect(screen.getByText(/expected on 5 Nov 2026/)).toBeInTheDocument();
-    expect(screen.queryByText("Dashboard indicator")).toBeInTheDocument(); // card label only
-    expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
-    expect(screen.queryByText("What makes up the index")).not.toBeInTheDocument();
+    expect(await screen.findByText("Provisional")).toBeInTheDocument();
+    expect(screen.getByText(/Provisional until 5 Nov 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/\/100/)).toBeInTheDocument();
   });
 });
 
@@ -150,13 +148,28 @@ describe("App with sample scores", () => {
     expect(screen.getByText(/Floor 2: corroborated attack/)).toBeInTheDocument();
   });
 
-  it("folds the UK travel advice into one chip on the EU view", async () => {
+  it("folds each government's travel advice into one chip on the EU view", async () => {
     window.location.hash = "terrorism-eu";
     mockFetch(sample);
     renderAt("2026-10-22T14:00:00Z");
-    const chips = (await screen.findByText("Official levels elsewhere")).parentElement!;
-    expect(within(chips).getAllByText("FCDO")).toHaveLength(1);
-    expect(within(chips).getByText("OCAM/CUTA")).toBeInTheDocument();
+    const national = (await screen.findByText("Official levels elsewhere")).parentElement!;
+    expect(within(national).getByText("OCAM/CUTA")).toBeInTheDocument();
+    const travel = screen.getByText("Travel advice from 1 government").parentElement!;
+    expect(within(travel).getAllByText("FCDO")).toHaveLength(1);
+  });
+
+  it("lists every government's travel advice for Slovakia", async () => {
+    const reading = (issuer: string, name: string, raw: string, scale: string[]) => ({
+      id: `anchor_${issuer.toLowerCase()}_sk`, country: "SK", name, url: "https://x", scale, raw,
+      level: scale.indexOf(raw) + 1, normalized: 0, as_of: "2026-10-22T13:00:00Z", status: "ok",
+      kind: "travel", issuer });
+    const anchors = [...sample.anchors, reading("US", "US State Department", "Level 1", ["Level 1", "Level 2", "Level 3", "Level 4"]),
+      reading("DK", "Udenrigsministeriet (Denmark)", "ingen rejsevejledning", ["ingen rejsevejledning", "Vær opmærksom"])];
+    mockFetch({ ...sample, anchors });
+    renderAt("2026-10-22T14:00:00Z");
+    const travel = (await screen.findByText("Travel advice from 3 governments")).parentElement!;
+    expect(within(travel).getByText("US State Department")).toBeInTheDocument();
+    expect(within(travel).getByText("ingen rejsevejledning")).toBeInTheDocument();
   });
 });
 

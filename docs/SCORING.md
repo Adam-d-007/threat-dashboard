@@ -33,7 +33,7 @@ P is a weighted sum of four components, each between 0 and 1:
 |---|---|---|
 | **E**, events | 35% | Terrorism-related incidents in the last 60 days |
 | **M**, media | 15% | News coverage of terrorism mentioning the region |
-| **A**, official levels | 20% | Official threat levels elsewhere and UK travel-advice wording |
+| **A**, official levels | 20% | Official threat levels elsewhere and other governments' travel advice |
 | **L**, language model | 30% | A language model's reading of the events against the NBAC definitions |
 
 ### A shared curve
@@ -79,8 +79,15 @@ Each official level is turned into 0 to 1 on its own scale ((level âˆ’ lowest) Ã
 lowest)); UK travel advice maps "cannot be ruled out" to 0, "likely" to 0.5 and "very likely"
 to 1.
 
-- **Slovakia:** SIS 40%, Poland 30%, UK advice for Slovakia 30%. Austria publishes no level.
-- **EU:** the mean of the UK advice across the 27 states (50%) and the mean of the published
+Travel advice comes from nine governments: the UK, the US, Canada, Germany and New Zealand for all
+27 states, and the Netherlands, Japan, Czechia and Denmark for Slovakia only (their data is
+published per country, and each source is read once per run). A government never rates its own
+country. Other ministries were checked and left out: their sites forbid or block automated
+reading, or build the page in the browser (see `pipeline/config/anchors.yaml`).
+
+- **Slovakia:** SIS 40%, Poland 30%, the mean of all travel advice for Slovakia 30%. Austria
+  publishes no level.
+- **EU:** the mean of all travel advice across the 27 states (50%) and the mean of the published
   national levels of France, Belgium, the Netherlands and Poland (50%).
 - **Rise bonus:** +0.15 when any of them rose in the last 30 days.
 
@@ -104,17 +111,18 @@ A component without a value is left out, and the remaining weights are scaled up
 This happens when:
 
 - **the language model fails** (the page says so), and
-- **E or M is warming up.** Both compare today with their own history, and that history only
-  starts with the first live runs (22 October 2026). Until E has 14 distinct days of history and
-  M has 14 complete days, they are shown as "warming up" and left out. Showing them earlier would
-  compare today with a baseline that does not exist yet.
+- **M is warming up.** It compares today with its own history, which only starts with the
+  first live runs (22 October 2026). Until M has 14 complete days it is left out.
 
-**The whole indicator is provisional while E warms up.** The first live run showed why: with
-only a few hours of events, the language model judged the evidence thin and the 30-day attack
-floor had nothing to fire on, so the EU came out at level 1, which Europol's 45 attacks in 2025
-contradict. For the first 14 days the scores are computed and recorded, but the page shows
-"warming up" with the expected date, not a level. History is counted in days, not runs, so a
-burst of manual runs cannot shorten it.
+**The indicator is provisional for its first 14 days.** E normally compares today with the median
+of 180 days. Until it has 14 distinct days of history, it uses the median of the days there are,
+so on the first day it reads close to normal and gains meaning each day. The page shows the level
+and index with a "provisional" label, a dashed border and the date the full method starts. This
+is a compromise Adam asked for (2026-10-22): a first estimate is shown rather than none, but it
+should be read as one. History is counted in days, not runs, so a burst of manual runs cannot
+shorten the provisional period. Two other choices were rejected: comparing E with its floor
+would have read six ordinary events as seven times normal (EU level 3 on the first day), and
+leaving E out made the score rest on official levels and the language model alone.
 
 If no component has a value at all, the page shows no level, rather than an invented one.
 

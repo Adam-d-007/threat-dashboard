@@ -654,27 +654,6 @@ sources:
 
   # --- Need accounts or approval before they can run ---------------------------------------
 
-  - id: acled
-    name: ACLED
-    group: backbone
-    tier: B
-    adapter: acled
-    urls: ["https://acleddata.com/api/acled/read"]
-    lang: en
-    regions: [SK, EU]
-    enabled: false
-    verified_on: null
-    acled:
-      days: 30
-      regions: [12, 11]   # Europe (incl. Ukraine and Russia), Middle East
-    notes: >-
-      2026-10-22: Adam's account signs in (token OK) but /api/acled/read answers HTTP 403 for
-      recent and year-old data: no API access at its current level (likely Open). Next step:
-      ask access@acleddata.com for API access. Secrets ACLED_EMAIL and ACLED_PASSWORD are set;
-      once access is granted, rerun the pipeline with acled_check and set enabled: true.
-      Recent events need the Partner or Enterprise tier; Research gets a 12-month lag. The
-      adapter follows ACLED's documentation but has not been run against the real API yet.
-
   - id: reliefweb
     name: ReliefWeb (OCHA)
     group: context

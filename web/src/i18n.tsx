@@ -30,10 +30,11 @@ const en = {
   changeSinceLast: (d: number) => `${d > 0 ? "+" : ""}${d} since last run`,
   noChange: "no change since last run",
   anchors: "Official levels elsewhere",
+  travelAdvice: (n: number) => `Travel advice from ${n} ${n === 1 ? "government" : "governments"}`,
   notComputedTitle: "The indicator is not computed yet",
-  warmingTitle: "The indicator is warming up",
-  warmingBody: (d: string) =>
-    `It compares today with the normal level of the last weeks, and that history started recently. The first indicator is expected on ${d}. Until then this page shows the official level, incidents and reports only, never an estimate.`,
+  provisional: "Provisional",
+  provisionalNote: (d: string) =>
+    `Provisional until ${d}: events are compared with the few days of history collected so far, and news coverage is not counted yet. Read it as a first estimate; from ${d} it is measured against two weeks of history.`,
   notComputedBody:
     "Scoring is still being built. Until it runs, this page shows the official level and the latest reports only, never an estimate.",
   sampleBanner:
@@ -65,7 +66,7 @@ const en = {
     events:
       "Corroborated incidents in the last 60 days, weighted by severity, distance and age, against their 180-day median.",
     media: "Articles on terrorism mentioning the region in 24 h, against their 90-day median.",
-    anchors: "Official threat levels and UK travel-advice wording, normalised to 0 to 1.",
+    anchors: "Official threat levels and other governments' travel advice, normalised to 0 to 1.",
     llm: "A language model's reading of the events against the NBAC level definitions.",
   } as Record<string, string>,
   weight: "weight",
@@ -180,7 +181,6 @@ const en = {
   activityLow: "below normal",
   activityNormal: "normal",
   activityHigh: "above normal",
-  acledEvents: (n: number, avg: number) => `${n} ACLED events in 7 days (4-week average ${avg})`,
   tone: "Tone",
   topDevelopments: "Top developments",
   slovakAngle: "Slovak angle",
@@ -231,7 +231,6 @@ const en = {
   footer: "Dashboard indicator computed from open sources. Not an official threat assessment.",
   attribution:
     "Map data © OpenStreetMap contributors. Place names from GeoNames (CC BY 4.0). Media counts from the GDELT Project. Base rates from Europol TE-SAT.",
-  acledAttribution: "ACLED figures: Armed Conflict Location & Event Data (ACLED),",
 };
 
 export type Strings = typeof en;
@@ -266,10 +265,11 @@ const sk: Strings = {
   changeSinceLast: (d: number) => `${d > 0 ? "+" : ""}${d} od poslednej aktualizácie`,
   noChange: "bez zmeny od poslednej aktualizácie",
   anchors: "Oficiálne úrovne v iných krajinách",
+  travelAdvice: (n: number) => `Cestovné odporúčania ${n} ${n === 1 ? "vlády" : "vlád"}`,
   notComputedTitle: "Ukazovateľ sa zatiaľ nepočíta",
-  warmingTitle: "Ukazovateľ sa zbieha",
-  warmingBody: (d: string) =>
-    `Porovnáva dnešok s bežnou úrovňou posledných týždňov a táto história sa začala zbierať len nedávno. Prvý ukazovateľ očakávame ${d}. Dovtedy táto stránka zobrazuje len oficiálnu úroveň, incidenty a správy, nikdy odhad.`,
+  provisional: "Predbežný",
+  provisionalNote: (d: string) =>
+    `Predbežný do ${d}: udalosti porovnávame s niekoľkými dňami histórie, ktoré máme zatiaľ k dispozícii, a mediálne pokrytie sa ešte nezapočítava. Berte ho ako prvý odhad; od ${d} sa meria voči dvom týždňom histórie.`,
   notComputedBody:
     "Hodnotenie je ešte vo vývoji. Kým nebude spustené, táto stránka zobrazuje len oficiálnu úroveň a najnovšie správy, nikdy odhad.",
   sampleBanner:
@@ -305,7 +305,7 @@ const sk: Strings = {
       "Potvrdené incidenty za posledných 60 dní, vážené závažnosťou, vzdialenosťou a vekom, v porovnaní so 180-dňovým mediánom.",
     media: "Články o terorizme, ktoré spomínajú región, za 24 hodín v porovnaní s 90-dňovým mediánom.",
     anchors:
-      "Oficiálne úrovne ohrozenia a formulácie britských cestovných odporúčaní, prepočítané na stupnicu 0 až 1.",
+      "Oficiálne úrovne ohrozenia a cestovné odporúčania iných vlád, prepočítané na stupnicu 0 až 1.",
     llm: "Hodnotenie udalostí jazykovým modelom podľa definícií úrovní NBAC.",
   },
   weight: "váha",
@@ -420,7 +420,6 @@ const sk: Strings = {
   activityLow: "pod bežnou úrovňou",
   activityNormal: "bežná úroveň",
   activityHigh: "nad bežnou úrovňou",
-  acledEvents: (n: number, avg: number) => `${n} udalostí ACLED za 7 dní (4-týždňový priemer ${avg})`,
   tone: "Tón",
   topDevelopments: "Najdôležitejší vývoj",
   slovakAngle: "Slovenský rozmer",
@@ -471,7 +470,6 @@ const sk: Strings = {
   footer: "Ukazovateľ dashboardu vypočítaný z otvorených zdrojov. Nejde o oficiálne hodnotenie hrozby.",
   attribution:
     "Mapové údaje © prispievatelia OpenStreetMap. Názvy miest z GeoNames (CC BY 4.0). Počty článkov z projektu GDELT. Dlhodobé počty z Europol TE-SAT.",
-  acledAttribution: "Údaje ACLED: Armed Conflict Location & Event Data (ACLED),",
 };
 
 const STRINGS: Record<Lang, Strings> = { en, sk };

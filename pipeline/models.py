@@ -107,7 +107,8 @@ class Event(Strict):
 
 
 class AnchorReading(Strict):
-    """An official threat level read from a government page, or FCDO travel-advice wording."""
+    """An official reading from a government page: a national threat level, or another
+    government's travel advice for a country."""
 
     id: str
     country: str = Field(description="ISO 3166-1 alpha-2")
@@ -127,6 +128,11 @@ class AnchorReading(Strict):
                                "time, e.g. a higher level for railways only")
     manual: bool = Field(default=False, description="Typed in by hand from the official page, "
                          "because the page cannot be read automatically")
+    kind: Literal["national", "travel"] = Field(
+        default="national", description="national: a country's own threat level; travel: another "
+        "government's travel advice for this country")
+    issuer: str | None = Field(default=None, description="ISO alpha-2 of the government that "
+                               "issues the travel advice (travel only)")
 
 
 class Component(Strict):
@@ -200,11 +206,6 @@ class Activity(Strict):
     baseline_median: float | None = None
 
 
-class AcledActivity(Strict):
-    events_7d: int
-    avg_week_prev_4: float
-
-
 class Tone(Strict):
     value: float
     baseline_median: float
@@ -224,7 +225,6 @@ class Theatre(Strict):
     countries: list[str] = Field(default_factory=list, description="ISO 3166-1 alpha-2, EU "
                                  "expanded to its member states; the map places a report in "
                                  "this theatre when it names one of them")
-    acled: AcledActivity | None = None
     tone: Tone | None = None
     sparkline: list[float] = Field(default_factory=list, description="Activity value per day, "
                                    "oldest first, up to 30 days")

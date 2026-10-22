@@ -56,9 +56,10 @@ proximity:
     near: {countries: [GB, NO, IS, LI, AL, BA, GE, MD, ME, MK, RS, TR, UA, XK], value: 0.3}
 
 anchors:
-  SK: {anchor_sk_sis: 0.4, anchor_pl_mswia: 0.3, anchor_fcdo_sk: 0.3}  # Austria publishes none
+  SK: {anchor_sk_sis: 0.4, anchor_pl_mswia: 0.3}  # Austria publishes none
+  SK_travel_weight: 0.3     # mean of every government's travel advice for Slovakia
   EU:
-    fcdo_weight: 0.5        # mean of the FCDO wording across the EU-27
+    travel_weight: 0.5      # mean of every government's travel advice across the EU-27
     national_weight: 0.5    # mean of the published national levels
     national: [anchor_fr_vigipirate, anchor_be_ocam, anchor_nl_nctv, anchor_pl_mswia]
   rise_bonus: 0.15          # added when any anchor rose in the last rise_days

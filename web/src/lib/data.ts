@@ -59,7 +59,7 @@ export async function loadLatest(now: Date = new Date()): Promise<LoadResult> {
   if (!SUPPORTED_SCHEMA_VERSIONS.includes(data?.schema_version as number)) {
     return { kind: "unsupported", version: data?.schema_version };
   }
-  return { kind: "ok", run: data as unknown as Run };
+  return { kind: "ok", run: withAnchorKinds(data as unknown as Run) };
 }
 
 /** Ids of the stored runs, newest first (runs/index.json), or [] when there is no index. */
@@ -84,7 +84,17 @@ export async function loadRun(id: string): Promise<LoadResult> {
   if (!SUPPORTED_SCHEMA_VERSIONS.includes(data?.schema_version)) {
     return { kind: "unsupported", version: data?.schema_version };
   }
-  return { kind: "ok", run: data as Run };
+  return { kind: "ok", run: withAnchorKinds(data as Run) };
+}
+
+/** Runs before 2026-10-22 carry no kind or issuer on their readings; UK FCDO wording was the
+ * only travel advice then. */
+function withAnchorKinds(run: Run): Run {
+  const fill = (a: Run["anchors"][number]) => {
+    const fcdo = a.id.startsWith("anchor_fcdo_");
+    return { ...a, kind: a.kind ?? (fcdo ? "travel" : "national"), issuer: a.issuer ?? (fcdo ? "GB" : null) };
+  };
+  return { ...run, anchors: run.anchors.map(fill) };
 }
 
 /** The index history, or null when none exists yet (before scoring runs). */

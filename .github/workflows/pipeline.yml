@@ -13,10 +13,6 @@ on:
         description: "First run the LLM acceptance check (about 2 LLM calls)"
         type: boolean
         default: false
-      acled_check:
-        description: "First report which ACLED data the account can read"
-        type: boolean
-        default: false
 
 permissions:
   contents: write
@@ -50,19 +46,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: uv run python -m pipeline.tools.llm_check
 
-      - name: ACLED access check
-        if: ${{ inputs.acled_check }}
-        continue-on-error: true
-        env:
-          ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
-          ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
-        run: uv run python -m pipeline.tools.acled_check
-
       - name: Run the pipeline
         env:
-          # Empty until Adam adds them; the acled source stays disabled until then.
-          ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
-          ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
           RELIEFWEB_APPNAME: ${{ vars.RELIEFWEB_APPNAME }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

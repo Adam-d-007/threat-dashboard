@@ -24,24 +24,22 @@ function regionEvents(events: Event[], region: Region): Event[] {
 
 export function TerrorismPage({ run, region, timeseries }: { run: Run; region: Region; timeseries: Timeseries | null }) {
   const { t } = useLang();
-  // A provisional score (less than two weeks of history) is recorded but never shown as a level.
-  const raw = run.terrorism?.[region] ?? null;
-  const assess = raw && !raw.provisional ? raw : null;
+  // A provisional score (less than two weeks of history) is shown with a label saying so.
+  const assess = run.terrorism?.[region] ?? null;
   const sis = run.anchors.find((a) => a.id === "anchor_sk_sis") ?? null;
   const events = regionEvents(run.events, region);
   const failing = run.sources.filter((s) => s.status === "failed" || s.status === "stale").length;
   const rows = timeseries?.rows.filter((r) => r.region === region) ?? [];
-  // Slovakia: Poland's level and the UK wording for Slovakia. EU: every national level, with
-  // the UK wording for all 27 states folded into one summary chip.
-  const isFcdo = (id: string) => id.startsWith("anchor_fcdo_");
-  const anchors = run.anchors.filter((a) =>
-    a.id === "anchor_sk_sis"
-      ? false
-      : region === "SK"
-        ? a.id === "anchor_pl_mswia" || a.id === "anchor_fcdo_sk"
-        : !isFcdo(a.id),
+  // National levels: Poland's for Slovakia, every published one for the EU. Travel advice: each
+  // government's reading for Slovakia, or for the EU one summary chip per government.
+  const national = run.anchors.filter(
+    (a) => a.kind !== "travel" && a.id !== "anchor_sk_sis" && (region === "EU" || a.id === "anchor_pl_mswia"),
   );
-  const fcdoAll = region === "EU" ? run.anchors.filter((a) => isFcdo(a.id)) : [];
+  const travel = run.anchors.filter((a) => a.kind === "travel");
+  const travelSk = region === "SK" ? travel.filter((a) => a.country === "SK") : [];
+  const groups = new Map<string, AnchorReading[]>();
+  for (const a of travel) groups.set(a.issuer ?? "", [...(groups.get(a.issuer ?? "") ?? []), a]);
+  const travelByIssuer = region === "EU" ? [...groups.values()].filter((g) => g.length > 1) : [];
 
   return (
     <div className="space-y-6">
@@ -65,18 +63,30 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         </div>
 
         <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
-          {assess ? <IndicatorCard a={assess} /> : <NotComputedCard availableFrom={raw?.available_from ?? null} />}
+          {assess ? <IndicatorCard a={assess} /> : <NotComputedCard />}
           <OfficialCard region={region} sis={sis} />
         </div>
 
-        {anchors.length + fcdoAll.length > 0 && (
+        {national.length > 0 && (
           <div>
             <h2 className="mb-2 text-sm font-medium text-muted">{t.anchors}</h2>
             <div className="flex flex-wrap gap-2">
-              {anchors.map((a) => (
+              {national.map((a) => (
                 <AnchorChip key={a.id} a={a} />
               ))}
-              {fcdoAll.length > 0 && <FcdoSummary anchors={fcdoAll} />}
+            </div>
+          </div>
+        )}
+        {travelSk.length + travelByIssuer.length > 0 && (
+          <div>
+            <h2 className="mb-2 text-sm font-medium text-muted">{t.travelAdvice(travelSk.length || travelByIssuer.length)}</h2>
+            <div className="flex flex-wrap gap-2">
+              {travelSk.map((a) => (
+                <AnchorChip key={a.id} a={a} />
+              ))}
+              {travelByIssuer.map((g) => (
+                <TravelSummary key={g[0].issuer} anchors={g} />
+              ))}
             </div>
           </div>
         )}
@@ -152,11 +162,16 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
 }
 
 function IndicatorCard({ a }: { a: RegionAssessment }) {
-  const { t } = useLang();
+  const { t, locale } = useLang();
   const delta = a.index_prev === null ? null : a.index - a.index_prev;
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 sm:p-6">
-      <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted">{t.indicator}</p>
+    <div className={`rounded-2xl border bg-surface p-5 sm:p-6 ${a.provisional ? "border-dashed border-ink-2" : "border-line"}`}>
+      <p className="mb-4 flex flex-wrap items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted">
+        {t.indicator}
+        {a.provisional && (
+          <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs normal-case tracking-normal text-ink">{t.provisional}</span>
+        )}
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-6">
         <LevelBadge level={a.level} size="xl" />
         <a href="#components" className="text-right text-ink no-underline">
@@ -168,20 +183,20 @@ function IndicatorCard({ a }: { a: RegionAssessment }) {
           <div className="text-sm text-ink-2">{delta === null || delta === 0 ? t.noChange : t.changeSinceLast(delta)}</div>
         </a>
       </div>
-      <p className="mt-4 text-sm text-muted">{t.indicatorNote}</p>
+      <p className="mt-4 text-sm text-muted">
+        {a.provisional && a.available_from ? t.provisionalNote(fmtDate(a.available_from, locale)) : t.indicatorNote}
+      </p>
     </div>
   );
 }
 
-function NotComputedCard({ availableFrom }: { availableFrom: string | null }) {
-  const { t, locale } = useLang();
+function NotComputedCard() {
+  const { t } = useLang();
   return (
     <div className="rounded-2xl border border-dashed border-line bg-surface p-5 sm:p-6">
       <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">{t.indicator}</p>
-      <p className="text-xl font-semibold">{availableFrom ? t.warmingTitle : t.notComputedTitle}</p>
-      <p className="mt-2 text-sm text-ink-2">
-        {availableFrom ? t.warmingBody(fmtDate(availableFrom, locale)) : t.notComputedBody}
-      </p>
+      <p className="text-xl font-semibold">{t.notComputedTitle}</p>
+      <p className="mt-2 text-sm text-ink-2">{t.notComputedBody}</p>
     </div>
   );
 }
@@ -232,7 +247,7 @@ function AnchorChip({ a }: { a: AnchorReading }) {
       className="group flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink no-underline hover:bg-surface-2"
       title={a.as_of ? fmtDate(a.as_of, locale) : undefined}
     >
-      <span className="font-semibold">{a.country}</span>
+      <span className="font-semibold">{a.kind === "travel" ? a.issuer : a.country}</span>
       <span className="text-ink-2">{a.name}</span>
       {a.level ? (
         <span className="flex items-center gap-2">
@@ -253,8 +268,8 @@ function AnchorChip({ a }: { a: AnchorReading }) {
   );
 }
 
-/** UK travel-advice wording for the EU states, counted per phrase, highest first. */
-function FcdoSummary({ anchors }: { anchors: AnchorReading[] }) {
+/** One government's travel advice for the EU states, counted per level, highest first. */
+function TravelSummary({ anchors }: { anchors: AnchorReading[] }) {
   const scale = anchors[0].scale;
   const counts = scale.map((raw) => ({ raw, n: anchors.filter((a) => a.raw === raw).length })).reverse();
   return (
@@ -262,8 +277,8 @@ function FcdoSummary({ anchors }: { anchors: AnchorReading[] }) {
       href="#sources"
       className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink no-underline hover:bg-surface-2"
     >
-      <span className="font-semibold">UK</span>
-      <span className="text-ink-2">FCDO</span>
+      <span className="font-semibold">{anchors[0].issuer}</span>
+      <span className="text-ink-2">{anchors[0].name.replace(" travel advice", "")}</span>
       {counts
         .filter((c) => c.n > 0)
         .map((c) => (
@@ -355,11 +370,15 @@ function ChangesCard({ run, events }: { run: Run; events: Event[] }) {
             <div>
               <h3 className="font-semibold">{t.anchorChanges}</h3>
               <ul className="list-disc pl-5">
-                {d!.anchor_changes.map((c) => (
-                  <li key={c.id}>
-                    {run.anchors.find((a) => a.id === c.id)?.name ?? c.id}: {c.value_from ?? "–"} → {c.value_to ?? "–"}
-                  </li>
-                ))}
+                {d!.anchor_changes.map((c) => {
+                  const a = run.anchors.find((x) => x.id === c.id);
+                  const label = a ? (a.kind === "travel" ? `${a.name} (${a.country})` : a.name) : c.id;
+                  return (
+                    <li key={c.id}>
+                      {label}: {c.value_from ?? "–"} → {c.value_to ?? "–"}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

@@ -18,7 +18,6 @@ import yaml
 
 from ..models import (
     SCHEMA_VERSION,
-    AcledActivity,
     Activity,
     AnchorReading,
     Brief,
@@ -114,13 +113,13 @@ GEO_ITEMS = [
 
 THEATRES = [
     ("russia_ukraine", "Russia and Ukraine war", "Vojna Ruska proti Ukrajine",
-     0.58, 1.6, 412, 380.0),
-    ("hybrid_eu", "Hybrid threats to the EU", "Hybridné hrozby voči EÚ", 0.49, 1.2, None, None),
+     0.58, 1.6),
+    ("hybrid_eu", "Hybrid threats to the EU", "Hybridné hrozby voči EÚ", 0.49, 1.2),
     ("sk_policy", "Slovak foreign and security policy",
-     "Zahraničná a bezpečnostná politika SR", 0.33, 0.85, None, None),
-    ("eu_defence", "EU policy and defence", "Politika a obrana EÚ", 0.41, 1.1, None, None),
-    ("middle_east", "Middle East", "Blízky východ", 0.66, 2.3, 288, 301.5),
-    ("western_balkans", "Western Balkans", "Západný Balkán", 0.22, 0.55, 14, 19.25),
+     "Zahraničná a bezpečnostná politika SR", 0.33, 0.85),
+    ("eu_defence", "EU policy and defence", "Politika a obrana EÚ", 0.41, 1.1),
+    ("middle_east", "Middle East", "Blízky východ", 0.66, 2.3),
+    ("western_balkans", "Western Balkans", "Západný Balkán", 0.22, 0.55),
 ]
 
 
@@ -184,9 +183,12 @@ def _events_and_items() -> tuple[list[Event], list[Item]]:
 def _anchors() -> list[AnchorReading]:
     def a(id_, cc, name, url, scale, raw, since=None, status="ok"):
         lvl = scale.index(raw) + 1
+        travel = id_.startswith("anchor_fcdo_")
         return AnchorReading(id=id_, country=cc, name=name, url=url, scale=scale, raw=raw,
                              level=lvl, normalized=round((lvl - 1) / (len(scale) - 1), 3),
-                             since=since, as_of=NOW, status=status)
+                             since=since, as_of=NOW, status=status,
+                             kind="travel" if travel else "national",
+                             issuer="GB" if travel else None)
     return [
         a("anchor_sk_sis", "SK", "SIS NBAC", "https://www.sis.gov.sk/o-nas/nbac-sto.html",
           ["1", "2", "3", "4"], "2", date(2017, 8, 23)),
@@ -260,15 +262,13 @@ def _geopolitics(items: list[Item]) -> Geopolitics:
     rnd = random.Random(7)
     countries = theatre_countries(CONFIG)
     theatres = []
-    for tid, n_en, n_sk, value, ratio, acled7, acled_avg in THEATRES:
+    for tid, n_en, n_sk, value, ratio in THEATRES:
         wave = [value + 0.12 * math.sin(d / 4) + rnd.uniform(-.06, .06) for d in range(30)]
         spark = [round(max(0.05, min(0.95, w)), 3) for w in wave]
         theatres.append(Theatre(
             id=tid, name_en=n_en, name_sk=n_sk, countries=countries[tid],
             activity=Activity(value=value, articles_24h=int(300 * ratio),
                               baseline_median=300.0),
-            acled=AcledActivity(events_7d=acled7, avg_week_prev_4=acled_avg)
-            if acled7 is not None else None,
             tone=Tone(value=-4.1 - ratio, baseline_median=-3.9), sparkline=spark,
             top_items=[TopItem(item_id=items[i].id, summary_en=en(f"Development {i + 1} in "
                                                                    f"{n_en}."),

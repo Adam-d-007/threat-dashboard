@@ -134,9 +134,11 @@ def test_curve_matches_spec():
 
 def anchor(aid, cc, scale, raw):
     lvl = scale.index(raw) + 1
+    travel = aid.startswith("anchor_fcdo_")
     return AnchorReading(id=aid, country=cc, name=aid, url="https://x", scale=scale, raw=raw,
                          level=lvl, normalized=(lvl - 1) / (len(scale) - 1), as_of=NOW,
-                         status="ok")
+                         status="ok", kind="travel" if travel else "national",
+                         issuer="GB" if travel else None)
 
 
 FCDO = ["cannot be ruled out", "likely", "very likely"]
@@ -168,6 +170,11 @@ def test_indicator_is_provisional_until_two_weeks_of_history():
         rows.append(row | {"run_id": f"r{n}"})
     a2, _ = score_region("SK", "r9", quiet_events(NOW), ANCHORS, {}, rows, state, None, NOW, CFG, 0)
     assert a2.provisional
+    # During warm-up E still counts, against the median of the days there are.
+    e = next(c for c in a2.components if c.id == "events")
+    assert e.value is not None and e.inputs["status"] == "provisional"
+    first_e = next(c for c in a.components if c.id == "events")
+    assert first_e.value is None and first_e.inputs["status"] == "warming_up"  # no history yet
 
 
 def simulate(incident_days: int, incident=None, quiet_days=30, baselines=None):

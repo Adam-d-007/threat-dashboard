@@ -43,7 +43,80 @@ anchors:
     scale: [vigilance, vigilance renforcée, alerte attentat]   # new plan since 22 June 2026
     verified_on: 2026-10-22
 
-# UK FCDO travel advice, terrorism sentence, via the GOV.UK Content API.
+# Other governments' travel advice, a second opinion on each country's security. Sources that
+# publish every country in one file are read for the EU-27; the others for Slovakia only, so each
+# source costs one request per run. Checked 2026-10-22. Not usable: Austria (robots.txt forbids
+# it), Ireland, Norway, Sweden, Israel, Lithuania (block automated readers), Finland, Italy,
+# Switzerland, Poland (pages built by JavaScript), Australia, Belgium, Korea (no answer).
+travel:
+  - id: us
+    issuer: US
+    name: US State Department
+    parser: us_state
+    url: https://travel.state.gov/_res/rss/TAsTWs.xml
+    page: https://travel.state.gov/content/travel/en/traveladvisories/traveladvisories.html
+    scale: [Level 1, Level 2, Level 3, Level 4]   # normal precautions ... do not travel
+    countries: eu
+  - id: ca
+    issuer: CA
+    name: Government of Canada
+    parser: ca_gc
+    url: https://data.international.gc.ca/travel-voyage/index-alpha-eng.json
+    page: https://travel.gc.ca/travelling/advisories
+    scale: [normal precautions, high degree of caution, avoid non-essential travel,
+            avoid all travel]
+    countries: eu
+  - id: de
+    issuer: DE
+    name: Auswärtiges Amt
+    parser: de_aa
+    url: https://www.auswaertiges-amt.de/opendata/travelwarning
+    page: https://www.auswaertiges-amt.de/de/reiseundsicherheit/reise-und-sicherheitshinweise
+    scale: [keine Warnung, Teilreisewarnung, Reisewarnung]
+    countries: eu
+  - id: nz
+    issuer: NZ
+    name: SafeTravel (New Zealand)
+    parser: nz_safetravel
+    url: https://www.safetravel.govt.nz/destinations
+    page: https://www.safetravel.govt.nz/destinations
+    scale: [Level 1, Level 2, Level 3, Level 4]   # "no advisory" counts as Level 1
+    countries: eu
+  - id: nl
+    issuer: NL
+    name: Nederland Wereldwijd
+    parser: nl_bz
+    url: https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes/countries/svk/traveladvice?output=json
+    page: https://www.nederlandwereldwijd.nl/reisadvies/slowakije
+    scale: [groen, geel, oranje, rood]
+    countries: [SK]
+  - id: jp
+    issuer: JP
+    name: MOFA Japan
+    parser: jp_mofa
+    url: https://www.ezairyu.mofa.go.jp/opendata/country/0421L.xml
+    page: https://www.anzen.mofa.go.jp/
+    scale: [no warning, Level 1, Level 2, Level 3, Level 4]
+    countries: [SK]
+  - id: cz
+    issuer: CZ
+    name: MZV ČR
+    parser: cz_mzv
+    url: https://mzv.gov.cz/jnp/cz/encyklopedie_statu/evropa/slovensko/cestovani/index.html
+    page: https://mzv.gov.cz/jnp/cz/encyklopedie_statu/evropa/slovensko/cestovani/index.html
+    scale: [žádné, upozornění, varování]
+    countries: [SK]
+  - id: dk
+    issuer: DK
+    name: Udenrigsministeriet (Denmark)
+    parser: dk_um
+    url: https://um.dk/rejse-og-ophold/rejse-til-udlandet/rejsevejledninger/slovakiet
+    page: https://um.dk/rejse-og-ophold/rejse-til-udlandet/rejsevejledninger/slovakiet
+    scale: [ingen rejsevejledning, Vær opmærksom, Vær ekstra forsigtig,
+            Vi fraråder alle ikke-nødvendige rejser, Vi fraråder alle rejser]
+    countries: [SK]
+
+# UK FCDO travel advice, terrorism sentence, via the GOV.UK Content API (one request per state).
 fcdo:
   url: https://www.gov.uk/api/content/foreign-travel-advice/
   scale: [cannot be ruled out, likely, very likely]

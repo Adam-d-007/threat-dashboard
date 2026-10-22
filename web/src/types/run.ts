@@ -1,7 +1,5 @@
 /* Generated from run.schema.json by npm run gen:types. Do not edit. */
 
-export type Events7D = number;
-export type AvgWeekPrev4 = number;
 /**
  * f(articles 24 h / 90-day median)
  */
@@ -53,6 +51,14 @@ export type Detail = string | null;
  * Typed in by hand from the official page, because the page cannot be read automatically
  */
 export type Manual = boolean;
+/**
+ * national: a country's own threat level; travel: another government's travel advice for this country
+ */
+export type Kind = "national" | "travel";
+/**
+ * ISO alpha-2 of the government that issues the travel advice (travel only)
+ */
+export type Issuer = string | null;
 export type Status1 = "ok" | "fallback" | "disabled";
 export type TextEn = string;
 export type TextSk = string | null;
@@ -317,14 +323,6 @@ export interface ThreatDashboardData {
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
- * via the `definition` "AcledActivity".
- */
-export interface AcledActivity {
-  events_7d: Events7D;
-  avg_week_prev_4: AvgWeekPrev4;
-}
-/**
- * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
  * via the `definition` "Activity".
  */
 export interface Activity {
@@ -333,7 +331,8 @@ export interface Activity {
   baseline_median: BaselineMedian;
 }
 /**
- * An official threat level read from a government page, or FCDO travel-advice wording.
+ * An official reading from a government page: a national threat level, or another
+ * government's travel advice for a country.
  *
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
  * via the `definition` "AnchorReading".
@@ -354,6 +353,8 @@ export interface AnchorReading {
   text_hash: TextHash;
   detail: Detail;
   manual: Manual;
+  kind: Kind;
+  issuer: Issuer;
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
@@ -514,7 +515,6 @@ export interface Theatre {
   name_sk: NameSk;
   activity: Activity;
   countries: Countries1;
-  acled: AcledActivity | null;
   tone: Tone1 | null;
   sparkline: Sparkline;
   top_items: TopItems;

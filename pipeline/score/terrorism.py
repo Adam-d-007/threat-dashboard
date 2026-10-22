@@ -142,10 +142,10 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
                                      checked_at=sis.as_of, url=sis.url,
                                      label_sk="zvýšený stupeň ohrozenia" if sis.level == 2
                                      else None)
-    # Until E has its two weeks of history the level is not meaningful (the 30-day gates and
-    # the LLM both see only the first days of events), so it is provisional and not shown.
+    # Until E has its two weeks of history it is measured against the few days there are, so
+    # the level is provisional: shown, but labelled as such.
     first = min((r["at"] for r in region_rows), default=now.isoformat())[:10]
-    provisional = e_comp.value is None
+    provisional = e_comp.inputs.get("status") in ("warming_up", "provisional")
     assessment = RegionAssessment(
         region=region, level=level, index=index, provisional=provisional,
         available_from=(date.fromisoformat(first)
@@ -155,7 +155,8 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
         rules_level=rules_level, components=[e_comp, m_comp, a_comp, l_comp], gates=shown,
         llm=llm, disagreement=disagreement, official=official,
         anchor_ids=[a.id for a in anchors if a.id != "anchor_sk_sis"
-                    and (region == "EU" or a.id in cfg["anchors"]["SK"])])
+                    and (region == "EU" or a.id in cfg["anchors"]["SK"]
+                         or (a.kind == "travel" and a.country == "SK"))])
     row = {"run_id": run_id, "at": now.isoformat(), "region": region, "index": index,
            "level": level, "rules_level": rules_level,
            "llm_level": llm.level if llm.status == "ok" else None,

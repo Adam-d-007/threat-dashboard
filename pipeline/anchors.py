@@ -1,4 +1,5 @@
-"""Official threat levels (anchors) read from government pages, and UK FCDO wording.
+"""Official threat levels (anchors) read from government pages, and other governments'
+travel advice (UK FCDO wording and the sources under `travel` in anchors.yaml).
 
 Each parser returns the raw value exactly as the page shows it; a value outside the
 configured scale, zero matches or several matches raise, so a layout change fails loudly
@@ -6,8 +7,11 @@ instead of reporting a wrong level. A failed read keeps the last known value wit
 """
 
 import hashlib
+import html as htmllib
+import json
 import logging
 import re
+import xml.etree.ElementTree as ET
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -113,6 +117,158 @@ def parse_fcdo(data: dict) -> dict:
     raise AnchorError(f"terrorism sentence not recognised: {sentence!r}")
 
 
+# --- Travel advice (anchors.yaml: travel). Each parser returns {ISO country: parsed}. -------
+
+def _text(page: str) -> str:
+    return _space(BeautifulSoup(page, "html.parser").get_text(" "))
+
+
+def parse_us_state(xml: str, fips: dict[str, str]) -> dict[str, dict]:
+    """State Department RSS: one item per country, with a 'Level N: ...' category and the
+    country's FIPS code as another category (Slovakia is LO)."""
+    out = {}
+    for item in ET.fromstring(xml).iter("item"):
+        cats = [c.text or "" for c in item.findall("category")]
+        levels = [m.group(1) for c in cats if (m := re.match(r"Level ([1-4]):", c))]
+        codes = [fips[c] for c in cats if c in fips]
+        if len(levels) == 1 and len(codes) == 1:
+            out[codes[0]] = {"raw": f"Level {levels[0]}",
+                             "detail": _space(item.findtext("title") or "")}
+    return out
+
+
+_CA = ["normal precautions", "high degree of caution", "avoid non-essential travel",
+       "avoid all travel"]
+
+
+def parse_ca_gc(data: dict) -> dict[str, dict]:
+    """advisory-state 0 to 3, named as on travel.gc.ca."""
+    return {cc: {"raw": _CA[c["advisory-state"]], "detail": c["eng"]["advisory-text"]}
+            for cc, c in data["data"].items()}
+
+
+def parse_de_aa(data: dict) -> dict[str, dict]:
+    """Auswärtiges Amt open data: warning flags per country. A situation-based warning counts
+    as the warning of the same reach."""
+    out = {}
+    for v in data["response"].values():
+        if not isinstance(v, dict) or "countryCode" not in v:
+            continue
+        raw = ("Reisewarnung" if v["warning"] or v["situationWarning"] else
+               "Teilreisewarnung" if v["partialWarning"] or v["situationPartWarning"] else
+               "keine Warnung")
+        out[v["countryCode"]] = {"raw": raw}
+    return out
+
+
+_NZ = {"normal": "Level 1", "low": "Level 1", "medium": "Level 2", "high": "Level 3",
+       "avoid": "Level 4"}
+
+
+def parse_nz_safetravel(page: str) -> dict[str, dict]:
+    """The destinations page embeds every country's adviceLevel. 'normal' means New Zealand
+    issues no advisory; it counts as level 1 (checked on the Bulgaria and Slovakia pages)."""
+    pairs = re.findall(r'"code":"([a-z]{2})","link":\{[^}]*\},"region":"[^"]*",'
+                       r'"adviceLevel":"([^"]*)"', htmllib.unescape(page))
+    if not pairs:
+        raise AnchorError("no adviceLevel entries found")
+    out = {}
+    for code, level in pairs:
+        if level not in _NZ:
+            raise AnchorError(f"unknown adviceLevel {level!r}")
+        out[code.upper()] = {"raw": _NZ[level],
+                             "detail": "no advisory" if level == "normal" else None}
+    return out
+
+
+def parse_nl_bz(data: dict) -> dict:
+    m = re.search(r"kleurcode van het reisadvies voor .{1,60}? is (groen|geel|oranje|rood)",
+                  _text(data["introduction"]))
+    if not m:
+        raise AnchorError("colour code sentence not found")
+    return {"raw": m.group(1)}
+
+
+def parse_jp_mofa(xml: str) -> dict:
+    """Japan's open data: riskLevel1 to riskLevel4 are non-zero where that danger level is
+    issued for some part of the country; 0 when no danger information is issued."""
+    root = ET.fromstring(xml)
+    issued = [n for n in (1, 2, 3, 4) if (root.findtext(f"riskLevel{n}") or "").strip() not in
+              ("", "0")]
+    if root.find("riskLevel1") is None:
+        raise AnchorError("riskLevel fields missing")
+    return {"raw": f"Level {max(issued)}" if issued else "no warning"}
+
+
+def parse_cz_mzv(page: str) -> dict:
+    """The 'Aktuální doporučení a varování' box: none, a notice, or a travel warning."""
+    m = re.search(r"Aktuální doporučení a varování (.{0,600}?) Celní a devizové předpisy",
+                  _text(page))
+    if not m:
+        raise AnchorError("current recommendations box not found")
+    box = m.group(1)
+    raw = ("žádné" if "Nebylo nalezeno žádné aktuální upozornění" in box else
+           "varování" if "Varování" in box else "upozornění")
+    return {"raw": raw, "detail": box[:200]}
+
+
+_DK = ["Vær opmærksom", "Vær ekstra forsigtig", "Vi fraråder alle ikke-nødvendige rejser",
+       "Vi fraråder alle rejser"]
+
+
+def parse_dk_um(page: str) -> dict:
+    text = _text(page)
+    if re.search(r"Vi har ingen rejsevejledning for", text):
+        return {"raw": "ingen rejsevejledning"}
+    m = re.search(r"Gyldig: [\d.]+ (" + "|".join(map(re.escape, _DK)) + ")", text)
+    if not m:
+        raise AnchorError("travel guidance level not found")
+    return {"raw": m.group(1)}
+
+
+def _travel_parse(cfg: dict, r, fips: dict[str, str]) -> dict[str, dict]:
+    parser = cfg["parser"]
+    if parser == "us_state":
+        return parse_us_state(r.text, fips)
+    if parser == "ca_gc":
+        return parse_ca_gc(r.json())
+    if parser == "de_aa":
+        return parse_de_aa(r.json())
+    if parser == "nz_safetravel":
+        return parse_nz_safetravel(r.text)
+    single = {"nl_bz": lambda: parse_nl_bz(r.json()), "jp_mofa": lambda: parse_jp_mofa(r.text),
+              "cz_mzv": lambda: parse_cz_mzv(r.text), "dk_um": lambda: parse_dk_um(r.text)}
+    if parser not in single:
+        raise AnchorError(f"unknown parser {parser!r}")
+    return {cfg["countries"][0]: single[parser]()}
+
+
+def read_travel(cfg: dict, eu: list[str], fips: dict[str, str], prev: dict, now: datetime,
+                ) -> list[AnchorReading]:
+    """One request for the source, then one reading per country it covers. A country the
+    source does not list, or a failed request, keeps that country's last value."""
+    # A government gives no travel advice for its own country (Germany for Germany).
+    countries = [cc for cc in (eu if cfg["countries"] == "eu" else cfg["countries"])
+                 if cc != cfg["issuer"]]
+    cfgs = [{"id": f"anchor_{cfg['id']}_{cc.lower()}", "country": cc, "name": cfg["name"],
+             "url": cfg["page"], "scale": cfg["scale"], "kind": "travel",
+             "issuer": cfg["issuer"]} for cc in countries]
+    try:
+        parsed = _travel_parse(cfg, get(cfg["url"]), fips)
+    except (AnchorError, FetchError, ValueError, KeyError, ET.ParseError,
+            json.JSONDecodeError) as e:
+        return [_failed(c, prev.get(c["id"]), f"{type(e).__name__}: {e}") for c in cfgs]
+    out = []
+    for c in cfgs:
+        try:
+            if c["country"] not in parsed:
+                raise AnchorError(f"{c['country']} not in the source")
+            out.append(_reading(c, now, parsed[c["country"]]))
+        except AnchorError as e:
+            out.append(_failed(c, prev.get(c["id"]), f"{type(e).__name__}: {e}"))
+    return out
+
+
 def _reading(cfg: dict, now: datetime, parsed: dict, manual: bool = False) -> AnchorReading:
     """parsed may carry as_of (when the value was last confirmed) and stale_reason."""
     raw = parsed["raw"]
@@ -125,7 +281,8 @@ def _reading(cfg: dict, now: datetime, parsed: dict, manual: bool = False) -> An
         normalized=round((level - 1) / (len(cfg["scale"]) - 1), 3), since=parsed.get("since"),
         as_of=parsed.get("as_of", now), status="stale" if parsed.get("stale_reason") else "ok",
         error=parsed.get("stale_reason"),
-        text_hash=parsed.get("text_hash"), detail=parsed.get("detail"), manual=manual)
+        text_hash=parsed.get("text_hash"), detail=parsed.get("detail"), manual=manual,
+        kind=cfg.get("kind", "national"), issuer=cfg.get("issuer"))
 
 
 def _failed(cfg: dict, prev: dict | None, error: str) -> AnchorReading:
@@ -136,7 +293,8 @@ def _failed(cfg: dict, prev: dict | None, error: str) -> AnchorReading:
         return kept.model_copy(update={"status": "failed", "error": error})
     return AnchorReading(id=cfg["id"], country=cfg["country"], name=cfg["name"], url=cfg["url"],
                          scale=cfg["scale"], raw=None, level=None, normalized=None, as_of=None,
-                         status="failed", error=error)
+                         status="failed", error=error, kind=cfg.get("kind", "national"),
+                         issuer=cfg.get("issuer"))
 
 
 def _read_one(cfg: dict, now: datetime, manual_levels: dict) -> AnchorReading:
@@ -174,7 +332,8 @@ def anchor_configs() -> list[dict]:
     f = conf["fcdo"]
     for cc, slug in f["countries"].items():
         out.append({"id": f"anchor_fcdo_{cc.lower()}", "country": cc, "name": "FCDO travel advice",
-                    "parser": "fcdo", "url": f["url"] + slug, "scale": f["scale"]})
+                    "parser": "fcdo", "url": f["url"] + slug, "scale": f["scale"],
+                    "kind": "travel", "issuer": "GB"})
     return out
 
 
@@ -189,4 +348,9 @@ def read_all(previous: list[dict], now: datetime | None = None) -> list[AnchorRe
             out.append(_read_one(cfg, now, manual))
         except (AnchorError, FetchError, ValueError, KeyError) as e:
             out.append(_failed(cfg, prev.get(cfg["id"]), f"{type(e).__name__}: {e}"))
+    conf = yaml.safe_load((CONFIG / "anchors.yaml").read_text())
+    gkg = next(s for s in yaml.safe_load((CONFIG / "sources.yaml").read_text())["sources"]
+               if s["adapter"] == "gdelt_gkg")["gkg"]
+    for cfg in conf["travel"]:
+        out.extend(read_travel(cfg, list(conf["fcdo"]["countries"]), gkg["countries"], prev, now))
     return out

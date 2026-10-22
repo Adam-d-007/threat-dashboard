@@ -90,12 +90,8 @@ SGDSN's site blocks automated reading, so France is entered by hand. Edit
 `pipeline/config/manual_anchors.yaml` (`raw`, `since`, `entered_on`), or tell Claude the new
 posture. The site marks the value stale 180 days after `entered_on`.
 
-## Switching on ACLED or ReliefWeb
+## Switching on ReliefWeb
 
-- **ACLED:** the secrets `ACLED_EMAIL` and `ACLED_PASSWORD` are set. When ACLED grants API
-  access, run Actions → pipeline → Run workflow with "First report which ACLED data the account
-  can read" ticked. If the log shows recent events, set `enabled: true` for `acled` in
-  `sources.yaml`.
 - **ReliefWeb:** when the appname is approved, add it as the Actions *variable*
   `RELIEFWEB_APPNAME` (Settings → Secrets and variables → Actions → Variables) and set
   `enabled: true` for `reliefweb`.

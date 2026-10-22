@@ -17,7 +17,7 @@ import yaml
 from pydantic import ValidationError
 
 from . import anchors as anchor_reader
-from .adapters import acled, gdelt_doc, gdelt_gkg, html_scrape, json_api, reliefweb, rss
+from .adapters import gdelt_doc, gdelt_gkg, html_scrape, json_api, reliefweb, rss
 from .adapters.base import FetchError, FetchResult
 from .health import run_status, source_health
 from .llm.client import LlmClient
@@ -83,8 +83,6 @@ def fetch_all(sources: list[dict], queries: list[dict], since: datetime, now: da
             return html_scrape.fetch(src)
         if src["adapter"] == "json_api":
             return json_api.fetch(src)
-        if src["adapter"] == "acled":
-            return acled.fetch(src, now)
         if src["adapter"] == "reliefweb":
             return reliefweb.fetch(src, since)
         raise ValueError(f"unknown adapter {src['adapter']!r} for {src['id']}")
@@ -386,8 +384,6 @@ def main(argv: list[str] | None = None) -> int:
         state.write_scoring_state(args.state_dir, scoring)
         if gkg_src and not args.fixtures:
             state.write_baselines(args.state_dir, baselines)
-        if (res := results.get("acled")) and res.ok:
-            state.write_acled(args.state_dir, res.records, finished)
     except ValidationError:
         log.exception("run failed validation; latest.json left unchanged")
         run.run.status = "failed"

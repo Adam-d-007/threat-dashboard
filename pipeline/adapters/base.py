@@ -43,7 +43,6 @@ class FetchResult:
     items: list[RawItem] = field(default_factory=list)
     http_status: int | None = None
     error: str | None = None
-    records: list[dict] = field(default_factory=list)  # non-article data, e.g. ACLED events
     item_count: int | None = None  # set when the items arrived another way (the buffer)
     # Sources made of several queries (GDELT DOC): every query id, and those that succeeded.
     parts: list[str] = field(default_factory=list)

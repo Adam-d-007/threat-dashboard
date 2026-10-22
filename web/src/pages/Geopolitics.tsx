@@ -55,14 +55,6 @@ export function GeopoliticsPage({ run }: { run: Run }) {
                 <TheatreCard key={th.id} th={th} itemById={itemById} />
               ))}
             </div>
-            {g.theatres.some((th) => th.acled) && (
-              <p className="mt-3 text-xs text-muted">
-                {t.acledAttribution}{" "}
-                <ArticleLink href="https://acleddata.com" className="text-link">
-                  acleddata.com
-                </ArticleLink>
-              </p>
-            )}
           </section>
 
           <TheatreMap theatres={g.theatres} items={run.items} />
@@ -171,7 +163,6 @@ function TheatreCard({ th, itemById }: { th: Theatre; itemById: Map<string, Item
       </div>
 
       <dl className="mt-3 space-y-1 text-sm text-ink-2">
-        {th.acled && <dd>{t.acledEvents(th.acled.events_7d, Math.round(th.acled.avg_week_prev_4))}</dd>}
         {th.tone && (
           <dd>
             {t.tone}: <span className="tabular">{th.tone.value.toFixed(1)}</span>{" "}

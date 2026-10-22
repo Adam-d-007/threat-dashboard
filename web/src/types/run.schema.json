@@ -1,24 +1,5 @@
 {
   "$defs": {
-    "AcledActivity": {
-      "additionalProperties": false,
-      "properties": {
-        "events_7d": {
-          "title": "Events 7D",
-          "type": "integer"
-        },
-        "avg_week_prev_4": {
-          "title": "Avg Week Prev 4",
-          "type": "number"
-        }
-      },
-      "required": [
-        "events_7d",
-        "avg_week_prev_4"
-      ],
-      "title": "AcledActivity",
-      "type": "object"
-    },
     "Activity": {
       "additionalProperties": false,
       "properties": {
@@ -71,7 +52,7 @@
     },
     "AnchorReading": {
       "additionalProperties": false,
-      "description": "An official threat level read from a government page, or FCDO travel-advice wording.",
+      "description": "An official reading from a government page: a national threat level, or another\ngovernment's travel advice for a country.",
       "properties": {
         "id": {
           "title": "Id",
@@ -214,6 +195,29 @@
           "description": "Typed in by hand from the official page, because the page cannot be read automatically",
           "title": "Manual",
           "type": "boolean"
+        },
+        "kind": {
+          "default": "national",
+          "description": "national: a country's own threat level; travel: another government's travel advice for this country",
+          "enum": [
+            "national",
+            "travel"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "issuer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO alpha-2 of the government that issues the travel advice (travel only)",
+          "title": "Issuer"
         }
       },
       "required": [
@@ -231,7 +235,9 @@
         "error",
         "text_hash",
         "detail",
-        "manual"
+        "manual",
+        "kind",
+        "issuer"
       ],
       "title": "AnchorReading",
       "type": "object"
@@ -2145,17 +2151,6 @@
           "title": "Countries",
           "type": "array"
         },
-        "acled": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AcledActivity"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        },
         "tone": {
           "anyOf": [
             {
@@ -2213,7 +2208,6 @@
         "name_sk",
         "activity",
         "countries",
-        "acled",
         "tone",
         "sparkline",
         "top_items",

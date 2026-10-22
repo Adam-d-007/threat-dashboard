@@ -78,13 +78,6 @@ def write_buffer(state_dir: Path, items: list[Item], now: datetime,
     _write(state_dir / BUFFER_FILE, buf.model_dump(mode="json"))
 
 
-def write_acled(state_dir: Path, records: list[dict], now: datetime) -> None:
-    """acled.json: ACLED's last 30 days, replaced whole each run because ACLED revises past
-    events. Called only after a successful fetch, so a failure keeps the previous file."""
-    _write(state_dir / "acled.json", {"schema_version": 1, "fetched_at": now.isoformat(),
-                                      "events": records})
-
-
 BASELINE_DAYS = 120
 PROCESSED_KEEP = 4 * 24 * 4  # four days of 15-minute GKG file stamps
 
