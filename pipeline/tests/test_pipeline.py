@@ -138,7 +138,7 @@ def test_window_start():
 
 def test_fixture_run_end_to_end(tmp_path):
     msg = tmp_path / "msg.txt"
-    assert pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path / "state"),
+    assert pipeline_main.main(["--fixtures", "--no-llm", "--state-dir", str(tmp_path / "state"),
                                "--commit-msg-file", str(msg)]) == 0
     latest = json.loads((tmp_path / "state" / "latest.json").read_text())
     run = Run.model_validate(latest)
@@ -154,6 +154,7 @@ def test_fixture_run_end_to_end(tmp_path):
     # Fixture runs use no LLM: the keyword rules find the TASR arrest and the Europol item.
     assert {i.source_id for i in run.items} == {"tasr", "europol"}
     assert run.run.llm.status == "disabled" and run.run.counts.relevant == 2
+    assert all(i.classification.status in ("rules", "unclassified") for i in run.items)
     assert dup[0].classification.event_type == "plot_disrupted"
     assert dup[0].classification.sk_link == "none"  # the rules see no Slovak place in the title
     # No anchors, no history and no LLM in a fixture run: no score, never an invented one.
@@ -928,3 +929,28 @@ def test_theatre_tone_against_its_median():
     short = {"gkg": {k: {d: v for d, v in base["gkg"][k].items() if d in days[-5:]}
                      for k in base["gkg"]}}
     assert geopolitics.tone(short, spec, NOW, cfg) is None  # not enough history yet
+
+
+# --- GTD aggregates ----------------------------------------------------------------------
+
+def test_gtd_aggregates_count_slovakia_and_the_eu_and_refuse_unknown_names():
+    from pipeline.tools import gtd_aggregates as g
+    rows = [{"iyear": "1990", "country_txt": "West Germany (FRG)", "region_txt": "Western Europe",
+             "nkill": "2"},
+            {"iyear": "1992", "country_txt": "Czechoslovakia", "region_txt": "Eastern Europe",
+             "nkill": ""},
+            {"iyear": "2021", "country_txt": "Slovak Republic", "region_txt": "Eastern Europe",
+             "nkill": "0"},
+            {"iyear": "2021", "country_txt": "Norway", "region_txt": "Western Europe",
+             "nkill": "8"},
+            {"iyear": "2021", "country_txt": "Iraq", "region_txt": "Middle East & North Africa",
+             "nkill": "5"}]
+    out = g.aggregate(rows)
+    assert out["data_ends"] == 2021 and len(out["EU"]) == 32  # 1990 to 2021, gaps as zero
+    eu = {y["year"]: y for y in out["EU"]}
+    assert eu[1990] == {"year": 1990, "incidents": 1, "deaths": 2}
+    assert eu[1992]["incidents"] == 1 and eu[2021]["incidents"] == 1
+    assert sum(y["incidents"] for y in out["SK"]) == 1  # Czechoslovakia is not Slovakia
+    with pytest.raises(SystemExit, match="Atlantis"):
+        g.aggregate(rows + [{"iyear": "2000", "country_txt": "Atlantis",
+                             "region_txt": "Western Europe", "nkill": "0"}])

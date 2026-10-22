@@ -76,7 +76,7 @@ def activity(baselines: dict, spec: dict, now: datetime, cfg: dict) -> tuple[Act
     history = [counts[d] for d in complete[:-1] if d >= start]
     if len(history) < mc["min_history_days"]:
         return Activity(value=None, articles_24h=counts[latest]), []
-    base = max(median(history), mc["floor"])
+    base = max(median(history), mc["theatre_floor"])
     spark = [round(curve(counts[d] / base, cfg), 3) for d in complete[-30:]]
     return Activity(value=round(curve(counts[latest] / base, cfg), 4),
                     articles_24h=counts[latest], baseline_median=float(median(history))), spark

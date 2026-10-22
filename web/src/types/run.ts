@@ -173,6 +173,14 @@ export type Origin = "manual" | "news";
 export type Verified = boolean;
 export type Url1 = string | null;
 export type Watchlist = WatchlistEntry[];
+export type Source = string;
+export type DataEnds = number;
+export type Generated = string;
+export type Year = number;
+export type Incidents = number;
+export type Deaths = number;
+export type Sk = GtdYear[];
+export type Eu = GtdYear[];
 /**
  * sha1 of the canonical URL
  */
@@ -208,7 +216,7 @@ export type FallbackUsed = boolean;
 export type ItemsLlm = number;
 export type ItemsRules = number;
 export type ItemsCached = number;
-export type Source = string;
+export type Source1 = string;
 export type Level2 = number;
 export type LabelSk = string | null;
 export type Since1 = string | null;
@@ -543,6 +551,28 @@ export interface WatchlistEntry {
   url: Url1;
 }
 /**
+ * Yearly Global Terrorism Database counts (static/gtd_aggregates.json, aggregates only).
+ *
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "Gtd".
+ */
+export interface Gtd {
+  source: Source;
+  data_ends: DataEnds;
+  generated: Generated;
+  SK: Sk;
+  EU: Eu;
+}
+/**
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "GtdYear".
+ */
+export interface GtdYear {
+  year: Year;
+  incidents: Incidents;
+  deaths: Deaths;
+}
+/**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
  * via the `definition` "Item".
  */
@@ -596,7 +626,7 @@ export interface LlmUsage {
  * via the `definition` "OfficialLevel".
  */
 export interface OfficialLevel {
-  source: Source;
+  source: Source1;
   level: Level2;
   label_sk: LabelSk;
   since: Since1;
@@ -645,6 +675,7 @@ export interface Run {
   diff: Diff | null;
   tesat: Tesat | null;
   sis_annual: SisAnnual | null;
+  gtd: Gtd | null;
   sample: Sample;
 }
 /**

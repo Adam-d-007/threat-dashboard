@@ -68,7 +68,9 @@ the EU) stops a near-empty baseline from turning one arrest into a spike.
 
 Articles that GDELT tags with its TERROR theme and that mention the region (Slovakia, or any EU
 member state) on the latest complete day, against the median of the previous 90 complete days.
-A day counts as complete when at least 90 of its 96 GDELT files were read. Media attention
+A day counts as complete when at least 90 of its 96 GDELT files were read. The median is never
+taken below a floor: 8 articles for Slovakia, where GDELT tags very few (see the replays
+below), and 1 for the EU. Media attention
 measures coverage, not threat (a dramatic trial raises it), which is why its weight is only 15%.
 
 ### A, official levels
@@ -179,19 +181,19 @@ index of 30, the bottom of the spec's 30 to 45 target.
 ### Replays with real media counts
 
 `pipeline/tools/gkg_replay.py` read GDELT GKG bulk files from 15 days before each attack to 2 days
-after: one file per hour (the :00 file, 24 of the 96 a day), about 2.5 GB per incident, counted in
+after: one file per hour (the first that exists in the hour, 24 of the 96 a day), about 2.5 GB per incident, counted in
 memory. Only the daily counts are kept, in `pipeline/data/replays/`, scaled by 4 to a full day.
 The test `test_bulk_replays_count_real_media_and_still_raise_the_index` then replays each
 incident with E from the rebuilt incident and M from these counts (no language model). The
-tables show level/index in the last run before the attack and the first run after, and M before
-against its highest value in the two days after.
+table shows level/index in the last run before the attack and the first run after, and M before
+against its highest value in the two days after, with the Slovak floor at 8 (below).
 
 | Window | Slovakia | EU |
 |---|---|---|
-| Bratislava, 12 Oct 2022 | 2/24 → 3/52, M 0.00 → max 0.90 | 2/44 → 3/63, M 0.50 → max 0.52 |
+| Bratislava, 12 Oct 2022 | 2/24 → 3/52, M 0.00 → max 0.88 | 2/44 → 3/63, M 0.50 → max 0.52 |
 | Vienna, 2 Nov 2020 | 2/30 → 3/64, no M (see below) | 2/44 → 3/67, no M |
-| Solingen, 23 Aug 2024 | 2/36 → 2/49, M 0.90 → max 0.90 | 2/44 → 3/63, M 0.51 → max 0.60 |
-| Villach, 15 Feb 2025 | 2/36 → 3/68, M 0.85 → max 0.85 | 2/44 → 3/64, M 0.54 → max 0.54 |
+| Solingen, 23 Aug 2024 | 2/31 → 2/40, M 0.38 → max 0.38 | 2/44 → 3/63, M 0.51 → max 0.60 |
+| Villach, 15 Feb 2025 | 2/29 → 3/55, M 0.21 → max 0.21 | 2/44 → 3/64, M 0.54 → max 0.54 |
 
 What the real counts show:
 
@@ -202,13 +204,13 @@ What the real counts show:
 - **EU coverage moves little.** The EU's TERROR count is in the thousands every day, so one
   attack raises it by half at most (Solingen: ratio 1.96, two days later). Villach came two
   days after the Munich car attack, which had already raised the baseline.
-- **Slovak coverage is tiny and noisy.** The median day in each window had no Slovak TERROR
-  article in the sample, so the floor of 1 sets the scale: four stray articles give M = 0.85
-  before Solingen and Villach, and Bratislava's real rise (to 36 articles two days after)
-  barely shows (0.85 to 0.90). It also lifts the quiet Slovak index from 30 to 36.
-- **With a Slovak floor of 8** (tried in memory, not in `scoring.yaml`): the quiet index
-  returns to 29 to 31; Bratislava's M climbs 0, 0.21, 0.61, 0.88 over two days; Solingen,
-  with no Slovak link, keeps Slovakia at level 2 with M at most 0.38.
+- **Slovak coverage is tiny and noisy, hence the floor of 8.** The median day in each window
+  had no Slovak TERROR article in the sample. With the floor at 1 (the first setting), four
+  stray articles gave M = 0.85 before Solingen and Villach, Bratislava's real rise (to 36
+  articles two days after) barely showed (0.85 to 0.90), and the quiet Slovak index rose from
+  30 to 36. With the floor at 8 (set on 2026-10-22): the quiet index is 29 to 31;
+  Bratislava's M climbs 0, 0.21, 0.61, 0.88 over two days; Solingen, with no Slovak link,
+  keeps Slovakia at level 2 with M at most 0.38.
 
 **Open questions for the four-week review:**
 
@@ -218,7 +220,5 @@ What the real counts show:
 - Ukraine sits at proximity 0.5 for Slovakia. Acts of war are classified as geopolitics, not
   terrorism, so they should not inflate the index; this needs checking on live data.
 - The weights (35/15/20/30) are judgement calls and are reviewed with four weeks of data.
-- **The Slovak media floor.** GDELT tags very few TERROR articles to Slovakia: in the four
-  replay windows the median day had none. With the floor at 1, an ordinary day with four
-  articles gives M = 0.85, as high as the days after the Bratislava attack, so M adds noise,
-  not signal. A floor of 8 fixes that in the replays (below). Not changed yet: Adam to decide.
+- The Slovak media floor of 8 was set from four replays; check it against live counts, which
+  read all 96 files a day rather than one an hour.

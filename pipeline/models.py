@@ -289,6 +289,22 @@ class TesatYear(Strict):
     arrests_total: int
 
 
+class GtdYear(Strict):
+    year: int
+    incidents: int
+    deaths: int
+
+
+class Gtd(Strict):
+    """Yearly Global Terrorism Database counts (static/gtd_aggregates.json, aggregates only)."""
+
+    source: str
+    data_ends: int
+    generated: str
+    SK: list[GtdYear]
+    EU: list[GtdYear]
+
+
 class SisAnnual(Strict):
     """Points from the latest SIS annual report, summarised by hand (manual_anchors.yaml)."""
 
@@ -373,6 +389,7 @@ class Run(Strict):
     diff: Diff | None = None
     tesat: Tesat | None = None
     sis_annual: SisAnnual | None = None
+    gtd: Gtd | None = None
     sample: bool = Field(default=False, description="True for made-up sample data used to "
                          "develop the frontend; the site labels it on every page")
 

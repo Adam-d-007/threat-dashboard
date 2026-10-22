@@ -100,12 +100,12 @@ def media_component(baselines: dict, region: str, now: datetime, cfg: dict) -> C
         "%Y-%m-%d")
     history = [count(d) for d in complete[:-1] if d >= start]
     inputs: dict = {"day": latest, "articles": count(latest), "complete_days": len(history),
-                    "floor": mc["floor"]}
+                    "floor": mc["floor"][region]}
     if len(history) < mc["min_history_days"]:
         inputs["status"] = "warming_up"
         return Component(id="media", weight=weight, value=None, inputs=inputs)
     base = median(history)
-    r = count(latest) / max(base, mc["floor"])
+    r = count(latest) / max(base, mc["floor"][region])
     inputs |= {"baseline_median": base, "ratio": round(r, 3)}
     return Component(id="media", weight=weight, value=round(curve(r, cfg), 4), inputs=inputs)
 

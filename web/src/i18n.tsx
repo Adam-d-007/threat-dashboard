@@ -156,6 +156,15 @@ const en = {
       `Slovakia reported ${attacks} attacks and ${arrests} arrests for terrorism in that year.`,
     gtdPending: "Long-term history from the Global Terrorism Database (which ends in 2021) will be added later.",
   },
+  gtd: {
+    sk: "Slovakia",
+    eu: "the EU-27",
+    title: (where: string) => `Terrorist incidents per year in ${where}`,
+    summary: (total: number, year: number, n: number) =>
+      `${total} ${total === 1 ? "incident" : "incidents"} in all; most in ${year} (${n})`,
+    bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidents, ${deaths} deaths`,
+    ends: (year: number) => `GTD data ends in ${year}. Today's 27 member states for every year; failed attacks included.`,
+  },
   latestReports: "Latest reports",
   dateEstimated: "date estimated",
   brief: "Daily brief",
@@ -386,6 +395,15 @@ const sk: Strings = {
     slovakia: (attacks: number, arrests: number) =>
       `Slovensko v danom roku nahlásilo ${attacks} útokov a ${arrests} zadržaní za terorizmus.`,
     gtdPending: "Dlhodobá história z Global Terrorism Database (končí rokom 2021) bude doplnená neskôr.",
+  },
+  gtd: {
+    sk: "na Slovensku",
+    eu: "v EÚ-27",
+    title: (where: string) => `Teroristické incidenty podľa rokov ${where}`,
+    summary: (total: number, year: number, n: number) =>
+      `Spolu ${total} ${total === 1 ? "incident" : total >= 2 && total <= 4 ? "incidenty" : "incidentov"}; najviac v roku ${year} (${n})`,
+    bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidentov, ${deaths} obetí`,
+    ends: (year: number) => `Údaje GTD končia rokom ${year}. Pre každý rok súčasných 27 členských štátov; vrátane neúspešných útokov.`,
   },
   latestReports: "Najnovšie správy",
   dateEstimated: "dátum je odhadnutý",

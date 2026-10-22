@@ -25,6 +25,7 @@ from .models import (
     SCHEMA_VERSION,
     AnchorReading,
     Diff,
+    Gtd,
     Item,
     LevelChange,
     LlmUsage,
@@ -50,6 +51,7 @@ from .store import state
 
 CONFIG = Path(__file__).parent / "config"
 FIXTURES = Path(__file__).parent / "fixtures"
+GTD = Path(__file__).parents[1] / "static" / "gtd_aggregates.json"
 OVERLAP = timedelta(hours=2)
 MAX_WINDOW = timedelta(hours=36)
 # --fixtures runs pretend it is this moment, so their output never depends on the date.
@@ -213,6 +215,12 @@ def load_sis_annual() -> SisAnnual | None:
     return SisAnnual(**s)
 
 
+def load_gtd() -> Gtd | None:
+    """GTD yearly counts from static/gtd_aggregates.json, or None until Adam has run
+    pipeline.tools.gtd_aggregates on the GTD download."""
+    return Gtd.model_validate_json(GTD.read_text()) if GTD.exists() else None
+
+
 def run_gkg(src: dict, baselines: dict, now: datetime) -> FetchResult:
     """Read new GKG files into baselines (in place). Missing files make the source failed only
     when nothing could be read at all."""
@@ -364,7 +372,7 @@ def main(argv: list[str] | None = None) -> int:
         for r, a in regions.items() if a and (prev_terr.get(r) or {}).get("level") != a.level]
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=relevant,
               anchors=anchors, diff=run_diff, tesat=load_tesat(),
-              sis_annual=load_sis_annual(),
+              sis_annual=load_sis_annual(), gtd=load_gtd(),
               terrorism=Terrorism(SK=regions["SK"], EU=regions["EU"]) if scored else None,
               geopolitics=geo,
               events=sorted((e for e in events if e.date >= recent),

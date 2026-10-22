@@ -23,7 +23,7 @@ gdelt_doc:
 # Terms are word starts (stems), matched case-insensitively with diacritics removed, so
 # "vybuch" also matches "výbuchu". A term ending in ! must match a whole word ("war!" does
 # not match "warfarin"). The prefilter favours recall: the LLM decides relevance.
-# Slovak and Czech lists: Adam to review.
+# Slovak and Czech lists reviewed by Adam on 2026-10-22.
 prefilter:
   keep_groups: [official, backbone]
   max_items: 600

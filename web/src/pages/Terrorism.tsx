@@ -137,7 +137,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       />
 
       <Card title={t.baseRates}>
-        <BaseRates tesat={run.tesat} />
+        <BaseRates tesat={run.tesat} gtd={run.gtd ?? null} region={region} />
       </Card>
 
       {region === "SK" && run.sis_annual && (

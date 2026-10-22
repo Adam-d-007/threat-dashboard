@@ -11,9 +11,9 @@ Where things stand (2026-10-22):
 | 2. Groq key | Done |
 | 3. ACLED | Secrets set; waiting for ACLED to grant API access (you emailed them) |
 | 4. ReliefWeb | Waiting for the approved appname |
-| 5. GTD | Optional; not started |
+| 5. GTD | Optional; the tool is ready, waiting for your download |
 | 6. Permission requests | Optional; not sent |
-| 7. Keyword review | **Ready for you now** |
+| 7. Keyword review | Done (Adam checked the Slovak and Czech terms, 2026-10-22) |
 
 All Terminal commands are run from the project folder:
 
@@ -92,9 +92,18 @@ Already requested. ReliefWeb answers by email within two business days.
 
 1. Go to START's GTD page (start.umd.edu/gtd), choose the download, and fill in their request
    form (non-commercial, research and education use).
-2. When you have the file, put it anywhere on your Mac outside the project folder and tell
-   Claude where it is. Its licence forbids publishing the raw file, so only yearly counts go
+2. When you have the file, put it anywhere on your Mac outside the project folder, for
+   example in Downloads. Its licence forbids publishing the raw file, so only yearly counts go
    into the repository.
+3. Run the tool on it (replace the path with yours; for a .csv file leave out
+   `--with openpyxl`):
+
+   ```bash
+   uv run --with openpyxl python -m pipeline.tools.gtd_aggregates ~/Downloads/globalterrorismdb.xlsx
+   ```
+
+4. Tell Claude. It checks `static/gtd_aggregates.json` and commits it; the next run shows the
+   history on both terrorism pages. Or just tell Claude where the file is.
 
 ## Step 6. Permission requests for blocked sources (optional)
 

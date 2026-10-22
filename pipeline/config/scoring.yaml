@@ -38,7 +38,10 @@ media:
   theme: TERROR             # GDELT GKG theme counted
   key: {SK: SK, EU: EU}     # baselines.json country key per region
   baseline_days: 90
-  floor: 1
+  # Slovakia 8: GDELT tags few TERROR articles to Slovakia (median 0 a day in the replay
+  # windows), and with a floor of 1 four stray articles gave M = 0.85. See SCORING.md.
+  floor: {SK: 8, EU: 1}
+  theatre_floor: 1          # theatre activity counts (geopolitics)
   min_history_days: 14      # complete days needed before M counts
   min_files_per_day: 90     # of 96 GKG files, for a day to count as complete
 

@@ -96,6 +96,34 @@ def test_disagreement_rule():
     assert disagree(1, 3) and disagree(2, 3) and disagree(4, 3)
 
 
+class LoudLlm:
+    """An LLM that always answers level 4, to force a disagreement with the rules."""
+
+    providers, available, calls = ["fake"], True, 0
+
+    def complete_json(self, system, user):
+        self.calls += 1
+        return json.dumps({"level": 4, "position": "high", "confidence": "high", "drivers": [],
+                           "what_changed_en": "x", "what_changed_sk": "x"})
+
+    def usage(self):
+        return {"model": "fake"}
+
+
+def test_forced_disagreement_keeps_the_gated_rules_level():
+    rows, state = [], {"regions": {}, "anchor_history": {}}
+    start = NOW - timedelta(days=30)
+    for n in range(60):  # a quiet month, rules only
+        t = start + timedelta(hours=12 * n)
+        _, row = score_region("SK", f"r{n}", quiet_events(t), ANCHORS, {}, rows, state, None, t,
+                              CFG, 0)
+        rows.append(row)
+    a, _ = score_region("SK", "r60", quiet_events(NOW), ANCHORS, {}, rows, state, LoudLlm(),
+                        NOW, CFG, 5)
+    assert a.llm.status == "ok" and a.llm.level == 4
+    assert a.disagreement and a.rules_level == 2 and a.level == a.rules_level
+
+
 def test_curve_matches_spec():
     assert curve(1, CFG) == pytest.approx(0.375)
     assert curve(2, CFG) == pytest.approx(0.609, abs=1e-3)

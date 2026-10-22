@@ -884,6 +884,71 @@
       "title": "Geopolitics",
       "type": "object"
     },
+    "Gtd": {
+      "additionalProperties": false,
+      "description": "Yearly Global Terrorism Database counts (static/gtd_aggregates.json, aggregates only).",
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "data_ends": {
+          "title": "Data Ends",
+          "type": "integer"
+        },
+        "generated": {
+          "title": "Generated",
+          "type": "string"
+        },
+        "SK": {
+          "items": {
+            "$ref": "#/$defs/GtdYear"
+          },
+          "title": "Sk",
+          "type": "array"
+        },
+        "EU": {
+          "items": {
+            "$ref": "#/$defs/GtdYear"
+          },
+          "title": "Eu",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source",
+        "data_ends",
+        "generated",
+        "SK",
+        "EU"
+      ],
+      "title": "Gtd",
+      "type": "object"
+    },
+    "GtdYear": {
+      "additionalProperties": false,
+      "properties": {
+        "year": {
+          "title": "Year",
+          "type": "integer"
+        },
+        "incidents": {
+          "title": "Incidents",
+          "type": "integer"
+        },
+        "deaths": {
+          "title": "Deaths",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "year",
+        "incidents",
+        "deaths"
+      ],
+      "title": "GtdYear",
+      "type": "object"
+    },
     "Item": {
       "additionalProperties": false,
       "properties": {
@@ -1576,6 +1641,17 @@
           ],
           "default": null
         },
+        "gtd": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Gtd"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "sample": {
           "default": false,
           "description": "True for made-up sample data used to develop the frontend; the site labels it on every page",
@@ -1595,6 +1671,7 @@
         "diff",
         "tesat",
         "sis_annual",
+        "gtd",
         "sample"
       ],
       "title": "Run",

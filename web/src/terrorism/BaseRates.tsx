@@ -1,9 +1,10 @@
 import { ArticleLink, Muted } from "../components/ui";
 import { useLang } from "../i18n";
-import type { Tesat } from "../types/run";
+import type { Gtd, Tesat } from "../types/run";
+import { GtdHistory } from "./GtdHistory";
 
 /** Europol TE-SAT headline figures, with attacks by type as one-series bars. */
-export function BaseRates({ tesat }: { tesat: Tesat | null }) {
+export function BaseRates({ tesat, gtd, region }: { tesat: Tesat | null; gtd: Gtd | null; region: "SK" | "EU" }) {
   const { t } = useLang();
   if (!tesat) return <Muted>{t.baseRatesPending}</Muted>;
   const cur = tesat.current;
@@ -51,7 +52,7 @@ export function BaseRates({ tesat }: { tesat: Tesat | null }) {
         </ul>
       </div>
       <p className="text-sm">{t.tesat.slovakia(tesat.slovakia_attacks, tesat.slovakia_arrests)}</p>
-      <Muted>{t.tesat.gtdPending}</Muted>
+      {gtd ? <GtdHistory gtd={gtd} region={region} /> : <Muted>{t.tesat.gtdPending}</Muted>}
     </div>
   );
 }

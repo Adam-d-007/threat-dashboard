@@ -194,6 +194,17 @@ describe("Phase 5: every panel renders in each special case", () => {
     expect(screen.getByText("SIS annual report for 2023 (published June 2024)")).toBeInTheDocument();
   });
 
+  it("shows GTD history for the page's region when the aggregates exist", async () => {
+    const yr = (year: number, incidents: number) => ({ year, incidents, deaths: 0 });
+    const gtd = { source: "https://www.start.umd.edu/gtd/", data_ends: 2021, generated: "2026-10-22",
+      SK: [yr(2020, 0), yr(2021, 1)], EU: [yr(2020, 30), yr(2021, 12)] };
+    mockFetch({ ...realRun, gtd });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("Terrorist incidents per year in Slovakia")).toBeInTheDocument();
+    expect(screen.getByText("1 incident in all; most in 2021 (1)")).toBeInTheDocument();
+    expect(screen.getByText(/GTD data ends in 2021/)).toBeInTheDocument();
+  });
+
   it("filters the geopolitics map by theatre", async () => {
     window.location.hash = "#geopolitics";
     mockFetch(base);
