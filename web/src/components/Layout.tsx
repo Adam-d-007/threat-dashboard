@@ -13,6 +13,9 @@ export function Layout({
   now,
   theme,
   setTheme,
+  runIds,
+  picked,
+  onPick,
   children,
 }: {
   route: Route;
@@ -20,6 +23,9 @@ export function Layout({
   now: Date;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  runIds: string[];
+  picked: string | null;
+  onPick: (id: string) => void;
   children: ReactNode;
 }) {
   const { t, lang, setLang, locale } = useLang();
@@ -64,6 +70,20 @@ export function Layout({
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
+            {runIds.length > 1 && (
+              <select
+                aria-label={t.runPicker}
+                value={picked ?? runIds[0]}
+                onChange={(e) => onPick(e.target.value)}
+                className="rounded-lg border border-line bg-surface-2 px-2 py-1.5 text-xs text-ink"
+              >
+                {runIds.map((id, i) => (
+                  <option key={id} value={id}>
+                    {i === 0 ? `${id} (${t.latest})` : id}
+                  </option>
+                ))}
+              </select>
+            )}
             {run && age && (
               <span className="hidden text-xs text-muted md:inline">
                 {t.lastRun} {fmtDateTime(run.run.finished_at, locale)}
@@ -96,8 +116,16 @@ export function Layout({
         </div>
       </header>
       <div className="mx-auto max-w-6xl space-y-2 px-4 pt-3 empty:hidden">
-        {age?.level === "red" && <Banner tone="crit">{t.ageRed}</Banner>}
-        {age?.level === "amber" && <Banner tone="warn">{t.ageAmber}</Banner>}
+        {picked && run && (
+          <Banner tone="info">
+            {t.viewingOld(run.run.id)}{" "}
+            <button type="button" className="underline" onClick={() => onPick(runIds[0])}>
+              {t.backToLatest}
+            </button>
+          </Banner>
+        )}
+        {!picked && age?.level === "red" && <Banner tone="crit">{t.ageRed}</Banner>}
+        {!picked && age?.level === "amber" && <Banner tone="warn">{t.ageAmber}</Banner>}
       </div>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
       <footer className="border-t border-line">

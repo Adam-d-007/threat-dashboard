@@ -380,6 +380,8 @@ class TimeseriesRow(Strict):
     rules_level: Level
     llm_level: Level | None
     components: dict[str, float | None]
+    gates: list[str] = Field(default_factory=list, description="Gates that changed the level "
+                             "in this run (a cap lowered it, or the floor raised it)")
 
 
 class Timeseries(Strict):

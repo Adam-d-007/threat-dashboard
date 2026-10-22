@@ -62,6 +62,31 @@ export async function loadLatest(now: Date = new Date()): Promise<LoadResult> {
   return { kind: "ok", run: data as unknown as Run };
 }
 
+/** Ids of the stored runs, newest first (runs/index.json), or [] when there is no index. */
+export async function loadRunIndex(now: Date = new Date()): Promise<string[]> {
+  if (SAMPLE_MODE) return [];
+  const res = await fetch(`${dataBaseUrl()}/runs/index.json?v=${slotKey(now)}`);
+  if (!res.ok) return [];
+  const runs = (await res.json())?.runs;
+  return Array.isArray(runs) ? runs : [];
+}
+
+/** One stored run (runs/<id>.json), checked like latest.json. */
+export async function loadRun(id: string): Promise<LoadResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${dataBaseUrl()}/runs/${encodeURIComponent(id)}.json`);
+  } catch (e) {
+    return { kind: "error", message: String(e) };
+  }
+  if (!res.ok) return { kind: "error", message: `HTTP ${res.status}` };
+  const data = await res.json();
+  if (!SUPPORTED_SCHEMA_VERSIONS.includes(data?.schema_version)) {
+    return { kind: "unsupported", version: data?.schema_version };
+  }
+  return { kind: "ok", run: data as Run };
+}
+
 /** The index history, or null when none exists yet (before scoring runs). */
 export async function loadTimeseries(now: Date = new Date()): Promise<Timeseries | null> {
   if (SAMPLE_MODE) return (await import("../sample/timeseries.json")).default as unknown as Timeseries;

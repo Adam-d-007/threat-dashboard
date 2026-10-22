@@ -1,5 +1,11 @@
+import { marked } from "marked";
 import { Card } from "../components/ui";
 import { useLang } from "../i18n";
+import scoring from "../../../docs/SCORING.md?raw";
+
+// Links in SCORING.md are relative to the repository; on the site they point to GitHub.
+const REPO = "https://github.com/Adam-d-007/threat-dashboard/blob/main/";
+const html = marked.parse(scoring.replaceAll("](../", `](${REPO}`), { async: false });
 
 export function MethodPage() {
   const { t } = useLang();
@@ -13,15 +19,9 @@ export function MethodPage() {
           ))}
         </div>
       </Card>
-      <Card title={t.components}>
-        <dl className="space-y-3 text-sm">
-          {Object.entries(t.componentNames).map(([id, name]) => (
-            <div key={id}>
-              <dt className="font-semibold">{name}</dt>
-              <dd className="text-ink-2">{t.componentHelp[id]}</dd>
-            </div>
-          ))}
-        </dl>
+      <Card title={t.fullMethod}>
+        {/* Our own document, bundled at build time: not user content. */}
+        <div className="method-doc" dangerouslySetInnerHTML={{ __html: html }} />
       </Card>
     </div>
   );

@@ -51,9 +51,12 @@ def write_side_files(state_dir: Path, sources: list[SourceHealth], seen: dict[st
     cutoff = now - timedelta(days=SEEN_DAYS)
     _write(state_dir / "seen.json",
            {k: v for k, v in seen.items() if datetime.fromisoformat(v) >= cutoff})
-    runs = sorted((state_dir / "runs").glob("*.json"))
+    runs = sorted(p for p in (state_dir / "runs").glob("*.json") if p.name != "index.json")
     for old in runs[:-KEEP_RUNS]:
         old.unlink()
+    # The browser cannot list a folder on GitHub, so the run picker reads this index.
+    _write(state_dir / "runs" / "index.json",
+           {"schema_version": 1, "runs": [p.stem for p in runs[-KEEP_RUNS:]][::-1]})
 
 
 def load_buffer(state_dir: Path) -> list[Item]:

@@ -18,7 +18,12 @@ export function IndexHistory({ rows, officialLevel }: { rows: TimeseriesRow[]; o
   const c = useChartColors();
   const [range, setRange] = useState<Range>("90");
   const data = useMemo(() => {
-    const pts = rows.map((r) => ({ x: new Date(r.at).getTime(), index: r.index, level: r.level }));
+    const pts = rows.map((r) => ({
+      x: new Date(r.at).getTime(),
+      index: r.index,
+      level: r.level,
+      gates: r.gates ?? [],
+    }));
     if (range === "all" || pts.length === 0) return pts;
     const end = pts[pts.length - 1].x;
     return pts.filter((p) => p.x >= end - Number(range) * DAY);
@@ -67,9 +72,28 @@ export function IndexHistory({ rows, officialLevel }: { rows: TimeseriesRow[]; o
               cursor={{ stroke: c.muted, strokeWidth: 1 }}
               contentStyle={{ background: c.surface, border: `1px solid ${c.grid}`, borderRadius: 8, color: c.ink }}
               labelFormatter={(x) => new Date(Number(x)).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}
-              formatter={(v, _n, p) => [`${v} (${t.levelWord} ${p.payload.level})`, t.index]}
+              formatter={(v, _n, p) => [
+                `${v} (${t.levelWord} ${p.payload.level})` +
+                  (p.payload.gates.length ? ` · ${t.gateMarker}: ${p.payload.gates.map((g: string) => t.gateNames[g] ?? g).join("; ")}` : ""),
+                t.index,
+              ]}
             />
-            <Line type="monotone" dataKey="index" stroke={c["series-1"]} strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+            <Line
+              type="monotone"
+              dataKey="index"
+              stroke={c["series-1"]}
+              strokeWidth={2}
+              isAnimationActive={false}
+              activeDot={{ r: 4 }}
+              // A ring marks runs where a rule (gate) changed the level.
+              dot={(props: { cx?: number; cy?: number; index?: number; payload?: { gates: string[] } }) =>
+                props.payload?.gates.length ? (
+                  <circle key={props.index} cx={props.cx} cy={props.cy} r={5} fill={c.surface} stroke={c.ink} strokeWidth={2} />
+                ) : (
+                  <g key={props.index} />
+                )
+              }
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>

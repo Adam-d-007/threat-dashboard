@@ -2188,6 +2188,14 @@
           },
           "title": "Components",
           "type": "object"
+        },
+        "gates": {
+          "description": "Gates that changed the level in this run (a cap lowered it, or the floor raised it)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Gates",
+          "type": "array"
         }
       },
       "required": [
@@ -2198,7 +2206,8 @@
         "level",
         "rules_level",
         "llm_level",
-        "components"
+        "components",
+        "gates"
       ],
       "title": "TimeseriesRow",
       "type": "object"

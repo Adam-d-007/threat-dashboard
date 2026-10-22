@@ -159,6 +159,8 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     row = {"run_id": run_id, "at": now.isoformat(), "region": region, "index": index,
            "level": level, "rules_level": rules_level,
            "llm_level": llm.level if llm.status == "ok" else None,
+           "gates": [g.id for g in shown if g.id != "floor_eu_attack_30d"]
+           + (["floor_eu_attack_30d"] if gate_raised else []),
            "components": {"events": e_comp.value, "media": m_comp.value,
                           "anchors": a_comp.value, "llm": l_comp.value,
                           "events_raw": e_comp.inputs["weighted_sum"], "p": round(p, 4),

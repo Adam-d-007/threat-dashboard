@@ -288,6 +288,10 @@ export type Index1 = number;
 export type Level4 = 1 | 2 | 3 | 4;
 export type RulesLevel1 = 1 | 2 | 3 | 4;
 export type LlmLevel = (1 | 2 | 3 | 4) | null;
+/**
+ * Gates that changed the level in this run (a cap lowered it, or the floor raised it)
+ */
+export type Gates1 = string[];
 export type Rows = TimeseriesRow[];
 export type Sample1 = boolean;
 
@@ -745,6 +749,7 @@ export interface TimeseriesRow {
   rules_level: RulesLevel1;
   llm_level: LlmLevel;
   components: Components1;
+  gates: Gates1;
 }
 export interface Components1 {
   [k: string]: number | null;

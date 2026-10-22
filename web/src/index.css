@@ -97,3 +97,19 @@ body {
 .leaflet-tile-pane {
   filter: var(--map-filter);
 }
+
+/* The method page renders docs/SCORING.md. */
+.method-doc {
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.method-doc h1 { display: none; }
+.method-doc h2 { color: var(--ink); font-size: 1.25rem; font-weight: 700; margin: 1.75rem 0 0.5rem; }
+.method-doc h3 { color: var(--ink); font-size: 1.05rem; font-weight: 600; margin: 1.25rem 0 0.4rem; }
+.method-doc p, .method-doc ul { margin: 0.6rem 0; }
+.method-doc ul { list-style: disc; padding-left: 1.25rem; }
+.method-doc strong { color: var(--ink); }
+.method-doc table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.875rem; display: block; overflow-x: auto; }
+.method-doc th, .method-doc td { border-bottom: 1px solid var(--border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; }
+.method-doc th { color: var(--ink); }
+.method-doc code { font-size: 0.85em; background: var(--surface-2); padding: 0.1rem 0.3rem; border-radius: 4px; }
