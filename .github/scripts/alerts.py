@@ -34,7 +34,8 @@ def ensure_label(label: str, color: str, description: str) -> None:
 
 def main() -> None:
     state, job = Path(sys.argv[1]), sys.argv[2]
-    runs = sorted((state / "runs").glob("*.json"))
+    # runs/ also holds index.json (the run picker's list), which is not a run.
+    runs = sorted(p for p in (state / "runs").glob("*.json") if p.name != "index.json")
     last = [json.loads(p.read_text())["run"] for p in runs[-2:]]
     latest = json.loads((state / "latest.json").read_text()) if (state / "latest.json").exists() \
         else {}
