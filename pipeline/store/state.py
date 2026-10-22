@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ..models import Item, RssBuffer, Run, SourceHealth
+from ..models import Event, Item, RssBuffer, Run, SourceHealth
 
 KEEP_RUNS = 28
 SEEN_DAYS = 30
@@ -108,3 +108,27 @@ def merge_gkg(baselines: dict, records: list[dict], now: datetime) -> dict:
 
 def write_baselines(state_dir: Path, baselines: dict) -> None:
     _write(state_dir / "baselines.json", baselines)
+
+
+CLASSIFIED_DAYS = 7
+
+
+def load_classified(state_dir: Path) -> dict[str, dict]:
+    """LLM labels from earlier runs, by item id, so an item is sent to the LLM only once."""
+    return (_read(state_dir / "classified.json") or {}).get("items", {})
+
+
+def write_classified(state_dir: Path, cache: dict[str, dict], now: datetime) -> None:
+    cutoff = now - timedelta(days=CLASSIFIED_DAYS)
+    kept = {k: v for k, v in cache.items() if datetime.fromisoformat(v["at"]) >= cutoff}
+    _write(state_dir / "classified.json", {"schema_version": 1, "items": kept})
+
+
+def load_events(state_dir: Path) -> list[Event]:
+    data = _read(state_dir / "events.json")
+    return [Event.model_validate(e) for e in data["events"]] if data else []
+
+
+def write_events(state_dir: Path, events: list[Event]) -> None:
+    _write(state_dir / "events.json",
+           {"schema_version": 1, "events": [e.model_dump(mode="json") for e in events]})

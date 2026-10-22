@@ -715,6 +715,14 @@
           "title": "Item Ids",
           "type": "array"
         },
+        "event_keys": {
+          "description": "LLM incident keys seen",
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Keys",
+          "type": "array"
+        },
         "domains": {
           "items": {
             "type": "string"
@@ -753,6 +761,7 @@
         "place",
         "sk_link",
         "item_ids",
+        "event_keys",
         "domains",
         "has_tier_a",
         "corroborated",
@@ -1132,6 +1141,81 @@
       "title": "LlmAssessment",
       "type": "object"
     },
+    "LlmUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "fallback",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "calls": {
+          "default": 0,
+          "title": "Calls",
+          "type": "integer"
+        },
+        "fallback_used": {
+          "default": false,
+          "title": "Fallback Used",
+          "type": "boolean"
+        },
+        "items_llm": {
+          "default": 0,
+          "title": "Items Llm",
+          "type": "integer"
+        },
+        "items_rules": {
+          "default": 0,
+          "title": "Items Rules",
+          "type": "integer"
+        },
+        "items_cached": {
+          "default": 0,
+          "title": "Items Cached",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "status",
+        "provider",
+        "model",
+        "calls",
+        "fallback_used",
+        "items_llm",
+        "items_rules",
+        "items_cached"
+      ],
+      "title": "LlmUsage",
+      "type": "object"
+    },
     "OfficialLevel": {
       "additionalProperties": false,
       "properties": {
@@ -1483,13 +1567,25 @@
         "in_window": {
           "title": "In Window",
           "type": "integer"
+        },
+        "after_prefilter": {
+          "default": 0,
+          "title": "After Prefilter",
+          "type": "integer"
+        },
+        "relevant": {
+          "default": 0,
+          "title": "Relevant",
+          "type": "integer"
         }
       },
       "required": [
         "fetched",
         "from_buffer",
         "after_dedupe",
-        "in_window"
+        "in_window",
+        "after_prefilter",
+        "relevant"
       ],
       "title": "RunCounts",
       "type": "object"
@@ -1538,6 +1634,17 @@
         },
         "counts": {
           "$ref": "#/$defs/RunCounts"
+        },
+        "llm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LlmUsage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -1547,7 +1654,8 @@
         "finished_at",
         "window_start",
         "git_sha",
-        "counts"
+        "counts",
+        "llm"
       ],
       "title": "RunInfo",
       "type": "object"

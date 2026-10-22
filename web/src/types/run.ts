@@ -128,6 +128,10 @@ export type Date = string;
 export type Country1 = string;
 export type SkLink1 = "none" | "indirect" | "direct";
 export type ItemIds1 = string[];
+/**
+ * LLM incident keys seen
+ */
+export type EventKeys = string[];
 export type Domains = string[];
 export type HasTierA = boolean;
 export type Corroborated = boolean;
@@ -188,6 +192,14 @@ export type Drivers = Driver[];
 export type WhatChangedEn1 = string | null;
 export type WhatChangedSk1 = string | null;
 export type Model = string | null;
+export type Status4 = "ok" | "fallback" | "disabled";
+export type Provider = string | null;
+export type Model1 = string | null;
+export type Calls = number;
+export type FallbackUsed = boolean;
+export type ItemsLlm = number;
+export type ItemsRules = number;
+export type ItemsCached = number;
 export type Source = string;
 export type Level2 = number;
 export type LabelSk = string | null;
@@ -206,7 +218,7 @@ export type Disagreement = boolean;
 export type AnchorIds = string[];
 export type SchemaVersion = 1;
 export type Id7 = string;
-export type Status4 = "ok" | "partial" | "failed";
+export type Status5 = "ok" | "partial" | "failed";
 export type StartedAt = string;
 export type FinishedAt = string;
 export type WindowStart = string;
@@ -218,11 +230,13 @@ export type Fetched = number;
 export type FromBuffer = number;
 export type AfterDedupe = number;
 export type InWindow = number;
+export type AfterPrefilter = number;
+export type Relevant1 = number;
 export type Id8 = string;
 export type Name2 = string;
 export type Tier1 = "A" | "B" | "C";
 export type Group = string;
-export type Status5 = "ok" | "stale" | "failed" | "disabled";
+export type Status6 = "ok" | "stale" | "failed" | "disabled";
 export type LastSuccess = string | null;
 export type LastError = string | null;
 export type Items = number;
@@ -421,6 +435,7 @@ export interface Event {
   place: Place | null;
   sk_link: SkLink1;
   item_ids: ItemIds1;
+  event_keys: EventKeys;
   domains: Domains;
   has_tier_a: HasTierA;
   corroborated: Corroborated;
@@ -535,6 +550,20 @@ export interface LlmAssessment {
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "LlmUsage".
+ */
+export interface LlmUsage {
+  status: Status4;
+  provider: Provider;
+  model: Model1;
+  calls: Calls;
+  fallback_used: FallbackUsed;
+  items_llm: ItemsLlm;
+  items_rules: ItemsRules;
+  items_cached: ItemsCached;
+}
+/**
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
  * via the `definition` "OfficialLevel".
  */
 export interface OfficialLevel {
@@ -592,12 +621,13 @@ export interface Run {
  */
 export interface RunInfo {
   id: Id7;
-  status: Status4;
+  status: Status5;
   started_at: StartedAt;
   finished_at: FinishedAt;
   window_start: WindowStart;
   git_sha: GitSha;
   counts: RunCounts;
+  llm: LlmUsage | null;
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
@@ -608,6 +638,8 @@ export interface RunCounts {
   from_buffer: FromBuffer;
   after_dedupe: AfterDedupe;
   in_window: InWindow;
+  after_prefilter: AfterPrefilter;
+  relevant: Relevant1;
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
@@ -618,7 +650,7 @@ export interface SourceHealth {
   name: Name2;
   tier: Tier1;
   group: Group;
-  status: Status5;
+  status: Status6;
   last_success: LastSuccess;
   last_error: LastError;
   items: Items;

@@ -1,8 +1,9 @@
 """One pipeline run: python -m pipeline.main [--no-llm] [--fixtures] [--slot 04|13]
 
-Stages so far: load state, fetch, read official levels (anchors), normalize, merge the
-hourly RSS buffer, dedupe, window filter, diff, write. The workflow commits the state
-directory to the data branch afterwards.
+Stages: load state, fetch, read official levels (anchors), normalize, merge the hourly RSS
+buffer, dedupe (exact and near), window filter, prefilter, classify (LLM, rules fallback),
+geocode, cluster into events, diff, write. The workflow commits the state directory to the
+data branch afterwards.
 """
 
 import argparse
@@ -19,11 +20,13 @@ from . import anchors as anchor_reader
 from .adapters import acled, gdelt_doc, gdelt_gkg, html_scrape, json_api, reliefweb, rss
 from .adapters.base import FetchError, FetchResult
 from .health import run_status, source_health
+from .llm.client import LlmClient
 from .models import (
     SCHEMA_VERSION,
     AnchorReading,
     Diff,
     Item,
+    LlmUsage,
     Run,
     RunCounts,
     RunInfo,
@@ -32,8 +35,12 @@ from .models import (
     TesatYear,
     ValueChange,
 )
+from .process.classify import classify
+from .process.cluster import cluster
 from .process.dedupe import dedupe
+from .process.geocode import geocode
 from .process.normalize import normalize
+from .process.prefilter import prefilter
 from .store import state
 
 CONFIG = Path(__file__).parent / "config"
@@ -93,6 +100,33 @@ def load_config() -> tuple[list[dict], list[dict]]:
     sources = yaml.safe_load((CONFIG / "sources.yaml").read_text())["sources"]
     queries = yaml.safe_load((CONFIG / "keywords.yaml").read_text())["gdelt_doc"]["queries"]
     return sources, queries
+
+
+def understand(items: list[Item], groups: dict[str, str], client: LlmClient | None,
+               cache: dict, events: list, now: datetime) -> tuple[list[Item], list, list, dict]:
+    """Prefilter, classify, geocode and cluster. Returns (prefiltered items, events, new event
+    ids, classification stats)."""
+    cfg_pre = yaml.safe_load((CONFIG / "keywords.yaml").read_text())["prefilter"]
+    cfg_llm = yaml.safe_load((CONFIG / "scoring.yaml").read_text())["llm"]
+    kept = prefilter(items, groups, cfg_pre)
+    refs, stats = classify(kept, client, cfg_llm, cache)
+    for item in kept:
+        if item.classification and refs.get(item.id):
+            item.classification.places = geocode(refs[item.id])
+    events, new_ids = cluster(kept, events, now)
+    return kept, events, new_ids, stats
+
+
+def llm_usage(client: LlmClient | None, stats: dict) -> LlmUsage:
+    if client is None or not client.providers:
+        return LlmUsage(status="disabled", items_rules=stats["rules"],
+                        items_cached=stats["cached"])
+    u = client.usage()
+    fell_back = stats["rules"] > 0 or stats["batches_failed"] > 0
+    return LlmUsage(status="fallback" if fell_back else "ok", provider=u["provider"],
+                    model=u["model"], calls=u["calls"], fallback_used=u["fallback_used"],
+                    items_llm=stats["llm"], items_rules=stats["rules"],
+                    items_cached=stats["cached"])
 
 
 def normalize_all(sources: list[dict], results: dict[str, FetchResult], now: datetime,
@@ -190,7 +224,7 @@ def run_id(now: datetime, slot: str | None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m pipeline.main")
-    p.add_argument("--no-llm", action="store_true", help="skip LLM stages (no LLM yet in Phase 1)")
+    p.add_argument("--no-llm", action="store_true", help="label items with keyword rules only")
     p.add_argument("--fixtures", action="store_true", help="read pipeline/fixtures, no network")
     p.add_argument("--slot", choices=["04", "13"], help="override the hour in the run id")
     p.add_argument("--state-dir", type=Path, default=Path("state"))
@@ -245,6 +279,15 @@ def main(argv: list[str] | None = None) -> int:
     in_window = sorted((i for i in unique if i.published_at >= since),
                        key=lambda i: i.published_at, reverse=True)
 
+    client = None if (args.no_llm or args.fixtures) else LlmClient.from_env(
+        yaml.safe_load((CONFIG / "scoring.yaml").read_text())["llm"])
+    cache = state.load_classified(args.state_dir)
+    groups = {s["id"]: s["group"] for s in sources}
+    kept, events, new_event_ids, cstats = understand(
+        in_window, groups, client, cache, state.load_events(args.state_dir), started)
+    relevant = [i for i in kept if i.classification and i.classification.relevant]
+    recent = (started - timedelta(days=30)).date()
+
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]
     finished = started if args.fixtures else datetime.now(UTC).replace(microsecond=0)
@@ -252,12 +295,20 @@ def main(argv: list[str] | None = None) -> int:
     info = RunInfo(id=run_id(started, args.slot), status=status, started_at=started,
                    finished_at=finished, window_start=since, git_sha=args.git_sha,
                    counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
-                                    after_dedupe=len(unique), in_window=len(in_window)))
-    run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=in_window,
-              anchors=anchors, diff=diff(prev["latest"], anchors, health), tesat=load_tesat())
+                                    after_dedupe=len(unique), in_window=len(in_window),
+                                    after_prefilter=len(kept), relevant=len(relevant)),
+                   llm=llm_usage(client, cstats))
+    run_diff = diff(prev["latest"], anchors, health)
+    run_diff.new_event_ids = new_event_ids
+    run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=relevant,
+              anchors=anchors, diff=run_diff, tesat=load_tesat(),
+              events=sorted((e for e in events if e.date >= recent),
+                            key=lambda e: e.date, reverse=True))
 
     try:
         state.write(args.state_dir, run, seen, finished)
+        state.write_events(args.state_dir, events)
+        state.write_classified(args.state_dir, cache, finished)
         if gkg_src and not args.fixtures:
             state.write_baselines(args.state_dir, baselines)
         if (res := results.get("acled")) and res.ok:
@@ -267,7 +318,8 @@ def main(argv: list[str] | None = None) -> int:
         run.run.status = "failed"
         state.write_failed(args.state_dir, run, seen, finished)
 
-    msg = f"run {run.run.id} {run.run.status} items {len(run.items)}"
+    msg = (f"run {run.run.id} {run.run.status} items {len(run.items)} "
+           f"events {len(run.events)} llm {run.run.llm.status} {run.run.llm.calls} calls")
     log.info(msg)
     if args.commit_msg_file:
         args.commit_msg_file.write_text(msg + "\n")

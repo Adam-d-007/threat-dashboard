@@ -1,8 +1,56 @@
-# GDELT DOC 2.0 queries. Phase 1 has one; Phase 2 adds the rest and the
-# prefilter terms in EN, SK, CS, DE, HU, PL, FR and UK.
+# GDELT DOC 2.0 queries, and prefilter terms.
 gdelt_doc:
   queries:
     # GDELT has no "slovakia" country name: its lookup still labels Slovakia's FIPS code LO
     # as "Czechoslovakia" (data.gdeltproject.org/api/v2/guides/LOOKUP-COUNTRIES.TXT).
     - id: terror_sk_sources
       query: "theme:TERROR sourcecountry:LO"
+
+# Prefilter (pipeline/process/prefilter.py). An item is kept when its source group is in
+# keep_groups, or its title or snippet contains one of these terms at the start of a word.
+# Terms are word starts (stems), matched case-insensitively with diacritics removed, so
+# "vybuch" also matches "výbuchu". A term ending in ! must match a whole word ("war!" does
+# not match "warfarin"). The prefilter favours recall: the LLM decides relevance.
+# Slovak and Czech lists: Adam to review.
+prefilter:
+  keep_groups: [official, backbone]
+  max_items: 600
+  terms:
+    en: [terror, attack, bomb, explos, blast, shooting, gunman, gunmen, stabbing, knife attack,
+         hostage, extremis, radicali, jihad, islamic state, isis, daesh, al-qaeda, hamas,
+         hezbollah, sabotage, arson, drone, airspace, cyberattack, cyber attack, ransomware,
+         hacker, disinformation, hybrid, espionage, spy!, spies!, plot!, plots!, foiled, arrested,
+         militant, neo-nazi, far-right, far-left, anarchist, assassinat, security alert,
+         threat level, evacuat, nato!, military, troops, missile, war!, wars!, ceasefire, sanction,
+         invasion, front line, frontline, shelling, airstrike, mobilis, mobiliz]
+    sk: [terori, utok, bomb, vybus, vybuch, strelb, strelec, nozom, rukojem, extremis,
+         radikal, dzihad, islamsk, sabotaz, podpal, dron, vzdusn, kyberneticke, hacker,
+         dezinform, hybridn, spion, zadrzal, zadrzan, obvinil, obvinen, atentat, hrozb,
+         bezpecnost, armad, vojsk, vojak, raket, vojn, primeri, sankci, nato!, invazi, ostrel,
+         mobiliz, naka, policajt, vrazd]
+    cs: [terori, utok, bomb, vybus, vybuch, strelb, strelec, nozem, rukojm, extremis,
+         radikal, dzihad, islamsk, sabotaz, zhar, dron, vzdusn, kyberneticke, hacker,
+         dezinform, hybridni, spion, zadrzel, zadrzen, obvinil, obvinen, atentat, hrozb,
+         bezpecnost, armad, vojsk, vojak, raket, valk, primeri, sankc, nato!, invaz, ostrel,
+         mobiliz, vrazd]
+    de: [terror, anschlag, bombe, sprengstoff, explosion, schusse, schutze, messerangriff,
+         messer, geisel, extremis, radikalis, dschihad, islamist, sabotage, brandanschlag,
+         drohne, luftraum, cyberangriff, hacker, desinformation, hybrid, spion, festgenommen,
+         festnahme, attentat, bedrohung, sicherheit, bundeswehr, rakete, krieg, waffenruhe,
+         sanktion, nato!, invasion, front]
+    hu: [terror, merenylet, tamad, bomba, robban, lovoldoz, kesel, tusz, szelsoseg,
+         radikaliz, dzsihad, iszlam allam, szabotazs, gyujtogat, dron, legter, kibertamad,
+         hacker, dezinformaci, hibrid, kem!, kemek!, orizetbe, letartoztat, fenyeget, biztonsag,
+         raket, haboru, tuzszunet, szankci, nato!, hadsereg, katona]
+    pl: [terror, zamach, atak, bomb, wybuch, strzelanin, nozem, zakladni, ekstremis,
+         radykaliz, dzihad, panstwo islamskie, sabotaz, podpalen, dron, przestrzen powietrzn,
+         cyberatak, haker, dezinformac, hybrydow, szpieg, zatrzyman, aresztowa, zagrozeni,
+         bezpieczenst, rakiet, wojn, zawieszeni broni, sankcj, nato!, armi, zolnierz]
+    fr: [terror, attentat, attaque, bombe, explosi, fusillade, tireur, couteau, otage,
+         extremis, radicalis, djihad, etat islamique, sabotage, incendie criminel, drone,
+         espace aerien, cyberattaque, pirate, desinformation, hybride, espion, interpelle,
+         arrete, menace, securite, vigipirate, missile, guerre, cessez-le-feu, sanction,
+         otan, invasion]
+    uk: [терор, атак, вибух, обстріл, ракет, дрон, бпла, диверс, саботаж, кібератак, хакер,
+         дезінформац, гібридн, шпигун, затрима, загроз, безпек, війн, перемир, санкці, нато,
+         окупант, фронт]

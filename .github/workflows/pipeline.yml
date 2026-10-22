@@ -8,6 +8,11 @@ on:
     - cron: "35 4,13 * * *"
     - cron: "5 5,14 * * *"
   workflow_dispatch:
+    inputs:
+      llm_check:
+        description: "First run the LLM acceptance check (about 2 LLM calls)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -33,12 +38,21 @@ jobs:
 
       - run: uv sync --frozen --no-dev
 
+      - name: LLM acceptance check
+        if: ${{ inputs.llm_check }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: uv run python -m pipeline.tools.llm_check
+
       - name: Run the pipeline
         env:
           # Empty until Adam adds them; the acled source stays disabled until then.
           ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
           ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
           RELIEFWEB_APPNAME: ${{ vars.RELIEFWEB_APPNAME }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           slot=""
           if [ "${{ github.event_name }}" = "schedule" ]; then

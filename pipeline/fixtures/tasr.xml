@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Fixture TASR</title><link>https://www.teraz.sk</link><description>Synthetic test feed</description>
-<item><title>Polícia zadržala muža podozrivého z prípravy útoku</title><link>https://www.teraz.sk/slovensko/fixture-zadrzanie/1000001-clanok.html?utm_source=rss&amp;utm_medium=feed</link><description>&lt;p&gt;Synthetic snippet for &lt;b&gt;tests&lt;/b&gt;.&lt;/p&gt;</description><pubDate>Thu, 22 Oct 2026 09:24:00 +0200</pubDate></item>
+<item><title>Polícia zadržala muža podozrivého z prípravy teroristického útoku</title><link>https://www.teraz.sk/slovensko/fixture-zadrzanie/1000001-clanok.html?utm_source=rss&amp;utm_medium=feed</link><description>&lt;p&gt;Synthetic snippet for &lt;b&gt;tests&lt;/b&gt;.&lt;/p&gt;</description><pubDate>Thu, 22 Oct 2026 09:24:00 +0200</pubDate></item>
 <item><title>Ministri rokovali o bezpečnosti</title><link>https://www.teraz.sk/zahranicie/fixture-ministri/1000002-clanok.html</link><description>Second synthetic item.</description><pubDate>Thu, 22 Oct 2026 06:10:00 +0200</pubDate></item>
 <item><title>Old item outside the window</title><link>https://www.teraz.sk/slovensko/fixture-old/1000003-clanok.html</link><description>Too old.</description><pubDate>Mon, 12 Oct 2026 06:10:00 +0200</pubDate></item>
 </channel></rss>

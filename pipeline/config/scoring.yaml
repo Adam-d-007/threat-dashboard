@@ -1,0 +1,16 @@
+# Scoring and model settings. Phase 4 adds weights, floors, thresholds, gates and smoothing.
+
+llm:
+  # The first available model in prefer is used; otherwise the newest stable model of the
+  # family, chosen from the provider's live model list each run (logged in run.llm.model).
+  gemini:
+    prefer: [gemini-3.8-flash, gemini-2.5-flash]
+    family: flash
+    requests_per_minute: 10
+  groq:
+    prefer: [openai/gpt-oss-120b, llama-3.3-70b-versatile]
+    requests_per_minute: 10
+  batch_size: 25            # items per classification call
+  budget:
+    classify: 30            # calls per run; the spec's total is 40 to 45
+    assess: 10

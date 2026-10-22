@@ -97,6 +97,7 @@ class Event(Strict):
     place: Place | None = None
     sk_link: SkLink
     item_ids: list[str]
+    event_keys: list[str] = Field(default_factory=list, description="LLM incident keys seen")
     domains: list[str]
     has_tier_a: bool
     corroborated: bool
@@ -314,6 +315,19 @@ class RunCounts(Strict):
     from_buffer: int = Field(description="Items read from the hourly RSS collector's buffer")
     after_dedupe: int
     in_window: int
+    after_prefilter: int = 0
+    relevant: int = 0
+
+
+class LlmUsage(Strict):
+    status: Literal["ok", "fallback", "disabled"]
+    provider: str | None = None
+    model: str | None = None
+    calls: int = 0
+    fallback_used: bool = False
+    items_llm: int = 0
+    items_rules: int = 0
+    items_cached: int = 0
 
 
 class RunInfo(Strict):
@@ -324,6 +338,7 @@ class RunInfo(Strict):
     window_start: datetime
     git_sha: str | None
     counts: RunCounts
+    llm: LlmUsage | None = None
 
 
 class Run(Strict):
