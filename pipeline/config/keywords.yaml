@@ -2,5 +2,7 @@
 # prefilter terms in EN, SK, CS, DE, HU, PL, FR and UK.
 gdelt_doc:
   queries:
+    # GDELT has no "slovakia" country name: its lookup still labels Slovakia's FIPS code LO
+    # as "Czechoslovakia" (data.gdeltproject.org/api/v2/guides/LOOKUP-COUNTRIES.TXT).
     - id: terror_sk_sources
-      query: "theme:TERROR sourcecountry:slovakia"
+      query: "theme:TERROR sourcecountry:LO"
