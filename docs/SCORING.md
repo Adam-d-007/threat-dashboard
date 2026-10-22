@@ -154,7 +154,8 @@ language model can move the index, but it cannot move the level against the rule
 |---|---|---|
 | Raw index shown only when a gate raises the level | Also whenever the level rises | Otherwise one run showed level 3 with index 48, outside level 3's band |
 | 180-day backfill sets the E and M baselines | E and M warm up from live data | A backfill from GDELT bulk files would measure something different from the live event signal |
-| Replays from GDELT bulk data | Replays from the incidents themselves (below) | Full bulk replays need about 4 GB of files per window; to be added |
+| Replays from GDELT bulk data | Incidents rebuilt for E, real GDELT bulk counts for M (below) | E is built from classified news items, which bulk files do not contain; M is replayed from one GKG file per hour, not all four |
+| Media baselines from GDELT DOC TimelineVolRaw | GKG theme counts read from the bulk files every run | One source for live counts, baselines and replays; DOC calls are rate-limited from GitHub |
 | Austria in the Slovak anchors | Left out | DSN publishes no current level |
 
 ## Calibration so far
@@ -175,6 +176,40 @@ components, so they test the events, official levels, gates and smoothing, not t
 Every replay raises the index within one run. The quiet month keeps Slovakia at level 2 with an
 index of 30, the bottom of the spec's 30 to 45 target.
 
+### Replays with real media counts
+
+`pipeline/tools/gkg_replay.py` read GDELT GKG bulk files from 15 days before each attack to 2 days
+after: one file per hour (the :00 file, 24 of the 96 a day), about 2.5 GB per incident, counted in
+memory. Only the daily counts are kept, in `pipeline/data/replays/`, scaled by 4 to a full day.
+The test `test_bulk_replays_count_real_media_and_still_raise_the_index` then replays each
+incident with E from the rebuilt incident and M from these counts (no language model). The
+tables show level/index in the last run before the attack and the first run after, and M before
+against its highest value in the two days after.
+
+| Window | Slovakia | EU |
+|---|---|---|
+| Bratislava, 12 Oct 2022 | 2/24 → 3/52, M 0.00 → max 0.90 | 2/44 → 3/63, M 0.50 → max 0.52 |
+| Vienna, 2 Nov 2020 | 2/30 → 3/64, no M (see below) | 2/44 → 3/67, no M |
+| Solingen, 23 Aug 2024 | 2/36 → 2/49, M 0.90 → max 0.90 | 2/44 → 3/63, M 0.51 → max 0.60 |
+| Villach, 15 Feb 2025 | 2/36 → 3/68, M 0.85 → max 0.85 | 2/44 → 3/64, M 0.54 → max 0.54 |
+
+What the real counts show:
+
+- **GDELT's 2020 archive has gaps.** Around the Vienna attack 178 of 432 hours have no GKG file
+  at all, and no day reaches the 90 of 96 files the live pipeline needs to count it. M therefore
+  has no value in the Vienna replay, exactly as it would have had live.
+
+- **EU coverage moves little.** The EU's TERROR count is in the thousands every day, so one
+  attack raises it by half at most (Solingen: ratio 1.96, two days later). Villach came two
+  days after the Munich car attack, which had already raised the baseline.
+- **Slovak coverage is tiny and noisy.** The median day in each window had no Slovak TERROR
+  article in the sample, so the floor of 1 sets the scale: four stray articles give M = 0.85
+  before Solingen and Villach, and Bratislava's real rise (to 36 articles two days after)
+  barely shows (0.85 to 0.90). It also lifts the quiet Slovak index from 30 to 36.
+- **With a Slovak floor of 8** (tried in memory, not in `scoring.yaml`): the quiet index
+  returns to 29 to 31; Bratislava's M climbs 0, 0.21, 0.61, 0.88 over two days; Solingen,
+  with no Slovak link, keeps Slovakia at level 2 with M at most 0.38.
+
 **Open questions for the four-week review:**
 
 - A single deadly attack anywhere in the EU lifts the EU to level 3. Is that the intended
@@ -183,3 +218,7 @@ index of 30, the bottom of the spec's 30 to 45 target.
 - Ukraine sits at proximity 0.5 for Slovakia. Acts of war are classified as geopolitics, not
   terrorism, so they should not inflate the index; this needs checking on live data.
 - The weights (35/15/20/30) are judgement calls and are reviewed with four weeks of data.
+- **The Slovak media floor.** GDELT tags very few TERROR articles to Slovakia: in the four
+  replay windows the median day had none. With the floor at 1, an ordinary day with four
+  articles gives M = 0.85, as high as the days after the Bratislava attack, so M adds noise,
+  not signal. A floor of 8 fixes that in the replays (below). Not changed yet: Adam to decide.

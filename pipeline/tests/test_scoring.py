@@ -1,6 +1,7 @@
 """Phase 4 acceptance: gates, disagreement, hysteresis, smoothing, incident replays."""
 
-from datetime import UTC, datetime, timedelta
+import json
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 import yaml
@@ -10,6 +11,8 @@ from pipeline.models import AnchorReading, Event
 from pipeline.score import gates
 from pipeline.score.components import curve
 from pipeline.score.terrorism import disagree, score_region
+from pipeline.tools.gkg_replay import INCIDENTS
+from pipeline.tools.gkg_replay import OUT as REPLAYS
 
 CFG = yaml.safe_load((CONFIG / "scoring.yaml").read_text())
 NOW = datetime(2026, 10, 22, 13, 5, tzinfo=UTC)
@@ -139,7 +142,7 @@ def test_indicator_is_provisional_until_two_weeks_of_history():
     assert a2.provisional
 
 
-def simulate(incident_days: int, incident=None, quiet_days=30):
+def simulate(incident_days: int, incident=None, quiet_days=30, baselines=None):
     """Run scoring twice a day: quiet_days of quiet, then the incident on its day. Returns
     the scoring per run for each region: [(run time, assessment)]."""
     rows, state, out = [], {"regions": {}, "anchor_history": {}}, {"SK": [], "EU": []}
@@ -150,8 +153,8 @@ def simulate(incident_days: int, incident=None, quiet_days=30):
         if incident and t >= NOW - timedelta(days=incident_days):
             events = events + [incident(t)]
         for region in ("SK", "EU"):
-            a, row = score_region(region, f"r{n}", events, ANCHORS, {}, rows, state, None, t,
-                                  CFG, 0)
+            a, row = score_region(region, f"r{n}", events, ANCHORS, baselines or {}, rows,
+                                  state, None, t, CFG, 0)
             rows.append(row)
             out[region].append((t, a))
     return out
@@ -202,6 +205,55 @@ def test_replays_raise_the_index_within_two_runs(name, incident, sk_gates, eu_ga
                 assert (b.max_level > 2) is not present, (name, region, gid)
             else:
                 assert (gid in gate_ids) is present, (name, region, gid, gate_ids)
+
+
+# --- Replays with real media counts from GDELT bulk files ------------------------------
+
+SAMPLED = 4  # gkg_replay reads one GKG file per hour; a live day has four per hour
+
+
+def gkg_baselines(incident_id: str, attack_day: date) -> dict:
+    """The incident's real daily TERROR counts (pipeline/tools/gkg_replay.py), moved so the
+    attack falls on attack_day and scaled to a full day of files, in baselines.json form."""
+    data = json.loads((REPLAYS / f"{incident_id}.json").read_text())
+    shift = attack_day - date.fromisoformat(data["date"])
+    daily, files = {}, {}
+    for day, row in data["counts"].items():
+        moved = (date.fromisoformat(day) + shift).isoformat()
+        daily[moved] = {"TERROR": {k: n * SAMPLED for k, n in row.items()}}
+        files[moved] = data["files_per_day"][day] * SAMPLED
+    return {"gkg": {"daily": daily, "files_per_day": files}}
+
+
+BULK = {  # incident id -> (the rebuilt incident, as in the replays above)
+    "bratislava_2022": _incident("SK", 4, "direct"),
+    "vienna_2020": _incident("AT", 4, "indirect"),
+    "solingen_2024": _incident("DE", 4, "none"),
+    "villach_2025": _incident("AT", 4, "indirect"),
+}
+
+
+def bulk_replay(incident_id: str) -> dict:
+    """Scoring with E from the rebuilt incident and M from the real counts. Returns, per
+    region, the runs from the last one before the attack day: (run time, assessment)."""
+    days = 3
+    base = gkg_baselines(incident_id, (NOW - timedelta(days=days)).date())
+    runs = simulate(days, incident=BULK[incident_id], baselines=base)
+    return {r: runs[r][-2 * days - 1:] for r in runs}
+
+
+@pytest.mark.parametrize("incident_id", list(INCIDENTS))
+def test_bulk_replays_count_real_media_and_still_raise_the_index(incident_id):
+    files = json.loads((REPLAYS / f"{incident_id}.json").read_text())["files_per_day"]
+    complete = sum(n * SAMPLED >= CFG["media"]["min_files_per_day"] for n in files.values())
+    for region, series in bulk_replay(incident_id).items():
+        media = [next(c for c in a.components if c.id == "media") for _, a in series]
+        # Fifteen days of real counts before the attack give M its 14 days of history, unless
+        # GDELT's archive lacks the files (Vienna 2020: no day is complete, so M stays empty).
+        has_media = complete >= CFG["media"]["min_history_days"] + 1
+        assert all((m.value is not None) is has_media for m in media), (incident_id, region)
+        before, after = series[0][1], [a for _, a in series[1:3]]
+        assert max(a.index for a in after) > before.index, (incident_id, region)
 
 
 def test_bratislava_reaches_level_3_and_drops_back_only_after_hysteresis():
