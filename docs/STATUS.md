@@ -124,9 +124,8 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 ## Phase 6, hardening
 
 - [x] `pipeline-failure` issue on failure or two partial runs (issue #1 opened on its own)
-- [ ] The next fully ok run comments on and closes it: not seen yet. The first run on `main`
-      showed the alert step crashing on `runs/index.json` (fixed), and runs stay partial until
-      GDELT's rate limit lets the `gdelt_outlets` query through once
+- [x] The next fully ok run comments on and closes it: run 2026-10-22T21 was ok and closed
+      issue #1 (after fixing the alert step's `runs/index.json` crash)
 - [x] `sis-change` issue when the SIS level paragraph changes
 - [x] `squash-data.yml` monthly rewrite of the data branch (dry run by default by hand)
 - [x] Squash run once as a dry run and once for real (2026-10-22): 20 commits became 1, the
