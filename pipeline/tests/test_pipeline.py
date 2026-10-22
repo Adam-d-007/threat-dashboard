@@ -94,8 +94,38 @@ def test_health_failed_then_stale():
     stale = source_health(SRC, FetchResult("x", ok=False, error="HTTP 404"), prev,
                           NOW + timedelta(hours=49))
     assert stale.status == "stale"
-    assert run_status([ok, failed]) == "partial"
-    assert run_status([ok]) == "ok"
+    assert run_status([ok, failed], "ok") == "partial"
+    assert run_status([ok], "ok") == "partial"  # one press source is not ten
+
+
+def test_run_status_needs_gdelt_and_ten_press_sources():
+    def h(i, group="slovak_press", status="ok"):
+        return source_health(SRC | {"id": i, "group": group},
+                             FetchResult(i, ok=status == "ok", items=[]), None, NOW)
+    press = [h(f"p{i}") for i in range(12)]
+    gdelt = h("gdelt_doc", group="backbone")
+    assert run_status([gdelt, *press], "ok") == "ok"
+    assert run_status([gdelt, *press], "fallback") == "partial"  # the LLM must succeed
+    assert run_status([h("gdelt_doc", "backbone", "failed"), *press], "ok") == "partial"
+    assert run_status([gdelt, *press[:9]], "ok") == "partial"  # only 9 press sources
+    assert run_status([gdelt, *press, h("y", group="analysis", status="failed")],
+                      "ok") == "partial"  # any failed source
+
+
+def test_source_turns_stale_after_six_empty_runs_only_if_it_had_items():
+    prev = None
+    for n in range(6):
+        res = FetchResult("x", ok=True, items=[RawItem(url="https://a/1", title="t", published_at=None)] if n == 0 else [])
+        h = source_health(SRC, res, prev, NOW + timedelta(hours=12 * n))
+        prev = h.model_dump(mode="json")
+    assert h.status == "ok" and h.zero_runs == 5
+    h = source_health(SRC, FetchResult("x", ok=True, items=[]), prev, NOW + timedelta(days=4))
+    assert h.status == "stale" and h.error == "no items for 6 runs"
+    prev = None
+    for _ in range(8):  # e.g. GDELT GKG: never items, so never stale for being empty
+        h = source_health(SRC, FetchResult("x", ok=True, items=[]), prev, NOW)
+        prev = h.model_dump(mode="json")
+    assert h.status == "ok" and h.zero_runs == 8
 
 
 def test_window_start():

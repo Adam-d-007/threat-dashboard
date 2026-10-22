@@ -247,6 +247,11 @@ export type Items = number;
 export type HttpStatus = number | null;
 export type Error1 = string | null;
 export type Note = string | null;
+/**
+ * Successful runs in a row with no items
+ */
+export type ZeroRuns = number;
+export type LastItemsAt = string | null;
 export type Sources = SourceHealth[];
 export type Items1 = Item[];
 export type Anchors = AnchorReading[];
@@ -662,6 +667,8 @@ export interface SourceHealth {
   http_status: HttpStatus;
   error: Error1;
   note: Note;
+  zero_runs: ZeroRuns;
+  last_items_at: LastItemsAt;
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema

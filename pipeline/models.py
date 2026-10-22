@@ -309,6 +309,8 @@ class SourceHealth(Strict):
     http_status: int | None = None
     error: str | None = None
     note: str | None = None
+    zero_runs: int = Field(default=0, description="Successful runs in a row with no items")
+    last_items_at: datetime | None = None
 
 
 class RunCounts(Strict):

@@ -1,0 +1,61 @@
+name: squash-data
+
+# Rewrites the data branch to a single commit with exactly the same files, so the repository
+# does not grow with every run. Manual runs are dry runs unless dry_run is unticked.
+on:
+  schedule:
+    - cron: "20 2 1 * *" # 1st of each month, 02:20 UTC, away from the pipeline slots
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only show what would happen"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+# Same group as the pipeline, so the two never run at once.
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  squash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: data
+          path: state
+          fetch-depth: 0
+
+      - name: Squash the data branch
+        working-directory: state
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          old_sha=$(git rev-parse HEAD)
+          old_tree=$(git rev-parse "HEAD^{tree}")
+          commits=$(git rev-list --count HEAD)
+          new_sha=$(git commit-tree "$old_tree" \
+            -m "Data branch squashed on $(date -u +%Y-%m-%d) (was $commits commits)")
+          # The new commit must hold exactly the same files.
+          [ "$(git rev-parse "$new_sha^{tree}")" = "$old_tree" ] || { echo "tree differs"; exit 1; }
+          echo "Files kept ($(git ls-tree -r --name-only "$new_sha" | wc -l)):"
+          git ls-tree --name-only "$new_sha"
+          echo "Size before: $(git count-objects -vH | grep size-pack)"
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: would replace $old_sha ($commits commits) with $new_sha (1 commit)."
+            exit 0
+          fi
+          # Refuse if anything was pushed meanwhile (e.g. the hourly collector).
+          git push --force-with-lease="data:$old_sha" origin "$new_sha:refs/heads/data"
+          git fetch -q origin data
+          [ "$(git rev-parse "FETCH_HEAD^{tree}")" = "$old_tree" ]
+          [ "$(git rev-list --count FETCH_HEAD)" = "1" ]
+          echo "Squashed: same files, 1 commit (was $commits)."

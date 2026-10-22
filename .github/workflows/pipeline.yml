@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: pipeline
@@ -78,3 +79,13 @@ jobs:
       - name: Commit to the data branch
         working-directory: state
         run: $GITHUB_WORKSPACE/.github/scripts/commit_data.sh "$RUNNER_TEMP/commit_msg.txt"
+
+      - name: Open or close alert issues
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Backup slots that found their slot already done write no run: nothing to report.
+          if [ -f "$RUNNER_TEMP/commit_msg.txt" ] || [ "${{ job.status }}" != "success" ]; then
+            python3 .github/scripts/alerts.py state "${{ job.status }}"
+          fi

@@ -313,13 +313,14 @@ def main(argv: list[str] | None = None) -> int:
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]
     finished = started if args.fixtures else datetime.now(UTC).replace(microsecond=0)
-    status = run_status(health) if buffer_ok else "partial"
+    usage = llm_usage(client, cstats)
+    status = run_status(health, usage.status) if buffer_ok else "partial"
     info = RunInfo(id=run_id(started, args.slot), status=status, started_at=started,
                    finished_at=finished, window_start=since, git_sha=args.git_sha,
                    counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
                                     after_dedupe=len(unique), in_window=len(in_window),
                                     after_prefilter=len(kept), relevant=len(relevant)),
-                   llm=llm_usage(client, cstats))
+                   llm=usage)
     run_diff = diff(prev["latest"], anchors, health)
     run_diff.new_event_ids = new_event_ids
     prev_terr = (prev["latest"] or {}).get("terrorism") or {}
