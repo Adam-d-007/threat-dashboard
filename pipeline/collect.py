@@ -1,9 +1,11 @@
-"""Hourly RSS collection: python -m pipeline.collect [--fixtures]
+"""Hourly collection: python -m pipeline.collect [--fixtures]
 
 Feeds keep only their newest items (teraz.sk: 15), so fetching twice a day misses most of
-them. This job fetches every enabled RSS source each hour and keeps the last 48 h of items
-in rss_buffer.json, which the twice-daily pipeline merges into its own fetch. It writes no
-other file, so its commits and the pipeline's never touch the same file.
+them; and GDELT rate-limits GitHub's shared servers, so one attempt per twice-daily run
+usually fails. This job fetches every enabled RSS source and runs the GDELT DOC queries
+(3-hour windows) each hour, keeps the last 48 h of items in rss_buffer.json with a health
+record per source, and the twice-daily pipeline merges the buffer into its own fetch. It
+writes no other file, so its commits and the pipeline's never touch the same file.
 """
 
 import argparse
@@ -18,6 +20,7 @@ from .process.dedupe import dedupe
 from .store import state
 
 KEEP = timedelta(hours=48)
+GDELT_WINDOW = timedelta(hours=3)
 
 log = logging.getLogger("pipeline.collect")
 
@@ -31,23 +34,30 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     now = FIXTURE_NOW if args.fixtures else datetime.now(UTC).replace(microsecond=0)
-    sources, _ = load_config()
-    rss_sources = [s for s in sources
-                   if s["enabled"] and s["adapter"] == "rss" and s.get("hourly", True)]
-    results = fetch_all(rss_sources, [], now, now, args.fixtures)
+    sources, queries = load_config()
+    wanted = {"rss"} if args.fixtures else {"rss", "gdelt_doc"}
+    collected = [s for s in sources
+                 if s["enabled"] and s["adapter"] in wanted and s.get("hourly", True)]
+    results = fetch_all(collected, queries, now - GDELT_WINDOW, now, args.fixtures)
     # Read-only: dates undated items the way the pipeline already did.
     seen = state.load(args.state_dir)["seen"]
-    fresh = normalize_all(rss_sources, results, now, seen)
+    fresh = normalize_all(collected, results, now, seen)
 
     try:
-        old, reset = state.load_buffer(args.state_dir), False
+        buf, reset = state.load_buffer_full(args.state_dir), False
+        old, health = buf.items, dict(buf.health)
     except ValidationError:
         log.exception("rss_buffer.json is invalid; starting a new buffer")
-        old, reset = [], True
+        old, health, reset = [], {}, True
+    for sid, res in results.items():
+        h = health.get(sid, {})
+        health[sid] = {"last_success": now.isoformat() if res.ok else h.get("last_success"),
+                       "last_error": h.get("last_error") if res.ok else now.isoformat(),
+                       "error": None if res.ok else res.error, "items": len(res.items)}
     old_ids = {i.id for i in old}
     kept = [i for i in dedupe(old + fresh) if now - i.fetched_at <= KEEP]
     new = sum(1 for i in kept if i.id not in old_ids)
-    state.write_buffer(args.state_dir, kept, now)
+    state.write_buffer(args.state_dir, kept, now, health)
 
     failed = [r.source_id for r in results.values() if not r.ok]
     msg = f"collect {now:%Y-%m-%dT%H:%M} +{new} new, {len(kept)} buffered"

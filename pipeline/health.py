@@ -30,7 +30,7 @@ def source_health(source: dict, result: FetchResult | None, previous: dict | Non
                             last_error=last_error, items=0, note=source.get("notes"),
                             last_items_at=last_items_at)
     if result.ok:
-        items = len(result.items)
+        items = result.item_count if result.item_count is not None else len(result.items)
         zero_runs = 0 if items else (previous or {}).get("zero_runs", 0) + 1
         if items:
             last_items_at = now

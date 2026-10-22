@@ -1,10 +1,22 @@
-# GDELT DOC 2.0 queries, and prefilter terms.
+# GDELT DOC 2.0 queries, and prefilter terms. The hourly collector runs the GDELT queries
+# (3-hour windows), because GDELT rate-limits GitHub's shared servers and one attempt per
+# twice-daily run failed in every run on 2026-10-22. All four were checked on that day.
 gdelt_doc:
   queries:
     # GDELT has no "slovakia" country name: its lookup still labels Slovakia's FIPS code LO
     # as "Czechoslovakia" (data.gdeltproject.org/api/v2/guides/LOOKUP-COUNTRIES.TXT).
     - id: terror_sk_sources
       query: "theme:TERROR sourcecountry:LO"
+    # Terrorism coverage from the neighbours' own media (FIPS: EZ Czechia, AU Austria,
+    # HU Hungary, PL Poland, UP Ukraine).
+    - id: terror_neighbours
+      query: "theme:TERROR (sourcecountry:EZ OR sourcecountry:AU OR sourcecountry:HU OR sourcecountry:PL OR sourcecountry:UP)"
+    # Terrorism coverage anywhere that mentions Slovakia.
+    - id: terror_mentions_sk
+      query: "theme:TERROR (Slovakia OR Slovak OR Bratislava OR Slovensko)"
+    # Hybrid incidents over Europe.
+    - id: hybrid_europe
+      query: "(sabotage OR \"drone sighting\" OR \"airspace violation\") (Europe OR NATO OR EU)"
 
 # Prefilter (pipeline/process/prefilter.py). An item is kept when its source group is in
 # keep_groups, or its title or snippet contains one of these terms at the start of a word.

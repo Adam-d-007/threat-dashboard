@@ -879,3 +879,24 @@ def test_brief_drops_lines_and_items_citing_unknown_ids(tmp_path):
     assert [x.item_id for x in eu.top_items] == ["1"]
     news = [w for w in geo.watchlist if w.origin == "news"]
     assert [w.title_en for w in news] == ["Summit"] and not news[0].verified
+
+
+# --- GDELT through the hourly collector ------------------------------------------------
+
+def test_collector_records_health_per_source(tmp_path):
+    collect.main(["--fixtures", "--state-dir", str(tmp_path)])
+    health = _buffer(tmp_path)["health"]
+    assert health["tasr"]["last_success"] == FIXTURE_NOW.isoformat()
+    assert health["tasr"]["error"] is None and "gdelt_doc" not in health  # fixtures: RSS only
+
+
+def test_pipeline_takes_gdelt_health_from_the_collector():
+    src = [{"id": "gdelt_doc", "name": "GDELT", "tier": "C", "group": "backbone"}]
+    item = _item(1, "Terror story", "x.com", source_id="gdelt_doc", tier="C")
+    fresh = {"gdelt_doc": {"last_success": (NOW - timedelta(hours=2)).isoformat()}}
+    res = pipeline_main.collected_health(src, [item], fresh, NOW - timedelta(days=1), NOW)
+    assert res["gdelt_doc"].ok and res["gdelt_doc"].item_count == 1
+    old = {"gdelt_doc": {"last_success": (NOW - timedelta(hours=8)).isoformat(),
+                         "error": "terror_sk_sources: HTTP 429"}}
+    res = pipeline_main.collected_health(src, [], old, NOW - timedelta(days=1), NOW)
+    assert not res["gdelt_doc"].ok and "429" in res["gdelt_doc"].error

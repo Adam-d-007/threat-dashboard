@@ -44,6 +44,7 @@ class FetchResult:
     http_status: int | None = None
     error: str | None = None
     records: list[dict] = field(default_factory=list)  # non-article data, e.g. ACLED events
+    item_count: int | None = None  # set when the items arrived another way (the buffer)
 
 
 class FetchError(Exception):

@@ -369,6 +369,8 @@ class RssBuffer(Strict):
     schema_version: Literal[1]
     updated_at: datetime
     items: list[Item]
+    health: dict[str, dict] = Field(default_factory=dict, description="Per collected source: "
+                                    "last_success, last_error, error, items")
 
 
 class TimeseriesRow(Strict):

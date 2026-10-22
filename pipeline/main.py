@@ -217,6 +217,25 @@ def run_gkg(src: dict, baselines: dict, now: datetime) -> FetchResult:
                        error=error, http_status=200)
 
 
+COLLECTED_FRESH = timedelta(hours=6)
+
+
+def collected_health(sources: list[dict], buffered: list[Item], health: dict[str, dict],
+                     since: datetime, now: datetime) -> dict[str, FetchResult]:
+    """Health for sources fetched by the hourly collector: ok when one of its runs in the last
+    6 hours succeeded; the item count is the source's buffered items in this run's window."""
+    out = {}
+    for s in sources:
+        h = health.get(s["id"], {})
+        last = datetime.fromisoformat(h["last_success"]) if h.get("last_success") else None
+        ok = last is not None and now - last <= COLLECTED_FRESH
+        count = sum(1 for i in buffered if i.source_id == s["id"] and i.published_at >= since)
+        out[s["id"]] = FetchResult(source_id=s["id"], ok=ok, item_count=count,
+                                   error=None if ok else (h.get("error") or
+                                                          "no successful collector run in 6 h"))
+    return out
+
+
 def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
     """Fixture runs make no network calls, so they carry the previous anchors forward."""
     return [AnchorReading.model_validate(a) for a in previous]
@@ -250,11 +269,14 @@ def main(argv: list[str] | None = None) -> int:
     since = window_start(prev["latest"], started)
     sources, queries = load_config()
     enabled = [s for s in sources if s["enabled"] and s["adapter"] != "gdelt_gkg"]
+    # GDELT DOC is fetched by the hourly collector (see collect.py); its items arrive with the
+    # buffer. Fixture runs read the GDELT fixture directly.
+    fetched = enabled if args.fixtures else [s for s in enabled if s["adapter"] != "gdelt_doc"]
     gkg_src = next((s for s in sources if s["enabled"] and s["adapter"] == "gdelt_gkg"), None)
     log.info("run %s window from %s, %d sources enabled",
              run_id(started, args.slot), since.isoformat(), len(enabled))
 
-    results = fetch_all(enabled, queries, since, started, args.fixtures)
+    results = fetch_all(fetched, queries, since, started, args.fixtures)
     baselines = state.load_baselines(args.state_dir)
     if gkg_src and not args.fixtures:
         results[gkg_src["id"]] = run_gkg(gkg_src, baselines, started)
@@ -263,7 +285,7 @@ def main(argv: list[str] | None = None) -> int:
         anchor_reader.read_all(prev_anchors, started)
 
     seen: dict[str, str] = dict(prev["seen"])
-    items = normalize_all(enabled, results, started, seen)
+    items = normalize_all(fetched, results, started, seen)
 
     enabled_ids = {s["id"] for s in enabled}
     try:
@@ -274,6 +296,10 @@ def main(argv: list[str] | None = None) -> int:
         log.exception("rss_buffer.json is invalid; continuing with this run's own fetch only")
         buffered, buffer_ok = [], False
     log.info("buffer     items=%d", len(buffered))
+    if not args.fixtures:
+        results |= collected_health([s for s in enabled if s not in fetched], buffered,
+                                    state.load_buffer_full(args.state_dir).health
+                                    if buffer_ok else {}, since, started)
 
     unique = dedupe(items + buffered)
     # Remember when undated items were first seen, so later runs keep the same date.

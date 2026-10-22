@@ -1,7 +1,7 @@
 """Read and write the files on the data branch (checked out at --state-dir)."""
 
 import json
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ..models import Event, Item, RssBuffer, Run, SourceHealth
@@ -60,15 +60,21 @@ def write_side_files(state_dir: Path, sources: list[SourceHealth], seen: dict[st
 
 
 def load_buffer(state_dir: Path) -> list[Item]:
-    """Items from the hourly RSS collector. Raises if the file exists but is invalid."""
+    """Items from the hourly collector. Raises if the file exists but is invalid."""
+    return load_buffer_full(state_dir).items
+
+
+def load_buffer_full(state_dir: Path) -> RssBuffer:
     data = _read(state_dir / BUFFER_FILE)
-    return RssBuffer.model_validate(data).items if data else []
+    return RssBuffer.model_validate(data) if data else RssBuffer(
+        schema_version=1, updated_at=datetime.min.replace(tzinfo=UTC), items=[])
 
 
-def write_buffer(state_dir: Path, items: list[Item], now: datetime) -> None:
+def write_buffer(state_dir: Path, items: list[Item], now: datetime,
+                 health: dict[str, dict] | None = None) -> None:
     """Only the collector calls this; the pipeline never writes the buffer, so the two
     workflows' commits touch different files and can always be rebased onto each other."""
-    buf = RssBuffer(schema_version=1, updated_at=now, items=items)
+    buf = RssBuffer(schema_version=1, updated_at=now, items=items, health=health or {})
     _write(state_dir / BUFFER_FILE, buf.model_dump(mode="json"))
 
 
