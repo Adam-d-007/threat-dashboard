@@ -280,6 +280,11 @@ export type AttacksFailed = number;
 export type AttacksFoiled = number;
 export type SlovakiaAttacks = number;
 export type SlovakiaArrests = number;
+export type ReportYear1 = number;
+export type Published = string;
+export type Url5 = string;
+export type PointsEn = string[];
+export type PointsSk = string[];
 /**
  * True for made-up sample data used to develop the frontend; the site labels it on every page
  */
@@ -639,6 +644,7 @@ export interface Run {
   events: Events;
   diff: Diff | null;
   tesat: Tesat | null;
+  sis_annual: SisAnnual | null;
   sample: Sample;
 }
 /**
@@ -729,6 +735,19 @@ export interface AttacksByIdeology {
 }
 export interface ArrestsByIdeology {
   [k: string]: number;
+}
+/**
+ * Points from the latest SIS annual report, summarised by hand (manual_anchors.yaml).
+ *
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "SisAnnual".
+ */
+export interface SisAnnual {
+  report_year: ReportYear1;
+  published: Published;
+  url: Url5;
+  points_en: PointsEn;
+  points_sk: PointsSk;
 }
 /**
  * timeseries.json: one row per region per run, never pruned.

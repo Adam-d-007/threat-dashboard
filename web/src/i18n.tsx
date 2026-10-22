@@ -137,6 +137,11 @@ const en = {
     note: "Shares of each total, not counts: 90 days of reports in this region against a full year of the whole EU. Attacks here are attacks, attempted attacks and disrupted plots; TE-SAT counts completed, failed and foiled attacks.",
   },
   baseRates: "Base rates",
+  sisAnnual: {
+    title: "Slovak Information Service: annual report",
+    source: (year: number, published: string) => `SIS annual report for ${year} (published ${published})`,
+    note: "Summarised by this dashboard; the latest report SIS has published.",
+  },
   baseRatesPending:
     "Europol TE-SAT yearly figures and GTD history (which ends in 2021) will appear here once they are entered.",
   tesat: {
@@ -215,7 +220,9 @@ const en = {
     `The data file has version ${v}, which this page does not support. Please reload the page. If the problem continues, the site needs an update.`,
   theme: { dark: "Dark", light: "Light" },
   footer: "Dashboard indicator computed from open sources. Not an official threat assessment.",
-  attribution: "Map data © OpenStreetMap contributors.",
+  attribution:
+    "Map data © OpenStreetMap contributors. Place names from GeoNames (CC BY 4.0). Media counts from the GDELT Project. Base rates from Europol TE-SAT.",
+  acledAttribution: "ACLED figures: Armed Conflict Location & Event Data (ACLED),",
 };
 
 export type Strings = typeof en;
@@ -361,6 +368,11 @@ const sk: Strings = {
     note: "Podiely z celku, nie počty: 90 dní správ z tohto regiónu oproti celému roku za celú EÚ. Útoky sú tu útoky, pokusy o útok a zmarené plány; TE-SAT počíta dokonané, neúspešné a zmarené útoky.",
   },
   baseRates: "Dlhodobé počty",
+  sisAnnual: {
+    title: "Slovenská informačná služba: výročná správa",
+    source: (year: number, published: string) => `Správa o činnosti SIS za rok ${year} (zverejnená ${published})`,
+    note: "Zhrnutie pripravil tento prehľad; ide o najnovšiu správu, ktorú SIS zverejnila.",
+  },
   baseRatesPending:
     "Ročné údaje Europolu (TE-SAT) a historické údaje GTD (končia rokom 2021) sa tu zobrazia po ich doplnení.",
   tesat: {
@@ -439,7 +451,9 @@ const sk: Strings = {
     `Súbor s údajmi má verziu ${v}, ktorú táto stránka nepodporuje. Obnovte, prosím, stránku. Ak problém pretrváva, stránku je potrebné aktualizovať.`,
   theme: { dark: "Tmavý", light: "Svetlý" },
   footer: "Ukazovateľ dashboardu vypočítaný z otvorených zdrojov. Nejde o oficiálne hodnotenie hrozby.",
-  attribution: "Mapové údaje © prispievatelia OpenStreetMap.",
+  attribution:
+    "Mapové údaje © prispievatelia OpenStreetMap. Názvy miest z GeoNames (CC BY 4.0). Počty článkov z projektu GDELT. Dlhodobé počty z Europol TE-SAT.",
+  acledAttribution: "Údaje ACLED: Armed Conflict Location & Event Data (ACLED),",
 };
 
 const STRINGS: Record<Lang, Strings> = { en, sk };

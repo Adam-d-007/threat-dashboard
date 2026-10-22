@@ -48,7 +48,27 @@ tesat:
     fatalities: 5
     arrests_total: 449
 
-# SIS annual report (Slovak threat context). Fill from the PDF; leave null until then.
+# SIS annual report (Slovak threat context), summarised in our own words from the terrorism
+# and extremism sections (2.1.5 and 2.1.6, pp. 14-17). No names of individuals. The 2023 report
+# (published June 2024) is the latest on sis.gov.sk as of 2026-10-22.
 sis_annual:
-  report_year: null
-  summary_sk: null
+  report_year: 2023
+  published: 2024-06
+  url: https://www.sis.gov.sk/pre-vas/sprava-o-cinnosti.html
+  points_sk:
+    - SIS v roku 2023 nezaznamenala bezprostredné ohrozenie Slovenska zo strany islamistických
+      skupín ani prípravu teroristického útoku na jeho území; k útoku ani k pokusu o útok nedošlo.
+    - Za najväčšie riziko v Európe považuje samoradikalizovaných jednotlivcov vrátane mladistvých,
+      inšpirovaných džihádistickou propagandou, a navrátilcov z konfliktových oblastí.
+    - Na pravicovoextrémistickej scéne sleduje najmä militantný akceleracionizmus, ktorý oslovuje
+      mladých ľudí online a oslavuje páchateľov útokov vrátane útoku v Bratislave z 12. 10. 2022.
+    - Ľavicovoextrémistickú scénu hodnotí ako roztrieštenú, málopočetnú a prevažne nenásilnú.
+  points_en:
+    - In 2023 SIS recorded no immediate threat to Slovakia from Islamist groups and no
+      preparation of a terrorist attack on its territory; there was no attack or attempt.
+    - It sees the main risk in Europe in self-radicalised individuals, including minors,
+      inspired by jihadist propaganda, and in returnees from conflict zones.
+    - On the right-wing extremist scene it watches militant accelerationism above all, which
+      reaches young people online and glorifies attackers, including the Bratislava attack of
+      12 October 2022.
+    - It assesses the left-wing extremist scene as fragmented, small and mostly non-violent.

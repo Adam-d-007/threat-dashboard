@@ -31,6 +31,7 @@ from .models import (
     Run,
     RunCounts,
     RunInfo,
+    SisAnnual,
     SourceHealth,
     Terrorism,
     Tesat,
@@ -204,6 +205,14 @@ def load_tesat() -> Tesat | None:
                  previous=TesatYear(**prev) if prev else None)
 
 
+def load_sis_annual() -> SisAnnual | None:
+    """The SIS annual report summary from manual_anchors.yaml, or None while it is empty."""
+    s = yaml.safe_load((CONFIG / "manual_anchors.yaml").read_text()).get("sis_annual") or {}
+    if not s.get("report_year"):
+        return None
+    return SisAnnual(**s)
+
+
 def run_gkg(src: dict, baselines: dict, now: datetime) -> FetchResult:
     """Read new GKG files into baselines (in place). Missing files make the source failed only
     when nothing could be read at all."""
@@ -355,6 +364,7 @@ def main(argv: list[str] | None = None) -> int:
         for r, a in regions.items() if a and (prev_terr.get(r) or {}).get("level") != a.level]
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=relevant,
               anchors=anchors, diff=run_diff, tesat=load_tesat(),
+              sis_annual=load_sis_annual(),
               terrorism=Terrorism(SK=regions["SK"], EU=regions["EU"]) if scored else None,
               geopolitics=geo,
               events=sorted((e for e in events if e.date >= recent),

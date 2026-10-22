@@ -1565,6 +1565,17 @@
           ],
           "default": null
         },
+        "sis_annual": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SisAnnual"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "sample": {
           "default": false,
           "description": "True for made-up sample data used to develop the frontend; the site labels it on every page",
@@ -1583,6 +1594,7 @@
         "events",
         "diff",
         "tesat",
+        "sis_annual",
         "sample"
       ],
       "title": "Run",
@@ -1698,6 +1710,47 @@
         "llm"
       ],
       "title": "RunInfo",
+      "type": "object"
+    },
+    "SisAnnual": {
+      "additionalProperties": false,
+      "description": "Points from the latest SIS annual report, summarised by hand (manual_anchors.yaml).",
+      "properties": {
+        "report_year": {
+          "title": "Report Year",
+          "type": "integer"
+        },
+        "published": {
+          "title": "Published",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "points_en": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Points En",
+          "type": "array"
+        },
+        "points_sk": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Points Sk",
+          "type": "array"
+        }
+      },
+      "required": [
+        "report_year",
+        "published",
+        "url",
+        "points_en",
+        "points_sk"
+      ],
+      "title": "SisAnnual",
       "type": "object"
     },
     "SourceHealth": {

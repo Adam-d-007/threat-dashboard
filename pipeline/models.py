@@ -289,6 +289,16 @@ class TesatYear(Strict):
     arrests_total: int
 
 
+class SisAnnual(Strict):
+    """Points from the latest SIS annual report, summarised by hand (manual_anchors.yaml)."""
+
+    report_year: int
+    published: str
+    url: str
+    points_en: list[str]
+    points_sk: list[str]
+
+
 class Tesat(Strict):
     """Europol TE-SAT yearly figures, typed in from the PDF (manual_anchors.yaml)."""
 
@@ -362,6 +372,7 @@ class Run(Strict):
     events: list[Event] = Field(default_factory=list, description="Events from the last 30 days")
     diff: Diff | None = None
     tesat: Tesat | None = None
+    sis_annual: SisAnnual | None = None
     sample: bool = Field(default=False, description="True for made-up sample data used to "
                          "develop the frontend; the site labels it on every page")
 

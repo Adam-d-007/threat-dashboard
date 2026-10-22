@@ -5,6 +5,7 @@ import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { AnchorReading, Event, RegionAssessment, Run, Timeseries } from "../types/run";
 import { BaseRates } from "../terrorism/BaseRates";
+import { SisAnnualPoints } from "../terrorism/SisAnnual";
 import { Incidents } from "../terrorism/Incidents";
 import { LatestReports } from "./LatestReports";
 
@@ -138,6 +139,12 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       <Card title={t.baseRates}>
         <BaseRates tesat={run.tesat} />
       </Card>
+
+      {region === "SK" && run.sis_annual && (
+        <Card title={t.sisAnnual.title}>
+          <SisAnnualPoints sis={run.sis_annual} />
+        </Card>
+      )}
 
       {!assess && <LatestReports items={run.items} />}
     </div>

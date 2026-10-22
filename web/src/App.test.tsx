@@ -186,6 +186,14 @@ describe("Phase 5: every panel renders in each special case", () => {
     expect(screen.getByText("TE-SAT 2026, EU 2025 (486)")).toBeInTheDocument();
   });
 
+  it("shows the SIS annual report points on the Slovak page only", async () => {
+    const sis_annual = { report_year: 2023, published: "2024-06", url: "https://www.sis.gov.sk/", points_en: ["Point one."], points_sk: ["Bod jeden."] };
+    mockFetch({ ...realRun, sis_annual });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("Point one.")).toBeInTheDocument();
+    expect(screen.getByText("SIS annual report for 2023 (published June 2024)")).toBeInTheDocument();
+  });
+
   it("filters the geopolitics map by theatre", async () => {
     window.location.hash = "#geopolitics";
     mockFetch(base);

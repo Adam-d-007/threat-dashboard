@@ -55,6 +55,14 @@ export function GeopoliticsPage({ run }: { run: Run }) {
                 <TheatreCard key={th.id} th={th} itemById={itemById} />
               ))}
             </div>
+            {g.theatres.some((th) => th.acled) && (
+              <p className="mt-3 text-xs text-muted">
+                {t.acledAttribution}{" "}
+                <ArticleLink href="https://acleddata.com" className="text-link">
+                  acleddata.com
+                </ArticleLink>
+              </p>
+            )}
           </section>
 
           <TheatreMap theatres={g.theatres} items={run.items} />
