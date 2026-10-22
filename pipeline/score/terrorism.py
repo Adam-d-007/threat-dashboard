@@ -45,8 +45,19 @@ def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event
         return LlmAssessment(status="fallback")
     events = [_event_brief(e, w) for e, w in contribs[:MAX_PROMPT_EVENTS]]
     known = {e["id"] for e in events}
-    anchor_rows = [{"country": a.country, "name": a.name, "value": a.raw,
-                    "level": f"{a.level}/{len(a.scale)}"} for a in anchors if a.raw]
+    # National levels one by one; travel advice summarised, because 138 readings made the
+    # prompt too large for Groq's free tier (HTTP 413 on 2026-10-22).
+    anchor_rows: list[dict] = [{"country": a.country, "name": a.name, "value": a.raw,
+                                "level": f"{a.level}/{len(a.scale)}"}
+                               for a in anchors if a.raw and a.kind == "national"]
+    travel = [a for a in anchors if a.raw and a.kind == "travel"
+              and (region == "EU" or a.country == "SK")]
+    by_gov: dict[str, dict[str, int]] = {}
+    for a in travel:
+        counts = by_gov.setdefault(f"{a.name} ({a.issuer})", {})
+        counts[a.raw] = counts.get(a.raw, 0) + 1
+    if by_gov:
+        anchor_rows.append({"travel_advice_countries_per_value": by_gov})
     user = assess_user(region, events, anchor_rows, comps, recent)
     prompt = user
     for attempt in (1, 2):

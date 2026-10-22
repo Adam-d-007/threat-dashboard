@@ -110,6 +110,34 @@ class LoudLlm:
         return {"model": "fake"}
 
 
+class RecordingLlm(LoudLlm):
+    def __init__(self):
+        self.prompts = []
+
+    def complete_json(self, system, user):
+        self.prompts.append(user)
+        return super().complete_json(system, user)
+
+
+def test_assessment_prompt_summarises_travel_advice():
+    eu = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE",
+          "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"]
+    travel = [AnchorReading(id=f"anchor_{g.lower()}_{cc.lower()}", country=cc, name=f"Gov {g}",
+                            url="https://x", scale=["Level 1", "Level 2"], raw="Level 1", level=1,
+                            normalized=0.0, as_of=NOW, status="ok", kind="travel", issuer=g)
+              for g in ("US", "CA", "DE", "NZ") for cc in eu]
+    llm = RecordingLlm()
+    score_region("EU", "r0", quiet_events(NOW), ANCHORS + travel, {}, [], {"regions": {},
+                 "anchor_history": {}}, llm, NOW, CFG, 5)
+    prompt = llm.prompts[0]
+    data = json.loads(prompt.removeprefix("<data>").removesuffix("</data>"))
+    summary = data["official_levels"][-1]["travel_advice_countries_per_value"]
+    expected = {f"{a.name} ({a.issuer})" for a in ANCHORS + travel if a.kind == "travel"}
+    assert summary["Gov US (US)"] == {"Level 1": 27} and set(summary) == expected
+    assert len(data["official_levels"]) == 1 + sum(a.kind == "national" for a in ANCHORS)
+    assert len(prompt) < 6000
+
+
 def test_forced_disagreement_keeps_the_gated_rules_level():
     rows, state = [], {"regions": {}, "anchor_history": {}}
     start = NOW - timedelta(days=30)

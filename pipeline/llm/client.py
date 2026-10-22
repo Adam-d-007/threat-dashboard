@@ -34,6 +34,7 @@ MAX_OUTPUT_TOKENS = 8192
 TRANSIENT = {429, 500, 502, 503, 504, None}
 FATAL = {401, 403}
 _SKIP = re.compile(r"lite|image|tts|live|audio|embedding|exp|thinking|vision|guard")
+MAX_MODELS = 4
 
 
 class LlmUnavailable(Exception):
@@ -56,13 +57,21 @@ def _version(name: str) -> tuple[float, ...]:
 
 
 def pick_models(available: list[str], prefer: list[str], family: str | None) -> list[str]:
-    """Preferred models that exist, in order, then the newest stable model of the family."""
+    """Preferred models that exist, in order, then the newest stable model of the family. With a
+    family (Gemini), the family's other stable models follow as fallbacks, newest first and
+    lite models last, up to MAX_MODELS: each has its own free-tier quota."""
     out = [p for p in prefer if p in available]
     pool = [m for m in available if (family is None or family in m) and not _SKIP.search(m)]
     stable = [m for m in pool if "preview" not in m] or pool
-    if stable and (newest := max(stable, key=_version)) not in out:
-        out.append(newest)
-    return out
+    if family is None:
+        if stable and (newest := max(stable, key=_version)) not in out:
+            out.append(newest)
+        return out
+    full = sorted((m for m in stable if m not in out), key=_version, reverse=True)
+    lite = sorted((m for m in available if family in m and "lite" in m and m not in out
+                   and "preview" not in m and not _SKIP.search(m.replace("lite", ""))),
+                  key=_version, reverse=True)
+    return (out + full + lite)[:MAX_MODELS]
 
 
 def pick_model(available: list[str], prefer: list[str], family: str | None) -> str | None:

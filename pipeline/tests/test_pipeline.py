@@ -811,6 +811,17 @@ GEMINI_OK = {"candidates": [{"content": {"parts": [{"text": '{"items": []}'}]}}]
 GROQ_OK = {"choices": [{"message": {"content": '{"items": []}'}}]}
 
 
+def test_gemini_falls_back_through_other_flash_models_lite_last():
+    from pipeline.llm.client import pick_models
+    avail = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-3.8-flash-lite", "gemini-3-flash",
+             "gemini-3.8-pro", "gemini-2.0-flash-exp", "gemini-3.8-flash-preview-09",
+             "gemini-3.8-flash-image"]
+    assert pick_models(avail, ["gemini-3.8-flash", "gemini-2.5-flash"], "flash") == [
+        "gemini-3.8-flash", "gemini-2.5-flash", "gemini-3-flash", "gemini-3.8-flash-lite"]
+    groq = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "whisper-large-v3"]
+    assert pick_models(groq, groq[:2], None) == groq[:2]  # no speech model as a fallback
+
+
 def test_overloaded_model_falls_back_to_the_next_gemini_model(monkeypatch):
     llm, c = _llm_client(monkeypatch, [("3.8-flash", 503, {})] * 3 + [("2.5-flash", 200, GEMINI_OK),
                                        ("2.5-flash", 200, GEMINI_OK)],
