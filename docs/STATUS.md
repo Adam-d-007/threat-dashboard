@@ -8,7 +8,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 | Area | State |
 |---|---|
 | Phase 1, heartbeat | Done, except: no scheduled run has fired yet (all runs so far were started by hand) |
-| Phase 2, sources | Mostly done: 28 of 41 sources live; ACLED and ReliefWeb wait on access; GDELT GKG not built |
+| Phase 2, sources | Mostly done: 29 of 41 live; ACLED and ReliefWeb wait on access; 7 need the publishers' permission; 3 are unreachable from GitHub and replaced |
 | Phase 3, processing (LLM classification, geocoding, clustering) | **Not started.** Needs Gemini and Groq keys |
 | Phase 4, scoring and calibration | **Not started.** The level and index do not exist yet |
 | Geopolitics computation (theatres, activity, brief) | **Not started** |
@@ -37,8 +37,8 @@ reports, but no dashboard indicator. That is the core of the product.
 - [x] Data age shown; red after 14 h (tested)
 - [x] Netlify deploy count unchanged by data commits (checked 2026-10-22)
 - [ ] **Two scheduled runs in a row.** Workflows are active and the cron is valid, but GitHub
-      had not fired a single scheduled run by 10:58 UTC (collector due hourly from 08:35).
-      Check again after the 13:05 pipeline slot.
+      had not fired a single scheduled run by 11:23 UTC (collector due hourly from 08:35).
+      Backup slots with a skip-if-done guard are ready on dev.
 
 ## Phase 2, sources
 
@@ -50,8 +50,10 @@ reports, but no dashboard indicator. That is the core of the product.
 - [x] TE-SAT 2026 figures entered and shown
 - [ ] **ACLED**: adapter written from the docs and switched off; waiting for credentials and
       the tier check (`pipeline/tools/acled_check.py`)
-- [ ] **ReliefWeb**: adapter not written; waiting for the approved appname
-- [ ] **GDELT GKG / Events files** (theme and location counts for baselines): not built
+- [ ] **ReliefWeb**: adapter written and tested against the documented format; waiting for the
+      approved appname (requested 2026-10-22)
+- [x] **GDELT GKG files**: daily counts per theme and country in baselines.json (live on GitHub,
+      64 files in the first run)
 - [ ] **GDELT DOC TimelineVolRaw** calls for baselines: not built
 - [ ] **GDELT DOC queries**: only 1 of the planned set (SK sources, terrorism theme)
 - [ ] **SIS annual report** in manual_anchors.yaml: empty
@@ -123,6 +125,9 @@ reports, but no dashboard indicator. That is the core of the product.
 - [ ] 14 days (28 runs) without manual fixes
 
 ## Waiting on Adam
+
+Step-by-step instructions: [SETUP.md](SETUP.md).
+
 
 - [ ] Gemini API key as Actions secret `GEMINI_API_KEY`, plus its daily limit from AI Studio
 - [ ] Groq API key as Actions secret `GROQ_API_KEY`
