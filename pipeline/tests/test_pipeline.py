@@ -556,8 +556,9 @@ def test_gkg_counts_each_article_once_per_theme_and_country():
         ("20261022091500", "PROTEST,3", "1#Germany#GM#GM#...#51#9#GM#2"),
         ("20261022091500", "TAX_ONLY,1", "1#France#FR#FR#...#46#2#FR#1"),  # no listed theme
     ])
-    c = gdelt_gkg.count_file(raw, {"TERROR", "KILL", "PROTEST"}, {"LO": "SK", "AU": "AT", "GM": "DE"},
-                             {"SK", "AT", "DE"})["2026-10-22"]
+    counts, tones = gdelt_gkg.count_file(raw, {"TERROR", "KILL", "PROTEST"},
+                                         {"LO": "SK", "AU": "AT", "GM": "DE"}, {"SK", "AT", "DE"})
+    c = counts["2026-10-22"]
     assert c["TERROR"] == {"SK": 1, "AT": 1, "EU": 1, "ALL": 1}  # theme listed twice, counted once
     assert c["PROTEST"] == {"DE": 1, "EU": 1, "ALL": 1}
     assert "TAX_ONLY" not in c
@@ -900,3 +901,22 @@ def test_pipeline_takes_gdelt_health_from_the_collector():
                          "error": "terror_sk_sources: HTTP 429"}}
     res = pipeline_main.collected_health(src, [], old, NOW - timedelta(days=1), NOW)
     assert not res["gdelt_doc"].ok and "429" in res["gdelt_doc"].error
+
+
+
+def test_theatre_tone_against_its_median():
+    import yaml
+
+    from pipeline.score import geopolitics
+    cfg = yaml.safe_load((pipeline_main.CONFIG / "scoring.yaml").read_text())
+    spec = {"themes": ["ARMEDCONFLICT"], "countries": ["UA"]}
+    days = [(NOW - timedelta(days=d)).strftime("%Y-%m-%d") for d in range(20, 0, -1)]
+    base = {"gkg": {"files_per_day": {d: 96 for d in days},
+                    "daily": {d: {"ARMEDCONFLICT": {"UA": 10}} for d in days},
+                    "tone": {d: {"ARMEDCONFLICT": {"UA": -40.0}} for d in days}}}
+    base["gkg"]["tone"][days[-1]]["ARMEDCONFLICT"]["UA"] = -80.0  # yesterday: twice as negative
+    t = geopolitics.tone(base, spec, NOW, cfg)
+    assert (t.value, t.baseline_median) == (-8.0, -4.0)
+    short = {"gkg": {k: {d: v for d, v in base["gkg"][k].items() if d in days[-5:]}
+                     for k in base["gkg"]}}
+    assert geopolitics.tone(short, spec, NOW, cfg) is None  # not enough history yet

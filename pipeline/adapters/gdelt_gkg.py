@@ -8,7 +8,8 @@ on 2026-10-22). Only files at least 90 minutes older than the newest listed one 
 ones wait for the next run, which picks up everything not yet processed.
 
 GKG 2.1 columns (tab-separated, 0-based): 1 DATE, 8 V2Themes ("THEME,offset;..."),
-10 V2Locations ("type#name#FIPS#adm1#adm2#lat#lon#featureid#offset;...").
+10 V2Locations ("type#name#FIPS#adm1#adm2#lat#lon#featureid#offset;..."), 15 V2Tone
+("tone,positive,negative,..."; the first value is the article's average tone, -100 to 100).
 """
 
 import io
@@ -45,11 +46,16 @@ def pending_files(newest: datetime, done: set[str], max_back: timedelta) -> list
     return out[::-1]
 
 
-def count_file(raw: bytes, themes: set[str], fips: dict[str, str],
-               eu: set[str]) -> dict[str, dict[str, dict[str, int]]]:
-    """{day: {theme: {country: articles}}}. Each article counts once per theme and country;
-    'EU' counts it once if it mentions any EU member state; 'ALL' counts every article."""
-    counts: dict[str, dict[str, dict[str, int]]] = {}
+Nested = dict[str, dict[str, dict[str, float]]]  # day -> theme -> country -> value
+
+
+def count_file(raw: bytes, themes: set[str], fips: dict[str, str], eu: set[str],
+               ) -> tuple[Nested, Nested]:
+    """({day: {theme: {country: articles}}}, the same with summed tone). Each article counts
+    once per theme and country; 'EU' counts it once if it mentions any EU member state; 'ALL'
+    counts every article."""
+    counts: Nested = {}
+    tones: Nested = {}
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
         name = z.namelist()[0]
         with z.open(name) as f:
@@ -67,12 +73,20 @@ def count_file(raw: bytes, themes: set[str], fips: dict[str, str],
                         places.add(fips[parts[2]])
                 keys = places | {"ALL"} | ({"EU"} if places & eu else set())
                 day = f"{cols[1][:4]}-{cols[1][4:6]}-{cols[1][6:8]}"
+                try:
+                    tone = float(cols[15].split(",", 1)[0]) if len(cols) > 15 else None
+                except ValueError:
+                    tone = None
                 by_theme = counts.setdefault(day, {})
+                tone_theme = tones.setdefault(day, {})
                 for theme in found:
                     by_country = by_theme.setdefault(theme, {})
+                    tone_country = tone_theme.setdefault(theme, {})
                     for k in keys:
                         by_country[k] = by_country.get(k, 0) + 1
-    return counts
+                        if tone is not None:
+                            tone_country[k] = round(tone_country.get(k, 0.0) + tone, 3)
+    return counts, tones
 
 
 def fetch(source: dict, done: set[str]) -> tuple[list[dict], list[str], str | None]:
@@ -90,7 +104,8 @@ def fetch(source: dict, done: set[str]) -> tuple[list[dict], list[str], str | No
             missing.append(f"{ts} ({e})")
             continue
         try:
-            records.append({"file": ts, "counts": count_file(r.content, themes, fips, eu)})
+            counts, tones = count_file(r.content, themes, fips, eu)
+            records.append({"file": ts, "counts": counts, "tone": tones})
         except zipfile.BadZipFile:
             missing.append(f"{ts} (bad zip)")
     error = f"{len(missing)} files missing, first: {missing[0]}" if missing else None

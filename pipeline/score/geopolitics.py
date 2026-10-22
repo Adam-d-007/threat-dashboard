@@ -20,6 +20,7 @@ from ..models import (
     Geopolitics,
     Item,
     Theatre,
+    Tone,
     TopItem,
     WatchlistEntry,
 )
@@ -33,6 +34,32 @@ def daily_activity(baselines: dict, spec: dict, day: str) -> int:
     day_counts = baselines.get("gkg", {}).get("daily", {}).get(day, {})
     return sum(day_counts.get(theme, {}).get(cc, 0)
                for theme in spec["themes"] for cc in spec["countries"])
+
+
+def daily_tone(baselines: dict, spec: dict, day: str) -> float | None:
+    """Average tone of the theatre's articles on a day, or None without tone data."""
+    gkg = baselines.get("gkg", {})
+    tone = gkg.get("tone", {}).get(day, {})
+    total = sum(tone.get(t, {}).get(c, 0.0) for t in spec["themes"] for c in spec["countries"])
+    n = sum(gkg.get("daily", {}).get(day, {}).get(t, {}).get(c, 0)
+            for t in spec["themes"] for c in spec["countries"])
+    return total / n if n and day in gkg.get("tone", {}) else None
+
+
+def tone(baselines: dict, spec: dict, now: datetime, cfg: dict) -> Tone | None:
+    """Tone on the latest complete day against the median of earlier complete days (90 days);
+    None until 14 days with tone exist."""
+    mc = cfg["media"]
+    files = baselines.get("gkg", {}).get("files_per_day", {})
+    today = now.strftime("%Y-%m-%d")
+    days = sorted(d for d, n in files.items() if n >= mc["min_files_per_day"] and d < today)
+    values = [(d, v) for d in days if (v := daily_tone(baselines, spec, d)) is not None]
+    if len(values) < mc["min_history_days"] + 1:
+        return None
+    latest_day, latest = values[-1]
+    start = (date.fromisoformat(latest_day) - timedelta(days=mc["baseline_days"])).isoformat()
+    history = [v for d, v in values[:-1] if d >= start]
+    return Tone(value=round(latest, 3), baseline_median=round(median(history), 3))
 
 
 def activity(baselines: dict, spec: dict, now: datetime, cfg: dict) -> tuple[Activity, list]:
@@ -117,7 +144,7 @@ def build(items: list[Item], prev_items: list[dict], prev_brief: list[str], base
         got = by_theatre.get(t["id"])
         theatres.append(Theatre(
             id=t["id"], name_en=t["name_en"], name_sk=t["name_sk"], activity=act,
-            sparkline=spark,
+            tone=tone(baselines, t["activity"], now, cfg), sparkline=spark,
             top_items=[TopItem(item_id=x.item_id, summary_en=x.summary_en,
                                summary_sk=x.summary_sk)
                        for x in (got.top_items if got else []) if x.item_id in known],

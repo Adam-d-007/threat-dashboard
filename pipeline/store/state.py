@@ -111,9 +111,17 @@ def merge_gkg(baselines: dict, records: list[dict], now: datetime) -> dict:
                 t = d.setdefault(theme, {})
                 for cc, n in countries.items():
                     t[cc] = t.get(cc, 0) + n
+        # Summed tone, kept beside the counts: average tone = tone / count.
+        for day, themes in rec.get("tone", {}).items():
+            d = gkg.setdefault("tone", {}).setdefault(day, {})
+            for theme, countries in themes.items():
+                t = d.setdefault(theme, {})
+                for cc, v in countries.items():
+                    t[cc] = round(t.get(cc, 0.0) + v, 3)
     cutoff = (now - timedelta(days=BASELINE_DAYS)).strftime("%Y-%m-%d")
     gkg["daily"] = {k: v for k, v in sorted(gkg["daily"].items()) if k >= cutoff}
     gkg["files_per_day"] = {k: v for k, v in sorted(files.items()) if k >= cutoff}
+    gkg["tone"] = {k: v for k, v in sorted(gkg.get("tone", {}).items()) if k >= cutoff}
     gkg["processed"] = sorted(done)[-PROCESSED_KEEP:]
     baselines["updated_at"] = now.isoformat()
     return baselines
