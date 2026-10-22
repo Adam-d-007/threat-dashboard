@@ -1,7 +1,99 @@
 @import "tailwindcss";
 
+/* Theme tokens. Dark is the default; the toggle sets data-theme on <html>.
+   Chart colours follow the dataviz reference palette: categorical slots 1-4 for the
+   score components, the fixed status palette for threat levels 1-4. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232322;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --link: #6da7ec;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --sample: #9085e9;
+  --map-filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #6e6c67;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --link: #1c5cab;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --sample: #6250d6;
+  --map-filter: none;
+}
+
+:root {
+  /* Threat levels 1-4: status palette, identical in both themes. Always shown with the
+     number and the word, never colour alone. */
+  --level-1: #0ca30c;
+  --level-2: #fab219;
+  --level-3: #ec835a;
+  --level-4: #d03b3b;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-grid: var(--grid);
+  --color-line: var(--border);
+  --color-link: var(--link);
+  --color-sample: var(--sample);
+  --color-level-1: var(--level-1);
+  --color-level-2: var(--level-2);
+  --color-level-3: var(--level-3);
+  --color-level-4: var(--level-4);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
 body {
-  background: #09090b;
-  color: #f4f4f5;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* In a layer, so Tailwind's text-* utilities (also layered, and later) can override it. */
+@layer base {
+  a {
+    color: var(--link);
+  }
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.leaflet-container {
+  background: var(--surface-2);
+  font-family: var(--font-sans);
+}
+
+.leaflet-tile-pane {
+  filter: var(--map-filter);
 }

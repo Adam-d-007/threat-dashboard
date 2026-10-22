@@ -1,0 +1,32 @@
+# Values typed in by hand. Each entry says where it was read and when.
+
+# Official levels whose pages cannot be read automatically.
+levels:
+  anchor_fr_vigipirate:
+    raw: vigilance renforcée
+    since: 2026-06-22
+    entered_on: 2026-10-22
+    read_from: >-
+      https://www.sgdsn.gouv.fr/vigipirate, posture "été-automne 2026" (stade "vigilance
+      renforcée", in effect since 22 June 2026). Update when SGDSN announces a new posture.
+
+# Europol TE-SAT, latest report. Fill from the PDF; leave null until then.
+tesat:
+  report_year: null        # e.g. 2025 (covers attacks in 2024)
+  data_year: null
+  attacks_total: null      # completed + failed + foiled
+  attacks_completed: null
+  attacks_failed: null
+  attacks_foiled: null
+  arrests_total: null
+  by_ideology:             # attacks per TE-SAT category
+    jihadist: null
+    right_wing: null
+    left_anarchist: null
+    ethno_separatist: null
+    other: null
+
+# SIS annual report (Slovak threat context). Fill from the PDF; leave null until then.
+sis_annual:
+  report_year: null
+  summary_sk: null

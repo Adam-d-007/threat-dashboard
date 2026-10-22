@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Data pipeline for the threat dashboard"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
+    "certifi>=2026.10.19",
     "feedparser>=6.0.14",
     "httpx>=0.28.1",
     "pydantic>=2.14",
@@ -28,3 +30,7 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["pipeline/tests"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests carry inline XML and HTML samples.
+"pipeline/tests/*" = ["E501"]

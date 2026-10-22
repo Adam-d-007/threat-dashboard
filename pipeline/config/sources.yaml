@@ -12,6 +12,13 @@
 #   enabled       false turns the source off; give the reason in notes
 #   verified_on   date the URLs were last fetched and parsed successfully
 #   notes         anything a maintainer needs to know
+# Optional:
+#   hourly        false keeps a source out of the hourly collector (default true for rss)
+#   max_items     keep only the newest N items (feeds that carry their whole archive)
+#   exclude_title regex; matching titles are dropped (e.g. paid advertisements)
+#   html / json   selectors or field names for the html_scrape and json_api adapters
+#
+# Official threat levels are not sources: they live in anchors.yaml.
 
 sources:
   - id: gdelt_doc
@@ -76,3 +83,526 @@ sources:
     notes: >-
       Linked from the newsroom footer. Items carry no publication date, so the pipeline
       dates each one by when it first saw it (published_estimated: true).
+
+  - id: dennikn
+    name: Denník N
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://dennikn.sk/feed/
+      - https://dennikn.sk/minuta/feed/?cat=430
+      - https://dennikn.sk/minuta/feed/?cat=431
+    lang: sk
+    regions: [SK]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Listed on dennikn.sk/rss-odber/ (articles, Slovensko and Svet minúty). 10 items each:
+      articles about 14 h, Slovensko minúty about 12 h, Svet minúty about 4 h. Articles are
+      paywalled, summaries only. robots.txt blocks named AI bots, not this User-Agent.
+
+  - id: aktuality
+    name: Aktuality.sk
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.aktuality.sk/rss/domace/
+      - https://www.aktuality.sk/rss/zahranicne/
+    lang: sk
+    regions: [SK]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Homepage <link rel=alternate>. 15 items each: domáce about 14 h, zahraničné about 4.5 h.
+      domáce mixes in advertorials.
+
+  - id: pravda
+    name: Pravda.sk
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.pravda.sk/spravy/domace/rss/xml
+      - https://www.pravda.sk/spravy/svet/rss/xml
+    lang: sk
+    regions: [SK]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Listed on pravda.sk/info/rss-info. 20 items each, about 18 to 20 h. No robots.txt.
+
+  - id: stvr
+    name: Správy STVR
+    group: slovak_press
+    tier: B
+    adapter: rss
+    urls: ["https://spravy.stvr.sk/spravy-po-minute/feed/"]
+    lang: sk
+    regions: [SK]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      <link rel=alternate> on spravy.stvr.sk/spravy-po-minute/. 100 items, about 24 h, 358 KB.
+      The other STVR feeds carry full article bodies uncompressed (2.9 to 3.6 MB) and are skipped.
+
+  - id: ct24
+    name: ČT24
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://ct24.ceskatelevize.cz/rss/rubrika/domaci-5
+      - https://ct24.ceskatelevize.cz/rss/rubrika/svet-16
+    lang: cs
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      <link rel=alternate> on the section pages. 30 items each: domácí about 2 days, svět about 32 h.
+
+  - id: orf
+    name: ORF
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls: ["https://rss.orf.at/news.xml"]
+    lang: de
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      orf.at homepage <link rel=alternate>. RSS 1.0, 27 items, about 17 h, dates in dc:date,
+      summaries short or empty.
+
+  - id: telex
+    name: Telex
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls: ["https://telex.hu/rss"]
+    lang: hu
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Linked from the telex.hu homepage. 50 items, about 17 h. Titles ending in "(x)" are paid
+      advertisements and are dropped.
+    exclude_title: '\(x\)\s*$'
+
+  - id: pap
+    name: PAP
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls: []
+    lang: pl
+    regions: [SK, EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: every request to www.pap.pl gets an Imperva Incapsula bot challenge, and the site
+      sends "tdm-reservation: 1" (EU text-and-data-mining opt-out) and "X-Robots-Tag: noai". No
+      feed for the main news service could be verified.
+
+  - id: ukrinform
+    name: Ukrinform (English)
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.ukrinform.net/rss/block-lastnews
+      - https://www.ukrinform.net/rss/rubric-ato
+    lang: en
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      block-lastnews is the <link rel=alternate> on /block-lastnews. The section pages advertise
+      /rss//rubric-ato (double slash, 404); the single-slash form works (found by probing).
+      30 items each: last news about 14 h, war rubric about 22 h.
+
+  # --- Official bodies -------------------------------------------------------------------
+
+  - id: minv
+    name: Ministerstvo vnútra SR (incl. Prezídium PZ)
+    group: official
+    tier: A
+    adapter: rss
+    urls: ["https://www.minv.sk/rss.php?rss-tlacove-spravy"]
+    lang: sk
+    regions: [SK]
+    enabled: true
+    hourly: false
+    max_items: 60
+    verified_on: 2026-10-22
+    notes: >-
+      <link rel=alternate> on minv.sk/?tlacove-spravy. The feed is the whole archive since 2008
+      (3,000 items, 2.2 MB, no caching), so it is read twice a day only and cut to the newest 60.
+      Police Presidium news is cross-posted here; its own feed (rss-5) has been stale since
+      27 Jun 2026. policia.sk is a parked domain, not the police.
+
+  - id: consilium
+    name: Council of the EU, press releases
+    group: official
+    tier: A
+    adapter: rss
+    urls: ["https://www.consilium.europa.eu/en/rss/pressreleases.ashx"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      20 items, about 5 days. The feed answers our requests, but consilium.europa.eu's pages and
+      robots.txt sit behind a Cloudflare browser check, so the URL could only be taken from
+      third-party feed listings, not from the Council's own site. Adam to confirm in a browser.
+
+  - id: eeas
+    name: EEAS press material
+    group: official
+    tier: A
+    adapter: html_scrape
+    urls: ["https://www.eeas.europa.eu/eeas/press-material_en"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: div.related-grid div.card
+      title: h3.card-title a
+      link: h3.card-title a
+      date: div.card-footer
+      date_format: "%d.%m.%Y"
+      tz: Europe/Brussels
+    notes: >-
+      No feed. About 36 items over 2 days, most of them EU delegation releases from around the
+      world. The HQ-only filter is disallowed by robots.txt (Crawl-delay 10; one request per run).
+
+  - id: nato
+    name: NATO news
+    group: official
+    tier: A
+    adapter: json_api
+    urls: ["https://www.nato.int/content/nato/en/news-and-events/articles/news/jcr:content/root/container/general_search.search.json?searchText=&searchType=wcm&sortBy=dateDesc&pageSize=25&page=1&urlTags=&selectedTagsFilter=&languages=&startDate=&endDate="]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    json:
+      items: pages
+      title: title
+      link: link
+      date: pageDate
+      snippet: description
+      date_format: "%d %B %Y"
+      tz: Europe/Brussels
+      base: https://www.nato.int
+    notes: >-
+      No feed. The news list on nato.int is filled by this JSON endpoint, named in the page's own
+      data-servlet-endpoint attribute. Undocumented, so it may change. 25 items, about a month.
+
+  - id: sk_cert
+    name: SK-CERT (NBÚ)
+    group: official
+    tier: A
+    adapter: html_scrape
+    urls: ["https://www.sk-cert.sk/sk/aktuality/index.html"]
+    lang: sk
+    regions: [SK]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: article.news-short
+      title: h3.news-list-title a
+      link: h3.news-list-title a
+      date: time.news-list-time
+      date_attr: datetime
+      date_format: "%Y-%d-%m"   # the attribute really is year-day-month
+      tz: Europe/Bratislava
+    notes: >-
+      The site's RSS has no item dates, so the news list is scraped instead. 27 items since 2025.
+
+  - id: cert_eu
+    name: CERT-EU
+    group: official
+    tier: A
+    adapter: rss
+    urls:
+      - https://cert.europa.eu/publications/security-advisories-rss
+      - https://cert.europa.eu/publications/threat-intelligence-rss
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      "RSS Feed" buttons on the two list pages. 10 items each. Dates use "CEST", which the RSS
+      adapter converts itself (feedparser would read it as UTC).
+
+  - id: enisa
+    name: ENISA news
+    group: official
+    tier: A
+    adapter: html_scrape
+    urls: ["https://www.enisa.europa.eu/news"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: div.view-id-news_index div.publications-item
+      title: .publication-content h3 a
+      link: .publication-content h3 a
+      date: time.datetime
+      date_attr: datetime
+      date_format: iso
+    notes: >-
+      No feed. 10 items, about 3 months.
+
+  - id: mzv
+    name: Ministerstvo zahraničných vecí a európskych záležitostí SR
+    group: official
+    tier: A
+    adapter: html_scrape
+    urls: []
+    lang: sk
+    regions: [SK, EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: every request to mzv.sk, robots.txt included, gets a Cloudflare challenge (403).
+      No feed is documented. Ask MZV (info@mzv.sk) for a feed or to allow this User-Agent.
+
+  - id: euvsdisinfo
+    name: EUvsDisinfo
+    group: official
+    tier: A
+    adapter: rss
+    urls: []
+    lang: en
+    regions: [EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: the site blocks this User-Agent (Cloudflare 403) and its robots.txt disallows
+      */feed/. Needs permission from EEAS / EUvsDisinfo.
+
+  # --- EU press --------------------------------------------------------------------------
+
+  - id: bbc_europe
+    name: BBC News Europe
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: ["https://feeds.bbci.co.uk/news/world/europe/rss.xml"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Listed on the BBC's official feeds page (bbc.co.uk/news/10628494). 22 items, about 5 days.
+
+  - id: france24
+    name: France 24 Europe
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: ["https://www.france24.com/en/europe/rss"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      <link rel=alternate> on france24.com/en/europe/. 30 items, about 58 h.
+
+  - id: politico_eu
+    name: POLITICO Europe
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.politico.eu/section/defense/feed/
+      - https://www.politico.eu/feed/
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      <link rel=alternate> on the defense section and the homepage. Defense: 31 items, about
+      9 days. Main: only 10 items (about 6 h) and some German Berlin Playbook items.
+
+  - id: euobserver
+    name: EUobserver
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: ["https://euobserver.com/feed/"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Homepage <link rel=alternate>. 20 items, about 63 h. Some articles are paywalled.
+
+  - id: dw
+    name: Deutsche Welle
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: []
+    lang: en
+    regions: [EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: dw.com links no feed, and its robots.txt forbids automated data mining without
+      DW's written permission. rss.dw.com/xml/rss-en-all works but is only named by third parties.
+
+  - id: euractiv
+    name: Euractiv (now Rapporteur)
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: []
+    lang: en
+    regions: [EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: euractiv.com redirects to rapporteur.com, whose robots.txt disallows /feed/, and
+      whose pages sit behind a Cloudflare block.
+
+  # --- Analysis (context for the brief; never evidence that an event happened) ------------
+
+  - id: isd
+    name: ISD Digital Dispatches
+    group: analysis
+    tier: B
+    adapter: html_scrape
+    urls: ["https://www.isdglobal.org/digital-dispatches/"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: .gb-query-loop-item.type-digital-dispatch
+      title: h2.gb-headline-text, p.gb-headline-2442171e
+      link: a.gb-container-link
+      date: p.gb-headline-text
+      date_format: "%B %d, %Y"
+    notes: >-
+      The advertised feeds are empty or 404. Low volume (a few items a month). Selectors use
+      generated class names and will break on a redesign.
+
+  - id: icct
+    name: ICCT publications
+    group: analysis
+    tier: B
+    adapter: html_scrape
+    urls: ["https://icct.nl/publications?field_publication_category%5B101%5D=101&field_publication_category%5B28%5D=28&field_publication_category%5B29%5D=29&field_publication_category%5B30%5D=30&field_publication_category%5B97%5D=97&sort_order=DESC"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: .view-content .views-row article
+      title: h5.teaser-title
+      link: a.teaser
+      date: .teaser-date
+      date_format: "%d %b %Y"
+    notes: >-
+      No feed. The URL applies the site's own filter (analysis, perspectives, policy briefs,
+      reports, snapshots); unfiltered, the list is flooded by journal articles.
+
+  - id: ecfr
+    name: ECFR analysis
+    group: analysis
+    tier: B
+    adapter: html_scrape
+    urls: ["https://ecfr.eu/analysis/"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    html:
+      item: article.tease
+      title: h2.post-title a
+      link: h2.post-title a
+      date: time.post-time
+      date_attr: datetime
+      date_format: "%Y-%m-%d %H:%M:%S"
+      tz: Europe/Berlin   # the attribute has no offset; site time zone assumed
+    notes: >-
+      The advertised feed (ecfr.eu/feed/) is blocked by Cloudflare; the analysis list is not.
+
+  - id: isw
+    name: Institute for the Study of War
+    group: analysis
+    tier: B
+    adapter: rss
+    urls: []
+    lang: en
+    regions: [EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: every page, robots.txt included, sits behind a Cloudflare managed challenge.
+
+  - id: globsec
+    name: GLOBSEC
+    group: analysis
+    tier: B
+    adapter: html_scrape
+    urls: []
+    lang: en
+    regions: [SK, EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Disabled: every page, robots.txt included, sits behind a Cloudflare managed challenge.
+      GLOBSEC is in Bratislava; asking them for a feed may be the only route.
+
+  # --- Need accounts or approval before they can run ---------------------------------------
+
+  - id: acled
+    name: ACLED
+    group: backbone
+    tier: B
+    adapter: acled
+    urls: ["https://acleddata.com/api/acled/read"]
+    lang: en
+    regions: [SK, EU]
+    enabled: false
+    verified_on: null
+    notes: >-
+      Waiting for Adam's myACLED account (registering with an @mcslovakia.com address). OAuth
+      password grant at acleddata.com/oauth/token; recent events need the Partner or Enterprise
+      tier, Research gets a 12-month lag. Adapter not written until the API can be called.
+
+  - id: reliefweb
+    name: ReliefWeb (OCHA)
+    group: context
+    tier: B
+    adapter: reliefweb
+    urls: ["https://api.reliefweb.int/v2/reports"]
+    lang: en
+    regions: [EU]
+    enabled: false
+    verified_on: null
+    notes: >-
+      Waiting for an approved appname (Google form linked from apidoc.reliefweb.int); unapproved
+      names get HTTP 403. Adapter not written until the API can be called.
+
+  - id: gdelt_gkg
+    name: GDELT 2.0 GKG files
+    group: backbone
+    tier: C
+    adapter: gdelt_gkg
+    urls: ["https://data.gdeltproject.org/gdeltv2/lastupdate.txt"]
+    lang: multi
+    regions: [SK, EU]
+    enabled: false
+    verified_on: 2026-10-22
+    notes: >-
+      Theme and location counts for the media baselines. About 200 MB per 12 h of files. Built
+      with the scoring in Phase 4, which is the only consumer.

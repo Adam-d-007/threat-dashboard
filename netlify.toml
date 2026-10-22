@@ -8,3 +8,8 @@
   publish = "dist"
   # Skip the build (and the deploy) when nothing under web/ changed.
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF ."
+
+# The dev branch deploy renders the bundled sample data (labelled on every page), so the design
+# can be reviewed before scoring exists. Production always reads the real data branch.
+[context.dev.environment]
+  VITE_SAMPLE_DATA = "true"

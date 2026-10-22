@@ -1,6 +1,10 @@
-import type { Run } from "../types/run";
+import type { Run, Timeseries } from "../types/run";
 
 export const SUPPORTED_SCHEMA_VERSIONS = [1];
+
+/** True on builds made with VITE_SAMPLE_DATA=true (the dev branch deploy and local design work).
+ * The site then renders the bundled, made-up sample files and says so on every page. */
+export const SAMPLE_MODE = import.meta.env.VITE_SAMPLE_DATA === "true";
 
 // Runs start at 04:05 and 13:05 UTC.
 const SLOTS_UTC: [number, number][] = [
@@ -39,16 +43,30 @@ export type LoadResult =
   | { kind: "error"; message: string };
 
 export async function loadLatest(now: Date = new Date()): Promise<LoadResult> {
-  let res: Response;
-  try {
-    res = await fetch(`${dataBaseUrl()}/latest.json?v=${slotKey(now)}`);
-  } catch (e) {
-    return { kind: "error", message: String(e) };
+  let data: { schema_version?: unknown };
+  if (SAMPLE_MODE) {
+    data = (await import("../sample/latest.json")).default;
+  } else {
+    let res: Response;
+    try {
+      res = await fetch(`${dataBaseUrl()}/latest.json?v=${slotKey(now)}`);
+    } catch (e) {
+      return { kind: "error", message: String(e) };
+    }
+    if (!res.ok) return { kind: "error", message: `HTTP ${res.status}` };
+    data = await res.json();
   }
-  if (!res.ok) return { kind: "error", message: `HTTP ${res.status}` };
-  const data = await res.json();
-  if (!SUPPORTED_SCHEMA_VERSIONS.includes(data?.schema_version)) {
+  if (!SUPPORTED_SCHEMA_VERSIONS.includes(data?.schema_version as number)) {
     return { kind: "unsupported", version: data?.schema_version };
   }
-  return { kind: "ok", run: data as Run };
+  return { kind: "ok", run: data as unknown as Run };
+}
+
+/** The index history, or null when none exists yet (before scoring runs). */
+export async function loadTimeseries(now: Date = new Date()): Promise<Timeseries | null> {
+  if (SAMPLE_MODE) return (await import("../sample/timeseries.json")).default as unknown as Timeseries;
+  const res = await fetch(`${dataBaseUrl()}/timeseries.json?v=${slotKey(now)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`timeseries.json: HTTP ${res.status}`);
+  return (await res.json()) as Timeseries;
 }

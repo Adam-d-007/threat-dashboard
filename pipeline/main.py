@@ -1,7 +1,8 @@
 """One pipeline run: python -m pipeline.main [--no-llm] [--fixtures] [--slot 04|13]
 
-Phase 1 stages: load state, fetch, normalize, merge the hourly RSS buffer, dedupe,
-window filter, write. The workflow commits the state directory to the data branch afterwards.
+Stages so far: load state, fetch, read official levels (anchors), normalize, merge the
+hourly RSS buffer, dedupe, window filter, diff, write. The workflow commits the state
+directory to the data branch afterwards.
 """
 
 import argparse
@@ -14,10 +15,21 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .adapters import gdelt_doc, rss
+from . import anchors as anchor_reader
+from .adapters import gdelt_doc, html_scrape, json_api, rss
 from .adapters.base import FetchResult
 from .health import run_status, source_health
-from .models import SCHEMA_VERSION, Item, Run, RunCounts, RunInfo
+from .models import (
+    SCHEMA_VERSION,
+    AnchorReading,
+    Diff,
+    Item,
+    Run,
+    RunCounts,
+    RunInfo,
+    SourceHealth,
+    ValueChange,
+)
 from .process.dedupe import dedupe
 from .process.normalize import normalize
 from .store import state
@@ -50,6 +62,10 @@ def fetch_all(sources: list[dict], queries: list[dict], since: datetime, now: da
             return gdelt_doc.fetch(src, queries, since, now)
         if src["adapter"] == "rss":
             return rss.fetch(src)
+        if src["adapter"] == "html_scrape":
+            return html_scrape.fetch(src)
+        if src["adapter"] == "json_api":
+            return json_api.fetch(src)
         raise ValueError(f"unknown adapter {src['adapter']!r} for {src['id']}")
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -94,11 +110,41 @@ def normalize_all(sources: list[dict], results: dict[str, FetchResult], now: dat
 
 
 def fixture_fetch(src: dict) -> FetchResult:
+    """Sources without a fixture file return an empty, successful result."""
     if src["adapter"] == "gdelt_doc":
         items = gdelt_doc.parse(json.loads((FIXTURES / f"{src['id']}.json").read_text()))
-    else:
+    elif (FIXTURES / f"{src['id']}.xml").exists():
         items = rss.parse((FIXTURES / f"{src['id']}.xml").read_bytes())
+    else:
+        items = []
     return FetchResult(source_id=src["id"], ok=True, items=items, http_status=200)
+
+
+def diff(prev_run: dict | None, anchors: list[AnchorReading],
+         health: list[SourceHealth]) -> Diff:
+    """Official level and source status changes since the previous run."""
+    if not prev_run:
+        return Diff()
+    prev_anchors = {a["id"]: a for a in prev_run.get("anchors", [])}
+    prev_sources = {s["id"]: s["status"] for s in prev_run.get("sources", [])}
+    anchor_changes = []
+    for a in anchors:
+        old = prev_anchors.get(a.id)
+        if old is None or a.raw is None:
+            continue
+        if old.get("raw") != a.raw:
+            anchor_changes.append(ValueChange(id=a.id, value_from=old.get("raw"), value_to=a.raw))
+        elif old.get("text_hash") and a.text_hash and old["text_hash"] != a.text_hash:
+            # Same level, different wording: worth a look (the SIS paragraph especially).
+            anchor_changes.append(ValueChange(id=a.id, value_from="text", value_to="text changed"))
+    source_changes = [ValueChange(id=h.id, value_from=prev_sources[h.id], value_to=h.status)
+                      for h in health if h.id in prev_sources and prev_sources[h.id] != h.status]
+    return Diff(anchor_changes=anchor_changes, source_changes=source_changes)
+
+
+def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
+    """Fixture runs make no network calls, so they carry the previous anchors forward."""
+    return [AnchorReading.model_validate(a) for a in previous]
 
 
 def run_id(now: datetime, slot: str | None) -> str:
@@ -125,6 +171,9 @@ def main(argv: list[str] | None = None) -> int:
              run_id(started, args.slot), since.isoformat(), len(enabled))
 
     results = fetch_all(enabled, queries, since, started, args.fixtures)
+    prev_anchors = (prev["latest"] or {}).get("anchors", [])
+    anchors = prev_anchors_as_models(prev_anchors) if args.fixtures else \
+        anchor_reader.read_all(prev_anchors, started)
 
     seen: dict[str, str] = dict(prev["seen"])
     items = normalize_all(enabled, results, started, seen)
@@ -155,7 +204,8 @@ def main(argv: list[str] | None = None) -> int:
                    finished_at=finished, window_start=since, git_sha=args.git_sha,
                    counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
                                     after_dedupe=len(unique), in_window=len(in_window)))
-    run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=in_window)
+    run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=in_window,
+              anchors=anchors, diff=diff(prev["latest"], anchors, health))
 
     try:
         state.write(args.state_dir, run, seen, finished)

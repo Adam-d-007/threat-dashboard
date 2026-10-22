@@ -3,7 +3,7 @@
 import hashlib
 import html
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..adapters.base import RawItem
@@ -44,13 +44,20 @@ def domain_of(url: str) -> str:
 
 def normalize(raw: RawItem, source: dict, fetched_at: datetime,
               first_seen: dict[str, str]) -> Item:
-    """Build an Item. first_seen maps item id to the first time the pipeline saw it,
-    and dates items whose source gives none."""
+    """Build an Item. first_seen maps item id to the first time the pipeline saw it; it dates
+    items whose source gives no date, or a date without a time."""
     url = canonical_url(raw.url)
     iid = item_id(url)
-    estimated = raw.published_at is None
-    if estimated:
-        published = datetime.fromisoformat(first_seen.get(iid, fetched_at.isoformat()))
+    seen_at = datetime.fromisoformat(first_seen.get(iid, fetched_at.isoformat()))
+    estimated = raw.published_at is None or raw.date_only
+    if raw.published_at is None:
+        published = seen_at
+    elif raw.date_only:
+        # A day without a time. Midnight would put a morning item before the window of the
+        # afternoon run and lose it, so use the first sighting on that day, else midday.
+        day_start = raw.published_at.astimezone(UTC)
+        same_day = timedelta(0) <= seen_at - day_start < timedelta(days=1)
+        published = seen_at if same_day else day_start + timedelta(hours=12)
     else:
         published = raw.published_at.astimezone(UTC)
     lang = raw.lang or source["lang"]

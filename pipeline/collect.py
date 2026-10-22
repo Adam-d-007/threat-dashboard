@@ -32,7 +32,8 @@ def main(argv: list[str] | None = None) -> int:
 
     now = FIXTURE_NOW if args.fixtures else datetime.now(UTC).replace(microsecond=0)
     sources, _ = load_config()
-    rss_sources = [s for s in sources if s["enabled"] and s["adapter"] == "rss"]
+    rss_sources = [s for s in sources
+                   if s["enabled"] and s["adapter"] == "rss" and s.get("hourly", True)]
     results = fetch_all(rss_sources, [], now, now, args.fixtures)
     # Read-only: dates undated items the way the pipeline already did.
     seen = state.load(args.state_dir)["seen"]

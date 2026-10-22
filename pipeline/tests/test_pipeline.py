@@ -1,17 +1,17 @@
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pytest
 
-from pipeline import collect
+from pipeline import anchors, collect
 from pipeline import main as pipeline_main
-from pipeline.adapters import base, gdelt_doc, rss
-from pipeline.adapters.base import FetchError, FetchResult
+from pipeline.adapters import base, dates, gdelt_doc, html_scrape, json_api, rss
+from pipeline.adapters.base import FetchError, FetchResult, RawItem
 from pipeline.health import run_status, source_health
 from pipeline.main import FIXTURE_NOW, FIXTURES, window_start
 from pipeline.models import Run
-from pipeline.process.normalize import canonical_url, clean_text, item_id
+from pipeline.process.normalize import canonical_url, clean_text, item_id, normalize
 
 NOW = datetime(2026, 10, 22, 11, 0, tzinfo=UTC)
 SRC = {"id": "x", "name": "X", "tier": "B", "group": "slovak_press"}
@@ -60,14 +60,14 @@ def test_get_does_not_retry_404(monkeypatch):
     calls = []
     monkeypatch.setattr(httpx, "get", lambda *a, **k: calls.append(1) or _response(404))
     with pytest.raises(FetchError) as e:
-        base.get("https://x", backoff_s=0)
+        base.get("https://x", backoff_s=0, check_robots=False)
     assert e.value.http_status == 404 and len(calls) == 1
 
 
 def test_get_retries_503_then_succeeds(monkeypatch):
     statuses = iter([503, 429, 200])
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _response(next(statuses)))
-    assert base.get("https://x", backoff_s=0).status_code == 200
+    assert base.get("https://x", backoff_s=0, check_robots=False).status_code == 200
 
 
 def test_health_failed_then_stale():
@@ -127,7 +127,7 @@ def test_failing_source_gives_partial_run(tmp_path, monkeypatch):
     sme = next(s for s in run.sources if s.id == "sme")
     # never succeeded before, so it is stale rather than merely failed
     assert sme.status == "stale" and sme.error == "HTTP 404"
-    assert all(s.status == "ok" for s in run.sources if s.id != "sme")
+    assert all(s.status in ("ok", "disabled") for s in run.sources if s.id != "sme")
 
 
 def test_crashing_adapter_does_not_stop_run(tmp_path, monkeypatch):
@@ -235,3 +235,184 @@ def test_invalid_buffer_makes_run_partial_not_failed(tmp_path):
     pipeline_main.main(["--fixtures", "--state-dir", str(tmp_path)])
     run = Run.model_validate_json((tmp_path / "latest.json").read_text())
     assert run.run.status == "partial" and run.run.counts.in_window == 6
+
+
+# --- robots.txt, dates, scraping adapters ---------------------------------------------
+
+def _robots_mock(monkeypatch, status, body=""):
+    base._robots.clear()
+
+    def fake_get(url, **kw):
+        assert url.endswith("/robots.txt")
+        return httpx.Response(status, text=body, request=httpx.Request("GET", url))
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+
+def test_robots_rules(monkeypatch):
+    _robots_mock(monkeypatch, 200, "User-agent: *\nDisallow: /feed/\n")
+    assert not base.robots_allowed("https://a.example/feed/")
+    assert base.robots_allowed("https://a.example/news/")
+    _robots_mock(monkeypatch, 403)  # bot wall in front of robots.txt: RFC 9309 says allowed
+    assert base.robots_allowed("https://b.example/x")
+    _robots_mock(monkeypatch, 503)
+    with pytest.raises(FetchError, match="unreachable"):
+        base.robots_allowed("https://c.example/x")
+    base._robots.clear()
+
+
+def test_rss_reads_cest_as_utc_plus_2():
+    feed = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <item><title>Advisory</title><link> https://cert.example/a </link>
+    <pubDate>Tue, 21 Oct 2026 14:30:00 CEST</pubDate></item></channel></rss>"""
+    item = rss.parse(feed)[0]
+    assert item.published_at == datetime(2026, 10, 21, 12, 30, tzinfo=UTC)
+    assert item.url == "https://cert.example/a"
+
+
+def test_postfilter_excludes_ads_and_keeps_newest():
+    items = rss.parse(b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <item><title>Real news</title><link>https://t.example/1</link><pubDate>Wed, 22 Oct 2026 08:00:00 +0000</pubDate></item>
+    <item><title>Buy this (x)</title><link>https://t.example/2</link><pubDate>Wed, 22 Oct 2026 09:00:00 +0000</pubDate></item>
+    <item><title>Older</title><link>https://t.example/3</link><pubDate>Mon, 20 Oct 2026 08:00:00 +0000</pubDate></item>
+    </channel></rss>""")
+    kept = base.postfilter(items, {"exclude_title": r"\(x\)\s*$", "max_items": 1})
+    assert [i.title for i in kept] == ["Real news"]
+
+
+def test_parse_local_dates():
+    assert dates.parse_local_date("vyhlásený dňa 23. augusta 2017") == date(2017, 8, 23)
+    assert dates.parse_local_date("do 30 listopada 2026 r.") == date(2026, 11, 30)
+    assert dates.parse_local_date("Sinds 12 december 2023 is") == date(2023, 12, 12)
+    with pytest.raises(ValueError):
+        dates.parse_local_date("no date here")
+
+
+SK_CERT_CFG = {"item": "article.news-short", "title": "h3.news-list-title a",
+               "link": "h3.news-list-title a", "date": "time.news-list-time",
+               "date_attr": "datetime", "date_format": "%Y-%d-%m", "tz": "Europe/Bratislava"}
+
+
+def test_html_scrape_parses_and_dedupes():
+    html = (FIXTURES / "html" / "sk_cert.html").read_text()
+    items = html_scrape.parse(html, "https://www.sk-cert.sk/sk/aktuality/index.html", SK_CERT_CFG)
+    assert len(items) == 2
+    assert items[0].url == "https://www.sk-cert.sk/sk/varovanie-1/index.html"
+    # 21 Oct 2026 00:00 in Bratislava (CEST) is 20 Oct 22:00 UTC; the day has no time.
+    assert items[0].published_at == datetime(2026, 10, 20, 22, 0, tzinfo=UTC)
+    assert items[0].date_only
+
+
+def test_html_scrape_fails_loudly_on_a_bot_wall():
+    with pytest.raises(FetchError, match="no items match"):
+        html_scrape.parse("<html><title>Just a moment...</title></html>", "https://x", SK_CERT_CFG)
+
+
+def test_json_api_parse():
+    data = {"pages": [{"title": "NATO news", "link": "/en/news/1", "pageDate": "21 October 2026",
+                       "description": "d", "googleAPIConfig": {"ignored": True}}]}
+    cfg = {"items": "pages", "title": "title", "link": "link", "date": "pageDate",
+           "snippet": "description", "date_format": "%d %B %Y", "base": "https://www.nato.int"}
+    item = json_api.parse(data, cfg)[0]
+    assert item.url == "https://www.nato.int/en/news/1" and item.date_only
+
+
+def _raw_date_only(day_utc_midnight):
+    return RawItem(url="https://x.sk/a", title="t", published_at=day_utc_midnight, date_only=True)
+
+
+def test_date_only_item_uses_first_sighting_on_that_day():
+    day = datetime(2026, 10, 22, 0, 0, tzinfo=UTC)
+    src = {"id": "s", "tier": "A", "lang": "sk"}
+    seen_10 = datetime(2026, 10, 22, 10, 35, tzinfo=UTC)
+    item = normalize(_raw_date_only(day), src, seen_10, {})
+    assert item.published_at == seen_10 and item.published_estimated
+    # First seen days later: midday of its own date, not the late sighting.
+    late = normalize(_raw_date_only(day), src, datetime(2026, 10, 25, 9, 0, tzinfo=UTC), {})
+    assert late.published_at == datetime(2026, 10, 22, 12, 0, tzinfo=UTC)
+
+
+# --- anchors ---------------------------------------------------------------------------
+
+def _html(name):
+    return (FIXTURES / "html" / f"{name}.html").read_text()
+
+
+def test_sis_parser():
+    r = anchors.parse_sis(_html("sis"))
+    assert r["raw"] == "2" and r["since"] == date(2017, 8, 23) and len(r["text_hash"]) == 40
+
+
+def test_sis_parser_fails_loudly_when_layout_changes():
+    with pytest.raises(anchors.AnchorError):
+        anchors.parse_sis("<div class='main-column'><p>Nový text bez úrovne.</p></div>")
+
+
+def test_ocam_nctv_parsers():
+    assert anchors.parse_ocam(_html("ocam"))["raw"] == "grave"
+    n = anchors.parse_nctv(_html("nctv"))
+    assert n["raw"] == "substantieel" and n["since"] == date(2023, 12, 12)
+    two_visible = _html("ocam").replace('"faible" style="display: none;"', '"faible" style="display:block"')
+    with pytest.raises(anchors.AnchorError, match="found 2"):
+        anchors.parse_ocam(two_visible)
+
+
+def test_mswia_national_level_detail_and_expiry():
+    r = anchors.parse_mswia(_html("mswia"), today=date(2026, 10, 22))
+    assert r["raw"] == "BRAVO" and not r["expired"]
+    assert "CHARLIE" in r["detail"] and "BRAVO-CRP" in r["detail"] and "SECOND ALERT" not in r["detail"]
+    assert anchors.parse_mswia(_html("mswia"), today=date(2026, 12, 1))["expired"]
+
+
+def _fcdo(sentence, doc_type="travel_advice"):
+    body = f'<h3 id="terrorism-in-x">Terrorism in X</h3><div role="note"><p>{sentence}</p></div>'
+    return {"document_type": doc_type,
+            "details": {"parts": [{"slug": "summary", "body": "<p>very likely</p>"},
+                                  {"slug": "safety-and-security", "body": body}]}}
+
+
+@pytest.mark.parametrize("sentence, raw", [
+    ("Terrorists are very likely to try to carry out attacks in France.", "very likely"),
+    ("Terrorists are likely to try to carry out attacks in the Netherlands.", "likely"),
+    ("Terrorist attacks in Slovakia cannot be ruled out.", "cannot be ruled out"),
+])
+def test_fcdo_phrases(sentence, raw):
+    assert anchors.parse_fcdo(_fcdo(sentence))["raw"] == raw
+
+
+def test_fcdo_rejects_redirects_and_unknown_wording():
+    with pytest.raises(anchors.AnchorError, match="redirect"):
+        anchors.parse_fcdo(_fcdo("x", doc_type="redirect"))
+    with pytest.raises(anchors.AnchorError, match="not recognised"):
+        anchors.parse_fcdo(_fcdo("Terrorism risk is moderate."))
+
+
+def test_failed_anchor_keeps_last_value():
+    cfg = {"id": "anchor_be_ocam", "country": "BE", "name": "OCAM", "url": "https://o",
+           "scale": ["faible", "moyen", "grave", "tresGrave"]}
+    ok = anchors._reading(cfg, NOW, {"raw": "grave"})
+    kept = anchors._failed(cfg, ok.model_dump(mode="json"), "FetchError: HTTP 503")
+    assert kept.raw == "grave" and kept.status == "failed" and kept.as_of == NOW
+    with pytest.raises(anchors.AnchorError, match="not on the scale"):
+        anchors._reading(cfg, NOW, {"raw": "Grave"})
+
+
+def test_diff_reports_level_and_wording_changes():
+    cfg = {"id": "anchor_sk_sis", "country": "SK", "name": "SIS", "url": "https://s",
+           "scale": ["1", "2", "3", "4"]}
+    old = anchors._reading(cfg, NOW, {"raw": "2", "text_hash": "a"}).model_dump(mode="json")
+    prev = {"anchors": [old], "sources": [{"id": "tasr", "status": "ok"}]}
+    health = [source_health(SRC | {"id": "tasr"}, FetchResult("tasr", ok=False, error="x"),
+                            {"last_success": NOW.isoformat()}, NOW)]
+    d = pipeline_main.diff(prev, [anchors._reading(cfg, NOW, {"raw": "2", "text_hash": "b"})], health)
+    assert d.anchor_changes[0].value_to == "text changed"
+    assert d.source_changes[0].value_from == "ok" and d.source_changes[0].value_to == "failed"
+    d2 = pipeline_main.diff(prev, [anchors._reading(cfg, NOW, {"raw": "3"})], [])
+    assert (d2.anchor_changes[0].value_from, d2.anchor_changes[0].value_to) == ("2", "3")
+
+
+def test_collector_skips_sources_marked_not_hourly(tmp_path, monkeypatch):
+    fetched = []
+    monkeypatch.setattr(pipeline_main, "fixture_fetch",
+                        lambda src: fetched.append(src["id"]) or FetchResult(src["id"], ok=True))
+    collect.main(["--fixtures", "--state-dir", str(tmp_path)])
+    assert "minv" not in fetched and "tasr" in fetched and "eeas" not in fetched

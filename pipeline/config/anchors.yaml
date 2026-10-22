@@ -1,0 +1,78 @@
+# Official threat levels read from government pages each run (pipeline/anchors.py).
+# scale lists the values the page can show, lowest first; anything else fails loudly.
+# Austria (DSN) publishes no current level, so it has no entry (checked 2026-10-22).
+
+anchors:
+  - id: anchor_sk_sis
+    country: SK
+    name: SIS NBAC
+    parser: sis
+    url: https://www.sis.gov.sk/o-nas/nbac-sto.html
+    scale: ["1", "2", "3", "4"]
+    verified_on: 2026-10-22
+
+  - id: anchor_be_ocam
+    country: BE
+    name: OCAM/CUTA
+    parser: ocam
+    url: https://ocam.belgium.be/
+    scale: [faible, moyen, grave, tresGrave]
+    verified_on: 2026-10-22
+
+  - id: anchor_nl_nctv
+    country: NL
+    name: NCTV
+    parser: nctv
+    url: https://www.nctv.nl/onderwerpen/d/dtn/over-het-dtn-en-het-dreigingsniveau
+    scale: [minimaal, beperkt, aanzienlijk, substantieel, kritiek]
+    verified_on: 2026-10-22
+
+  - id: anchor_pl_mswia
+    country: PL
+    name: Stopnie alarmowe (MSWiA)
+    parser: mswia
+    url: https://www.gov.pl/web/mswia/system-antyterrorystyczny-rp
+    scale: [ALFA, BRAVO, CHARLIE, DELTA]
+    verified_on: 2026-10-22
+
+  - id: anchor_fr_vigipirate
+    country: FR
+    name: Vigipirate
+    parser: manual   # sgdsn.gouv.fr blocks automated requests; value in manual_anchors.yaml
+    url: https://www.sgdsn.gouv.fr/vigipirate
+    scale: [vigilance, vigilance renforcée, alerte attentat]   # new plan since 22 June 2026
+    verified_on: 2026-10-22
+
+# UK FCDO travel advice, terrorism sentence, via the GOV.UK Content API.
+fcdo:
+  url: https://www.gov.uk/api/content/foreign-travel-advice/
+  scale: [cannot be ruled out, likely, very likely]
+  verified_on: 2026-10-22
+  countries:
+    AT: austria
+    BE: belgium
+    BG: bulgaria
+    HR: croatia
+    CY: cyprus
+    CZ: czechia
+    DK: denmark
+    EE: estonia
+    FI: finland
+    FR: france
+    DE: germany
+    GR: greece
+    HU: hungary
+    IE: ireland
+    IT: italy
+    LV: latvia
+    LT: lithuania
+    LU: luxembourg
+    MT: malta
+    NL: netherlands
+    PL: poland
+    PT: portugal
+    RO: romania
+    SK: slovakia
+    SI: slovenia
+    ES: spain
+    SE: sweden

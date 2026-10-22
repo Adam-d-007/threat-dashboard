@@ -1,5 +1,794 @@
 {
   "$defs": {
+    "AcledActivity": {
+      "additionalProperties": false,
+      "properties": {
+        "events_7d": {
+          "title": "Events 7D",
+          "type": "integer"
+        },
+        "avg_week_prev_4": {
+          "title": "Avg Week Prev 4",
+          "type": "number"
+        }
+      },
+      "required": [
+        "events_7d",
+        "avg_week_prev_4"
+      ],
+      "title": "AcledActivity",
+      "type": "object"
+    },
+    "Activity": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "f(articles 24 h / 90-day median)",
+          "title": "Value"
+        },
+        "articles_24h": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Articles 24H"
+        },
+        "baseline_median": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline Median"
+        }
+      },
+      "required": [
+        "value",
+        "articles_24h",
+        "baseline_median"
+      ],
+      "title": "Activity",
+      "type": "object"
+    },
+    "AnchorReading": {
+      "additionalProperties": false,
+      "description": "An official threat level read from a government page, or FCDO travel-advice wording.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "country": {
+          "description": "ISO 3166-1 alpha-2",
+          "title": "Country",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "scale": {
+          "description": "Allowed raw values, lowest to highest",
+          "items": {
+            "type": "string"
+          },
+          "title": "Scale",
+          "type": "array"
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Value read from the page, one of scale",
+          "title": "Raw"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "1-based position of raw on scale",
+          "title": "Level"
+        },
+        "normalized": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "(level - 1) / (len(scale) - 1)",
+          "title": "Normalized"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Date the level was declared, if stated",
+          "title": "Since"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Last time the value was read successfully",
+          "title": "As Of"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "stale",
+            "failed",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error"
+        },
+        "text_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "sha1 of the paragraph stating the level, to detect any change in wording",
+          "title": "Text Hash"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Other levels in force at the same time, e.g. a higher level for railways only",
+          "title": "Detail"
+        },
+        "manual": {
+          "default": false,
+          "description": "Typed in by hand from the official page, because the page cannot be read automatically",
+          "title": "Manual",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "country",
+        "name",
+        "url",
+        "scale",
+        "raw",
+        "level",
+        "normalized",
+        "since",
+        "as_of",
+        "status",
+        "error",
+        "text_hash",
+        "detail",
+        "manual"
+      ],
+      "title": "AnchorReading",
+      "type": "object"
+    },
+    "Brief": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "fallback",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/BriefLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "what_changed_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "What Changed En"
+        },
+        "what_changed_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "What Changed Sk"
+        }
+      },
+      "required": [
+        "status",
+        "lines",
+        "what_changed_en",
+        "what_changed_sk"
+      ],
+      "title": "Brief",
+      "type": "object"
+    },
+    "BriefLine": {
+      "additionalProperties": false,
+      "properties": {
+        "text_en": {
+          "title": "Text En",
+          "type": "string"
+        },
+        "text_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Sk"
+        },
+        "item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Item Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text_en",
+        "text_sk",
+        "item_ids"
+      ],
+      "title": "BriefLine",
+      "type": "object"
+    },
+    "Classification": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "llm",
+            "rules",
+            "unclassified"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "relevant": {
+          "title": "Relevant",
+          "type": "boolean"
+        },
+        "domain": {
+          "enum": [
+            "terrorism",
+            "hybrid",
+            "cyber",
+            "unrest",
+            "geopolitics",
+            "other"
+          ],
+          "title": "Domain",
+          "type": "string"
+        },
+        "event_type": {
+          "enum": [
+            "attack",
+            "attempted_attack",
+            "plot_disrupted",
+            "arrest",
+            "conviction",
+            "threat_statement",
+            "sabotage",
+            "other"
+          ],
+          "title": "Event Type",
+          "type": "string"
+        },
+        "ideology": {
+          "enum": [
+            "jihadist",
+            "right_wing",
+            "left_anarchist",
+            "ethno_separatist",
+            "state_linked",
+            "other",
+            "unknown"
+          ],
+          "title": "Ideology",
+          "type": "string"
+        },
+        "severity": {
+          "description": "0 not an incident, 1 arrest or disrupted plot, 2 attempted attack, 3 attack without deaths, 4 attack with 1 to 4 deaths, 5 attack with 5 or more deaths",
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Severity",
+          "type": "integer"
+        },
+        "sk_link": {
+          "enum": [
+            "none",
+            "indirect",
+            "direct"
+          ],
+          "title": "Sk Link",
+          "type": "string"
+        },
+        "countries": {
+          "description": "ISO 3166-1 alpha-2",
+          "items": {
+            "type": "string"
+          },
+          "title": "Countries",
+          "type": "array"
+        },
+        "places": {
+          "items": {
+            "$ref": "#/$defs/Place"
+          },
+          "title": "Places",
+          "type": "array"
+        },
+        "event_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Event Key"
+        },
+        "summary_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary En"
+        },
+        "summary_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Sk"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        }
+      },
+      "required": [
+        "status",
+        "relevant",
+        "domain",
+        "event_type",
+        "ideology",
+        "severity",
+        "sk_link",
+        "countries",
+        "places",
+        "event_key",
+        "summary_en",
+        "summary_sk",
+        "confidence"
+      ],
+      "title": "Classification",
+      "type": "object"
+    },
+    "Component": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "enum": [
+            "events",
+            "media",
+            "anchors",
+            "llm"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "weight": {
+          "title": "Weight",
+          "type": "number"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Inputs",
+          "type": "object"
+        },
+        "event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "weight",
+        "value",
+        "inputs",
+        "event_ids"
+      ],
+      "title": "Component",
+      "type": "object"
+    },
+    "Diff": {
+      "additionalProperties": false,
+      "properties": {
+        "new_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "New Event Ids",
+          "type": "array"
+        },
+        "level_changes": {
+          "items": {
+            "$ref": "#/$defs/LevelChange"
+          },
+          "title": "Level Changes",
+          "type": "array"
+        },
+        "anchor_changes": {
+          "items": {
+            "$ref": "#/$defs/ValueChange"
+          },
+          "title": "Anchor Changes",
+          "type": "array"
+        },
+        "source_changes": {
+          "items": {
+            "$ref": "#/$defs/ValueChange"
+          },
+          "title": "Source Changes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "new_event_ids",
+        "level_changes",
+        "anchor_changes",
+        "source_changes"
+      ],
+      "title": "Diff",
+      "type": "object"
+    },
+    "Driver": {
+      "additionalProperties": false,
+      "properties": {
+        "text_en": {
+          "title": "Text En",
+          "type": "string"
+        },
+        "text_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text Sk"
+        },
+        "event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "text_en",
+        "text_sk",
+        "event_ids"
+      ],
+      "title": "Driver",
+      "type": "object"
+    },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title_en": {
+          "title": "Title En",
+          "type": "string"
+        },
+        "title_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Sk"
+        },
+        "event_type": {
+          "enum": [
+            "attack",
+            "attempted_attack",
+            "plot_disrupted",
+            "arrest",
+            "conviction",
+            "threat_statement",
+            "sabotage",
+            "other"
+          ],
+          "title": "Event Type",
+          "type": "string"
+        },
+        "ideology": {
+          "enum": [
+            "jihadist",
+            "right_wing",
+            "left_anarchist",
+            "ethno_separatist",
+            "state_linked",
+            "other",
+            "unknown"
+          ],
+          "title": "Ideology",
+          "type": "string"
+        },
+        "severity": {
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Severity",
+          "type": "integer"
+        },
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "country": {
+          "title": "Country",
+          "type": "string"
+        },
+        "place": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Place"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sk_link": {
+          "enum": [
+            "none",
+            "indirect",
+            "direct"
+          ],
+          "title": "Sk Link",
+          "type": "string"
+        },
+        "item_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Item Ids",
+          "type": "array"
+        },
+        "domains": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Domains",
+          "type": "array"
+        },
+        "has_tier_a": {
+          "title": "Has Tier A",
+          "type": "boolean"
+        },
+        "corroborated": {
+          "title": "Corroborated",
+          "type": "boolean"
+        },
+        "first_seen": {
+          "format": "date-time",
+          "title": "First Seen",
+          "type": "string"
+        },
+        "last_updated": {
+          "format": "date-time",
+          "title": "Last Updated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title_en",
+        "title_sk",
+        "event_type",
+        "ideology",
+        "severity",
+        "date",
+        "country",
+        "place",
+        "sk_link",
+        "item_ids",
+        "domains",
+        "has_tier_a",
+        "corroborated",
+        "first_seen",
+        "last_updated"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "Gate": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "effect": {
+          "title": "Effect",
+          "type": "string"
+        },
+        "event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "effect",
+        "event_ids"
+      ],
+      "title": "Gate",
+      "type": "object"
+    },
     "GdeltInfo": {
       "additionalProperties": false,
       "properties": {
@@ -28,6 +817,43 @@
         "themes"
       ],
       "title": "GdeltInfo",
+      "type": "object"
+    },
+    "Geopolitics": {
+      "additionalProperties": false,
+      "properties": {
+        "theatres": {
+          "items": {
+            "$ref": "#/$defs/Theatre"
+          },
+          "title": "Theatres",
+          "type": "array"
+        },
+        "brief": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Brief"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "watchlist": {
+          "items": {
+            "$ref": "#/$defs/WatchlistEntry"
+          },
+          "title": "Watchlist",
+          "type": "array"
+        }
+      },
+      "required": [
+        "theatres",
+        "brief",
+        "watchlist"
+      ],
+      "title": "Geopolitics",
       "type": "object"
     },
     "Item": {
@@ -105,6 +931,29 @@
             }
           ],
           "default": null
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Classification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Event Id"
         }
       },
       "required": [
@@ -120,9 +969,487 @@
         "snippet",
         "domain",
         "also_reported_by",
-        "gdelt"
+        "gdelt",
+        "classification",
+        "event_id"
       ],
       "title": "Item",
+      "type": "object"
+    },
+    "LevelChange": {
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "enum": [
+            "SK",
+            "EU"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "level_from": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Level From"
+        },
+        "level_to": {
+          "title": "Level To",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "region",
+        "level_from",
+        "level_to"
+      ],
+      "title": "LevelChange",
+      "type": "object"
+    },
+    "LlmAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "fallback",
+            "disabled"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "mid",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "drivers": {
+          "items": {
+            "$ref": "#/$defs/Driver"
+          },
+          "title": "Drivers",
+          "type": "array"
+        },
+        "what_changed_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "What Changed En"
+        },
+        "what_changed_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "What Changed Sk"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        }
+      },
+      "required": [
+        "status",
+        "level",
+        "position",
+        "confidence",
+        "drivers",
+        "what_changed_en",
+        "what_changed_sk",
+        "model"
+      ],
+      "title": "LlmAssessment",
+      "type": "object"
+    },
+    "OfficialLevel": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "level": {
+          "title": "Level",
+          "type": "integer"
+        },
+        "label_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label Sk"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Since"
+        },
+        "checked_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checked At"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "level",
+        "label_sk",
+        "since",
+        "checked_at",
+        "url"
+      ],
+      "title": "OfficialLevel",
+      "type": "object"
+    },
+    "Place": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "lat": {
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "title": "Lon",
+          "type": "number"
+        },
+        "precision": {
+          "enum": [
+            "city",
+            "region",
+            "country"
+          ],
+          "title": "Precision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "lat",
+        "lon",
+        "precision"
+      ],
+      "title": "Place",
+      "type": "object"
+    },
+    "RegionAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "region": {
+          "enum": [
+            "SK",
+            "EU"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "index": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "index_prev": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index Prev"
+        },
+        "level_prev": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level Prev"
+        },
+        "rules_level": {
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "title": "Rules Level",
+          "type": "integer"
+        },
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "title": "Components",
+          "type": "array"
+        },
+        "gates": {
+          "items": {
+            "$ref": "#/$defs/Gate"
+          },
+          "title": "Gates",
+          "type": "array"
+        },
+        "llm": {
+          "$ref": "#/$defs/LlmAssessment"
+        },
+        "disagreement": {
+          "title": "Disagreement",
+          "type": "boolean"
+        },
+        "official": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OfficialLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "SIS level for SK; none for the EU, which has no EU-wide level"
+        },
+        "anchor_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Anchor Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "region",
+        "level",
+        "index",
+        "index_prev",
+        "level_prev",
+        "rules_level",
+        "components",
+        "gates",
+        "llm",
+        "disagreement",
+        "official",
+        "anchor_ids"
+      ],
+      "title": "RegionAssessment",
+      "type": "object"
+    },
+    "Run": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "run": {
+          "$ref": "#/$defs/RunInfo"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceHealth"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "anchors": {
+          "items": {
+            "$ref": "#/$defs/AnchorReading"
+          },
+          "title": "Anchors",
+          "type": "array"
+        },
+        "terrorism": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Terrorism"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Null until scoring exists"
+        },
+        "geopolitics": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geopolitics"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "events": {
+          "description": "Events from the last 30 days",
+          "items": {
+            "$ref": "#/$defs/Event"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Diff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sample": {
+          "default": false,
+          "description": "True for made-up sample data used to develop the frontend; the site labels it on every page",
+          "title": "Sample",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "run",
+        "sources",
+        "items",
+        "anchors",
+        "terrorism",
+        "geopolitics",
+        "events",
+        "diff",
+        "sample"
+      ],
+      "title": "Run",
       "type": "object"
     },
     "RunCounts": {
@@ -328,39 +1655,387 @@
       ],
       "title": "SourceHealth",
       "type": "object"
+    },
+    "Terrorism": {
+      "additionalProperties": false,
+      "properties": {
+        "SK": {
+          "$ref": "#/$defs/RegionAssessment"
+        },
+        "EU": {
+          "$ref": "#/$defs/RegionAssessment"
+        }
+      },
+      "required": [
+        "SK",
+        "EU"
+      ],
+      "title": "Terrorism",
+      "type": "object"
+    },
+    "Theatre": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name_en": {
+          "title": "Name En",
+          "type": "string"
+        },
+        "name_sk": {
+          "title": "Name Sk",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/Activity"
+        },
+        "acled": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AcledActivity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tone"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sparkline": {
+          "description": "Activity value per day, oldest first, up to 30 days",
+          "items": {
+            "type": "number"
+          },
+          "title": "Sparkline",
+          "type": "array"
+        },
+        "top_items": {
+          "items": {
+            "$ref": "#/$defs/TopItem"
+          },
+          "title": "Top Items",
+          "type": "array"
+        },
+        "sk_angle_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sk Angle En"
+        },
+        "sk_angle_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sk Angle Sk"
+        }
+      },
+      "required": [
+        "id",
+        "name_en",
+        "name_sk",
+        "activity",
+        "acled",
+        "tone",
+        "sparkline",
+        "top_items",
+        "sk_angle_en",
+        "sk_angle_sk"
+      ],
+      "title": "Theatre",
+      "type": "object"
+    },
+    "Timeseries": {
+      "additionalProperties": false,
+      "description": "timeseries.json: one row per region per run, never pruned.",
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TimeseriesRow"
+          },
+          "title": "Rows",
+          "type": "array"
+        },
+        "sample": {
+          "default": false,
+          "title": "Sample",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "rows",
+        "sample"
+      ],
+      "title": "Timeseries",
+      "type": "object"
+    },
+    "TimeseriesRow": {
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "region": {
+          "enum": [
+            "SK",
+            "EU"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "index": {
+          "title": "Index",
+          "type": "integer"
+        },
+        "level": {
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "title": "Level",
+          "type": "integer"
+        },
+        "rules_level": {
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "title": "Rules Level",
+          "type": "integer"
+        },
+        "llm_level": {
+          "anyOf": [
+            {
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Llm Level"
+        },
+        "components": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Components",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "at",
+        "region",
+        "index",
+        "level",
+        "rules_level",
+        "llm_level",
+        "components"
+      ],
+      "title": "TimeseriesRow",
+      "type": "object"
+    },
+    "Tone": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "baseline_median": {
+          "title": "Baseline Median",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "baseline_median"
+      ],
+      "title": "Tone",
+      "type": "object"
+    },
+    "TopItem": {
+      "additionalProperties": false,
+      "properties": {
+        "item_id": {
+          "title": "Item Id",
+          "type": "string"
+        },
+        "summary_en": {
+          "title": "Summary En",
+          "type": "string"
+        },
+        "summary_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Sk"
+        }
+      },
+      "required": [
+        "item_id",
+        "summary_en",
+        "summary_sk"
+      ],
+      "title": "TopItem",
+      "type": "object"
+    },
+    "ValueChange": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "value_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value From"
+        },
+        "value_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value To"
+        }
+      },
+      "required": [
+        "id",
+        "value_from",
+        "value_to"
+      ],
+      "title": "ValueChange",
+      "type": "object"
+    },
+    "WatchlistEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "title_en": {
+          "title": "Title En",
+          "type": "string"
+        },
+        "title_sk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Sk"
+        },
+        "origin": {
+          "enum": [
+            "manual",
+            "news"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "verified": {
+          "title": "Verified",
+          "type": "boolean"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "date",
+        "title_en",
+        "title_sk",
+        "origin",
+        "verified",
+        "url"
+      ],
+      "title": "WatchlistEntry",
+      "type": "object"
     }
   },
-  "additionalProperties": false,
-  "properties": {
-    "schema_version": {
-      "const": 1,
-      "title": "Schema Version",
-      "type": "integer"
-    },
-    "run": {
-      "$ref": "#/$defs/RunInfo"
-    },
-    "sources": {
-      "items": {
-        "$ref": "#/$defs/SourceHealth"
-      },
-      "title": "Sources",
-      "type": "array"
-    },
-    "items": {
-      "items": {
-        "$ref": "#/$defs/Item"
-      },
-      "title": "Items",
-      "type": "array"
-    }
-  },
-  "required": [
-    "schema_version",
-    "run",
-    "sources",
-    "items"
-  ],
-  "title": "Run",
-  "type": "object"
+  "title": "Threat dashboard data"
 }
