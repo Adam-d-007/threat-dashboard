@@ -53,3 +53,42 @@ class AssessmentOut(BaseModel):
     drivers: list[DriverOut] = Field(default_factory=list, max_length=5)
     what_changed_en: str = Field(max_length=600)
     what_changed_sk: str = Field(max_length=600)
+
+
+class BriefLineOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    text_en: str = Field(max_length=500)
+    text_sk: str = Field(max_length=500)
+    item_ids: list[str] = Field(default_factory=list, max_length=6)
+
+
+class TopItemOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    item_id: str
+    summary_en: str = Field(max_length=400)
+    summary_sk: str = Field(max_length=400)
+
+
+class TheatreOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    top_items: list[TopItemOut] = Field(default_factory=list, max_length=5)
+    sk_angle_en: str | None = Field(default=None, max_length=400)
+    sk_angle_sk: str | None = Field(default=None, max_length=400)
+
+
+class DateOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    title_en: str = Field(max_length=200)
+    title_sk: str = Field(max_length=200)
+    item_id: str
+
+
+class BriefOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    lines: list[BriefLineOut] = Field(max_length=8)
+    what_changed_en: str = Field(max_length=600)
+    what_changed_sk: str = Field(max_length=600)
+    theatres: list[TheatreOut] = Field(default_factory=list)
+    upcoming: list[DateOut] = Field(default_factory=list, max_length=10)

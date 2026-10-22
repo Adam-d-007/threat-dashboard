@@ -1,0 +1,14 @@
+# Upcoming dated events, edited by hand (EU Council meetings, NATO summits, elections in the
+# region). Dates the language model finds in the news appear on the site marked "from news,
+# unverified" until they are confirmed here. Past dates are hidden automatically.
+#
+#   - date: 2026-11-26
+#     title_en: Special European Council
+#     title_sk: Mimoriadne zasadnutie Európskej rady
+#     url: https://www.consilium.europa.eu/...
+
+events:
+  - date: 2026-11-26
+    title_en: Special European Council (26 and 27 November)
+    title_sk: Mimoriadne zasadnutie Európskej rady (26. a 27. novembra)
+    url: https://www.consilium.europa.eu/en/press/press-releases/2026/10/19/media-advisory-accreditation-for-the-special-european-council-26-and-27-november-2026/

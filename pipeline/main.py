@@ -43,6 +43,7 @@ from .process.dedupe import dedupe
 from .process.geocode import geocode
 from .process.normalize import normalize
 from .process.prefilter import prefilter
+from .score import geopolitics
 from .score.terrorism import score_region, update_anchor_history
 from .store import state
 
@@ -303,6 +304,11 @@ def main(argv: list[str] | None = None) -> int:
         if row:
             rows.append(row)
     scored = all(regions.values())
+    prev_latest = prev["latest"] or {}
+    prev_brief = [line["text_en"] for line in
+                  ((prev_latest.get("geopolitics") or {}).get("brief") or {}).get("lines", [])]
+    geo = geopolitics.build(relevant, prev_latest.get("items", []), prev_brief, baselines, client,
+                            started, cfg_score, CONFIG, call_limit)
 
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]
@@ -323,6 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=relevant,
               anchors=anchors, diff=run_diff, tesat=load_tesat(),
               terrorism=Terrorism(SK=regions["SK"], EU=regions["EU"]) if scored else None,
+              geopolitics=geo,
               events=sorted((e for e in events if e.date >= recent),
                             key=lambda e: e.date, reverse=True))
 

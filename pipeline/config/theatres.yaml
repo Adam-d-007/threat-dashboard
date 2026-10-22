@@ -1,0 +1,36 @@
+# Geopolitics theatres. Adam can add, remove or edit theatres here without code changes.
+# activity: GDELT GKG daily article counts for these themes and country keys (ISO alpha-2, or
+# EU for any member state), against their 90-day median. Themes must exist in GDELT's GKG theme
+# list (checked 2026-10-22 for the ones below). An article tagged with two listed countries
+# counts twice, so compare a theatre only with its own history.
+
+theatres:
+  - id: russia_ukraine
+    name_en: Russia and Ukraine war
+    name_sk: Vojna Ruska proti Ukrajine
+    activity: {themes: [ARMEDCONFLICT, MILITARY], countries: [UA, RU]}
+
+  - id: hybrid_eu
+    name_en: Hybrid threats to the EU
+    name_sk: Hybridné hrozby voči EÚ
+    activity: {themes: [CYBER_ATTACK, SURVEILLANCE, EXTREMISM], countries: [EU]}
+
+  - id: sk_policy
+    name_en: Slovak foreign and security policy
+    name_sk: Zahraničná a bezpečnostná politika SR
+    activity: {themes: [MILITARY, SECURITY_SERVICES, PROTEST], countries: [SK]}
+
+  - id: eu_defence
+    name_en: EU policy and defence
+    name_sk: Politika a obrana EÚ
+    activity: {themes: [MILITARY, SECURITY_SERVICES], countries: [EU]}
+
+  - id: middle_east
+    name_en: Middle East
+    name_sk: Blízky východ
+    activity: {themes: [ARMEDCONFLICT, KILL, MILITARY], countries: [IL, PS, LB, SY, IR, IQ]}
+
+  - id: western_balkans
+    name_en: Western Balkans
+    name_sk: Západný Balkán
+    activity: {themes: [ARMEDCONFLICT, PROTEST, MILITARY], countries: [RS, BA, ME, MK, AL, XK]}

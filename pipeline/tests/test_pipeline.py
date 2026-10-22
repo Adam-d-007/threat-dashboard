@@ -128,6 +128,10 @@ def test_fixture_run_end_to_end(tmp_path):
     assert dup[0].classification.sk_link == "none"  # the rules see no Slovak place in the title
     # No anchors, no history and no LLM in a fixture run: no score, never an invented one.
     assert run.terrorism is None
+    # Geopolitics: six theatres, no activity yet (no GDELT history), no brief without an LLM.
+    assert [t.id for t in run.geopolitics.theatres][:2] == ["russia_ukraine", "hybrid_eu"]
+    assert all(t.activity.value is None for t in run.geopolitics.theatres)
+    assert run.geopolitics.brief is None
     assert msg.read_text() == "run 2026-10-22T11 ok no score items 2 events 0 llm disabled 0 calls\n"
     seen = json.loads((tmp_path / "state" / "seen.json").read_text())
     assert seen[europol.id] == FIXTURE_NOW.isoformat()
@@ -817,3 +821,31 @@ def test_split_events_from_an_earlier_run_are_merged():
     assert [e.id for e in events] == ["evt_a", "evt_c"]
     assert events[0].domains == ["aktuality.sk", "rp.pl", "euronews.com"]
     assert events[0].item_ids == ["evt_a_i", "evt_b_i"]
+
+
+def test_brief_drops_lines_and_items_citing_unknown_ids(tmp_path):
+    from pipeline.score import geopolitics
+    items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
+    from pipeline.models import Classification
+    items[0].classification = Classification(status="llm", relevant=True, domain="geopolitics",
+                                             event_type="other", ideology="unknown", severity=0,
+                                             sk_link="indirect", countries=["AT"], confidence=0.9)
+    answer = {"lines": [{"text_en": "Real line", "text_sk": "Skutočný riadok", "item_ids": ["1"]},
+                        {"text_en": "Invented line", "text_sk": "Vymyslený", "item_ids": ["999"]}],
+              "what_changed_en": "x", "what_changed_sk": "x",
+              "theatres": [{"id": "eu_defence", "top_items": [
+                  {"item_id": "1", "summary_en": "ok", "summary_sk": "ok"},
+                  {"item_id": "999", "summary_en": "no", "summary_sk": "nie"}]}],
+              "upcoming": [{"date": "2099-01-01", "title_en": "Summit", "title_sk": "Samit",
+                            "item_id": "1"},
+                           {"date": "2099-01-02", "title_en": "Fake", "title_sk": "X",
+                            "item_id": "999"}]}
+    llm = FakeLlm([json.dumps(answer)])
+    import yaml
+    cfg = yaml.safe_load((pipeline_main.CONFIG / "scoring.yaml").read_text())
+    geo = geopolitics.build(items, [], [], {}, llm, NOW, cfg, pipeline_main.CONFIG, 99)
+    assert [x.text_en for x in geo.brief.lines] == ["Real line"]
+    eu = next(t for t in geo.theatres if t.id == "eu_defence")
+    assert [x.item_id for x in eu.top_items] == ["1"]
+    news = [w for w in geo.watchlist if w.origin == "news"]
+    assert [w.title_en for w in news] == ["Summit"] and not news[0].verified
