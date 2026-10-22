@@ -126,7 +126,9 @@ def test_fixture_run_end_to_end(tmp_path):
     assert run.run.llm.status == "disabled" and run.run.counts.relevant == 2
     assert dup[0].classification.event_type == "plot_disrupted"
     assert dup[0].classification.sk_link == "none"  # the rules see no Slovak place in the title
-    assert msg.read_text() == "run 2026-10-22T11 ok items 2 events 0 llm disabled 0 calls\n"
+    # No anchors, no history and no LLM in a fixture run: no score, never an invented one.
+    assert run.terrorism is None
+    assert msg.read_text() == "run 2026-10-22T11 ok no score items 2 events 0 llm disabled 0 calls\n"
     seen = json.loads((tmp_path / "state" / "seen.json").read_text())
     assert seen[europol.id] == FIXTURE_NOW.isoformat()
 

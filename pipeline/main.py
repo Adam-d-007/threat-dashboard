@@ -2,8 +2,8 @@
 
 Stages: load state, fetch, read official levels (anchors), normalize, merge the hourly RSS
 buffer, dedupe (exact and near), window filter, prefilter, classify (LLM, rules fallback),
-geocode, cluster into events, diff, write. The workflow commits the state directory to the
-data branch afterwards.
+geocode, cluster into events, score both regions, diff, write. The workflow commits the
+state directory to the data branch afterwards.
 """
 
 import argparse
@@ -26,11 +26,13 @@ from .models import (
     AnchorReading,
     Diff,
     Item,
+    LevelChange,
     LlmUsage,
     Run,
     RunCounts,
     RunInfo,
     SourceHealth,
+    Terrorism,
     Tesat,
     TesatYear,
     ValueChange,
@@ -41,6 +43,7 @@ from .process.dedupe import dedupe
 from .process.geocode import geocode
 from .process.normalize import normalize
 from .process.prefilter import prefilter
+from .score.terrorism import score_region, update_anchor_history
 from .store import state
 
 CONFIG = Path(__file__).parent / "config"
@@ -288,6 +291,19 @@ def main(argv: list[str] | None = None) -> int:
     relevant = [i for i in kept if i.classification and i.classification.relevant]
     recent = (started - timedelta(days=30)).date()
 
+    cfg_score = yaml.safe_load((CONFIG / "scoring.yaml").read_text())
+    scoring = state.load_scoring_state(args.state_dir)
+    rows = state.load_timeseries(args.state_dir)
+    update_anchor_history(scoring, anchors, started)
+    call_limit = cfg_score["llm"]["budget"]["classify"] + cfg_score["llm"]["budget"]["assess"]
+    regions = {}
+    for region in ("SK", "EU"):
+        regions[region], row = score_region(region, this_run, events, anchors, baselines, rows,
+                                            scoring, client, started, cfg_score, call_limit)
+        if row:
+            rows.append(row)
+    scored = all(regions.values())
+
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]
     finished = started if args.fixtures else datetime.now(UTC).replace(microsecond=0)
@@ -300,8 +316,13 @@ def main(argv: list[str] | None = None) -> int:
                    llm=llm_usage(client, cstats))
     run_diff = diff(prev["latest"], anchors, health)
     run_diff.new_event_ids = new_event_ids
+    prev_terr = (prev["latest"] or {}).get("terrorism") or {}
+    run_diff.level_changes = [
+        LevelChange(region=r, level_from=(prev_terr.get(r) or {}).get("level"), level_to=a.level)
+        for r, a in regions.items() if a and (prev_terr.get(r) or {}).get("level") != a.level]
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=relevant,
               anchors=anchors, diff=run_diff, tesat=load_tesat(),
+              terrorism=Terrorism(SK=regions["SK"], EU=regions["EU"]) if scored else None,
               events=sorted((e for e in events if e.date >= recent),
                             key=lambda e: e.date, reverse=True))
 
@@ -309,6 +330,8 @@ def main(argv: list[str] | None = None) -> int:
         state.write(args.state_dir, run, seen, finished)
         state.write_events(args.state_dir, events)
         state.write_classified(args.state_dir, cache, finished)
+        state.write_timeseries(args.state_dir, rows)
+        state.write_scoring_state(args.state_dir, scoring)
         if gkg_src and not args.fixtures:
             state.write_baselines(args.state_dir, baselines)
         if (res := results.get("acled")) and res.ok:
@@ -318,8 +341,11 @@ def main(argv: list[str] | None = None) -> int:
         run.run.status = "failed"
         state.write_failed(args.state_dir, run, seen, finished)
 
-    msg = (f"run {run.run.id} {run.run.status} items {len(run.items)} "
-           f"events {len(run.events)} llm {run.run.llm.status} {run.run.llm.calls} calls")
+    levels = (f"SK {regions['SK'].level}/{regions['SK'].index} "
+              f"EU {regions['EU'].level}/{regions['EU'].index}" if scored else "no score")
+    msg = (f"run {run.run.id} {run.run.status} {levels} "
+           f"items {len(run.items)} events {len(run.events)} "
+           f"llm {run.run.llm.status} {run.run.llm.calls} calls")
     log.info(msg)
     if args.commit_msg_file:
         args.commit_msg_file.write_text(msg + "\n")

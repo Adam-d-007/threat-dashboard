@@ -43,7 +43,14 @@ export function ComponentBreakdown({ components, index, events }: { components: 
                 className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-surface-2/60"
               >
                 <span className="h-3 w-3 shrink-0 rounded-sm" style={{ background: `var(--${COMPONENT_SERIES[c.id]})` }} aria-hidden />
-                <span className="flex-1 font-medium">{t.componentNames[c.id]}</span>
+                <span className="flex-1 font-medium">
+                  {t.componentNames[c.id]}
+                  {c.value === null && (
+                    <span className="ml-2 text-xs font-normal text-muted">
+                      {t.componentStatus[String(c.inputs.status ?? "no_data")] ?? String(c.inputs.status)}
+                    </span>
+                  )}
+                </span>
                 <span className="text-sm text-muted tabular">
                   {t.value} {c.value === null ? "–" : c.value.toFixed(2)} × {t.weight} {c.weight.toFixed(2)}
                 </span>

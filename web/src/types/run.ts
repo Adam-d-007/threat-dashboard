@@ -134,6 +134,10 @@ export type ItemIds1 = string[];
 export type EventKeys = string[];
 export type Domains = string[];
 export type HasTierA = boolean;
+/**
+ * Highest tier among its sources
+ */
+export type BestTier = ("A" | "B" | "C") | null;
 export type Corroborated = boolean;
 export type FirstSeen = string;
 export type LastUpdated = string;
@@ -438,6 +442,7 @@ export interface Event {
   event_keys: EventKeys;
   domains: Domains;
   has_tier_a: HasTierA;
+  best_tier: BestTier;
   corroborated: Corroborated;
   first_seen: FirstSeen;
   last_updated: LastUpdated;

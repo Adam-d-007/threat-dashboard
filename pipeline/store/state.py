@@ -88,11 +88,14 @@ def load_baselines(state_dir: Path) -> dict:
 def merge_gkg(baselines: dict, records: list[dict], now: datetime) -> dict:
     """Add per-file counts to the daily totals, once per file; prune to 120 days."""
     gkg = baselines["gkg"]
+    files = gkg.setdefault("files_per_day", {})
     done = set(gkg["processed"])
     for rec in records:
         if rec["file"] in done:
             continue
         done.add(rec["file"])
+        fday = f"{rec['file'][:4]}-{rec['file'][4:6]}-{rec['file'][6:8]}"
+        files[fday] = files.get(fday, 0) + 1
         for day, themes in rec["counts"].items():
             d = gkg["daily"].setdefault(day, {})
             for theme, countries in themes.items():
@@ -101,6 +104,7 @@ def merge_gkg(baselines: dict, records: list[dict], now: datetime) -> dict:
                     t[cc] = t.get(cc, 0) + n
     cutoff = (now - timedelta(days=BASELINE_DAYS)).strftime("%Y-%m-%d")
     gkg["daily"] = {k: v for k, v in sorted(gkg["daily"].items()) if k >= cutoff}
+    gkg["files_per_day"] = {k: v for k, v in sorted(files.items()) if k >= cutoff}
     gkg["processed"] = sorted(done)[-PROCESSED_KEEP:]
     baselines["updated_at"] = now.isoformat()
     return baselines
@@ -132,3 +136,23 @@ def load_events(state_dir: Path) -> list[Event]:
 def write_events(state_dir: Path, events: list[Event]) -> None:
     _write(state_dir / "events.json",
            {"schema_version": 1, "events": [e.model_dump(mode="json") for e in events]})
+
+
+def load_timeseries(state_dir: Path) -> list[dict]:
+    data = _read(state_dir / "timeseries.json")
+    return data["rows"] if data else []
+
+
+def write_timeseries(state_dir: Path, rows: list[dict]) -> None:
+    """Kept forever: about 300 KB a year at two runs a day."""
+    _write(state_dir / "timeseries.json", {"schema_version": 1, "rows": rows, "sample": False})
+
+
+def load_scoring_state(state_dir: Path) -> dict:
+    """Per region: displayed level and index, runs below threshold (hysteresis); per anchor:
+    level history (for the 'rose in 30 days' bonus)."""
+    return _read(state_dir / "scoring_state.json") or {"regions": {}, "anchor_history": {}}
+
+
+def write_scoring_state(state_dir: Path, scoring: dict) -> None:
+    _write(state_dir / "scoring_state.json", scoring)

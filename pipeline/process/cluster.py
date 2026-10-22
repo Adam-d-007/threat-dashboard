@@ -23,6 +23,11 @@ MAX_DAYS = 1
 SUMMARY_MIN = 66
 KEEP_DAYS = 90
 SK_RANK = {"none": 0, "indirect": 1, "direct": 2}
+TIER_RANK = {"A": 0, "B": 1, "C": 2}
+
+
+def _best(a: str | None, b: str | None) -> str | None:
+    return min((t for t in (a, b) if t), key=TIER_RANK.get, default=None)
 
 
 def km(a: Place, b: Place) -> float:
@@ -72,6 +77,7 @@ def _absorb(keep: Event, gone: Event) -> None:
         target = getattr(keep, attr)
         target.extend(x for x in getattr(gone, attr) if x not in target)
     keep.has_tier_a = keep.has_tier_a or gone.has_tier_a
+    keep.best_tier = _best(keep.best_tier, gone.best_tier)
     keep.corroborated = keep.has_tier_a or len(keep.domains) >= 2
     keep.severity = max(keep.severity, gone.severity)
     if keep.ideology == "unknown":
@@ -125,6 +131,7 @@ def _add(e: Event, item: Item, now: datetime) -> None:
         if d not in e.domains:
             e.domains.append(d)
     e.has_tier_a = e.has_tier_a or item.tier == "A"
+    e.best_tier = _best(e.best_tier, item.tier)
     e.corroborated = e.has_tier_a or len(e.domains) >= 2
     e.severity = max(e.severity, c.severity)
     if e.ideology == "unknown" and c.ideology != "unknown":

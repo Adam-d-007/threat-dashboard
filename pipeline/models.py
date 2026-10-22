@@ -100,6 +100,7 @@ class Event(Strict):
     event_keys: list[str] = Field(default_factory=list, description="LLM incident keys seen")
     domains: list[str]
     has_tier_a: bool
+    best_tier: Tier | None = Field(default=None, description="Highest tier among its sources")
     corroborated: bool
     first_seen: datetime
     last_updated: datetime

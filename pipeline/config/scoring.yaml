@@ -1,4 +1,5 @@
-# Scoring and model settings. Phase 4 adds weights, floors, thresholds, gates and smoothing.
+# Scoring and model settings. Every number is a starting value from the build spec, to be
+# recalibrated after four weeks of live runs (see docs/SCORING.md). Change only on purpose.
 
 llm:
   # The first available model in prefer is used; otherwise the newest stable model of the
@@ -15,3 +16,59 @@ llm:
   budget:
     classify: 30            # calls per run; the spec's total is 40 to 45
     assess: 10
+
+# Composite pressure P = sum(weight * component); index = round(100 P).
+weights: {events: 0.35, media: 0.15, anchors: 0.20, llm: 0.30}
+# Shared curve f(r) = 1 - base^r, r = x / max(baseline, floor), r capped. f(1) = 0.375.
+curve: {base: 0.625, r_cap: 5}
+# P thresholds for levels 2, 3 and 4.
+thresholds: [0.25, 0.50, 0.75]
+
+events:
+  window_days: 60
+  decay_days: 10            # weight e^(-age/10): halves about every 7 days
+  severity_weight: {0: 0, 1: 1, 2: 2, 3: 4, 4: 7, 5: 10}
+  corroboration: {corroborated: 1.0, B: 0.6, C: 0.3}
+  baseline_days: 180        # median of E_raw over the runs in this window
+  floor: {SK: 1.0, EU: 4.0}
+  min_history_runs: 28      # 14 days; until then E is "warming up" and left out of P
+
+media:
+  theme: TERROR             # GDELT GKG theme counted
+  key: {SK: SK, EU: EU}     # baselines.json country key per region
+  baseline_days: 90
+  floor: 1
+  min_history_days: 14      # complete days needed before M counts
+  min_files_per_day: 90     # of 96 GKG files, for a day to count as complete
+
+proximity:
+  SK:
+    self: 1.0
+    neighbours: {countries: [CZ, AT, HU, PL, UA], value: 0.5}
+    eu: 0.25
+    outside_eu_direct: 0.7  # outside the EU, only when sk_link is direct
+  EU:
+    member: 1.0
+    near: {countries: [GB, NO, IS, LI, AL, BA, GE, MD, ME, MK, RS, TR, UA, XK], value: 0.3}
+
+anchors:
+  SK: {anchor_sk_sis: 0.4, anchor_pl_mswia: 0.3, anchor_fcdo_sk: 0.3}  # Austria publishes none
+  EU:
+    fcdo_weight: 0.5        # mean of the FCDO wording across the EU-27
+    national_weight: 0.5    # mean of the published national levels
+    national: [anchor_fr_vigipirate, anchor_be_ocam, anchor_nl_nctv, anchor_pl_mswia]
+  rise_bonus: 0.15          # added when any anchor rose in the last rise_days
+  rise_days: 30
+
+llm_position: {low: 0.17, mid: 0.5, high: 0.83}
+
+smoothing_alpha: 0.5        # displayed index = EMA over runs, except when a gate raises the level
+hysteresis: {runs: 4, margin: 0.03}  # level goes down only after 4 runs at least 0.03 below
+
+# Gates written from the NBAC level definitions (pipeline/score/gates.py).
+gates:
+  floor_attack_days: 30     # corroborated attack, severity >= 2, EU or NATO: level >= 2
+  sk_cap2_direct_days: 30   # SK level 3 needs a corroborated direct-link event in 30 days ...
+  sk_cap2_attack_days: 14   # ... or a corroborated attack sev >= 3 in EU/NATO, sk_link >= indirect
+  sk_cap3_hours: 72         # SK level 4: direct, attack/attempt/plot, 72 h, Tier A source
+  eu_cap3_days: 7           # EU level 4: a severity 5 attack, or 3 attacks sev >= 3 in 2+ states

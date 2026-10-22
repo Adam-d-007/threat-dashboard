@@ -734,6 +734,24 @@
           "title": "Has Tier A",
           "type": "boolean"
         },
+        "best_tier": {
+          "anyOf": [
+            {
+              "enum": [
+                "A",
+                "B",
+                "C"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Highest tier among its sources",
+          "title": "Best Tier"
+        },
         "corroborated": {
           "title": "Corroborated",
           "type": "boolean"
@@ -764,6 +782,7 @@
         "event_keys",
         "domains",
         "has_tier_a",
+        "best_tier",
         "corroborated",
         "first_seen",
         "last_updated"
