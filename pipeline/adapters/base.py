@@ -43,6 +43,7 @@ class FetchResult:
     items: list[RawItem] = field(default_factory=list)
     http_status: int | None = None
     error: str | None = None
+    records: list[dict] = field(default_factory=list)  # non-article data, e.g. ACLED events
 
 
 class FetchError(Exception):
@@ -83,7 +84,8 @@ def robots_allowed(url: str) -> bool:
 
 
 def get(url: str, params: dict | None = None, retries: int = RETRIES,
-        backoff_s: float = BACKOFF_S, check_robots: bool = True) -> httpx.Response:
+        backoff_s: float = BACKOFF_S, check_robots: bool = True,
+        headers: dict | None = None) -> httpx.Response:
     """GET with a 30 s timeout and exponential backoff on network errors, 429 and 5xx.
 
     Raises FetchError when robots.txt disallows the URL, every attempt fails, or the server
@@ -97,7 +99,7 @@ def get(url: str, params: dict | None = None, retries: int = RETRIES,
             time.sleep(backoff_s * 2 ** (attempt - 1))
         try:
             r = httpx.get(url, params=params, timeout=TIMEOUT_S, follow_redirects=True,
-                          headers={"User-Agent": USER_AGENT}, verify=TLS)
+                          headers={"User-Agent": USER_AGENT, **(headers or {})}, verify=TLS)
         except httpx.HTTPError as e:
             last = FetchError(f"{type(e).__name__}: {e}")
             continue

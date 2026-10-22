@@ -6,7 +6,7 @@ import pytest
 
 from pipeline import anchors, collect
 from pipeline import main as pipeline_main
-from pipeline.adapters import base, dates, gdelt_doc, html_scrape, json_api, rss
+from pipeline.adapters import acled, base, dates, gdelt_doc, html_scrape, json_api, rss
 from pipeline.adapters.base import FetchError, FetchResult, RawItem
 from pipeline.health import run_status, source_health
 from pipeline.main import FIXTURE_NOW, FIXTURES, window_start
@@ -23,6 +23,10 @@ SRC = {"id": "x", "name": "X", "tier": "B", "group": "slovak_press"}
     ("https://example.sk/amp/clanok/1", "https://example.sk/clanok/1"),
     ("https://example.sk/clanok.amp?id=3&amp=1#top", "https://example.sk/clanok?id=3"),
     ("https://example.sk/ampere/x", "https://example.sk/ampere/x"),
+    # A bare key must stay bare: minv.sk routes on it.
+    ("https://www.minv.sk/?tlacove-spravy&sprava=x&utm_source=rss",
+     "https://www.minv.sk/?tlacove-spravy&sprava=x"),
+    ("https://dennikn.sk/minuta/feed/?cat=430", "https://dennikn.sk/minuta/feed?cat=430"),
 ])
 def test_canonical_url(raw, expected):
     assert canonical_url(raw) == expected
@@ -358,9 +362,9 @@ def test_ocam_nctv_parsers():
 
 def test_mswia_national_level_detail_and_expiry():
     r = anchors.parse_mswia(_html("mswia"), today=date(2026, 10, 22))
-    assert r["raw"] == "BRAVO" and not r["expired"]
+    assert r["raw"] == "BRAVO" and r["stale_reason"] is None
     assert "CHARLIE" in r["detail"] and "BRAVO-CRP" in r["detail"] and "SECOND ALERT" not in r["detail"]
-    assert anchors.parse_mswia(_html("mswia"), today=date(2026, 12, 1))["expired"]
+    assert "expired on 2026-11-30" in anchors.parse_mswia(_html("mswia"), today=date(2026, 12, 1))["stale_reason"]
 
 
 def _fcdo(sentence, doc_type="travel_advice"):
@@ -416,3 +420,54 @@ def test_collector_skips_sources_marked_not_hourly(tmp_path, monkeypatch):
                         lambda src: fetched.append(src["id"]) or FetchResult(src["id"], ok=True))
     collect.main(["--fixtures", "--state-dir", str(tmp_path)])
     assert "minv" not in fetched and "tasr" in fetched and "eeas" not in fetched
+
+
+# --- ACLED -----------------------------------------------------------------------------
+
+ACLED_SRC = {"id": "acled", "urls": ["https://acleddata.com/api/acled/read"],
+             "acled": {"days": 30, "regions": [12]}}
+
+
+def test_acled_without_credentials_fails_clearly(monkeypatch):
+    monkeypatch.delenv("ACLED_EMAIL", raising=False)
+    monkeypatch.delenv("ACLED_PASSWORD", raising=False)
+    res = acled.fetch(ACLED_SRC, NOW)
+    assert not res.ok and "not set" in res.error
+
+
+def test_acled_signs_in_and_follows_cursor(monkeypatch):
+    monkeypatch.setenv("ACLED_EMAIL", "a@b.sk")
+    monkeypatch.setenv("ACLED_PASSWORD", "pw")
+    sent = {}
+
+    def fake_post(url, **kw):
+        sent["form"] = kw["data"]
+        return httpx.Response(200, json={"access_token": "tok"}, request=httpx.Request("POST", url))
+
+    pages = iter([{"success": True, "data": [{"event_id_cnty": "UKR1"}], "next_cursor": 99},
+                  {"success": True, "data": [{"event_id_cnty": "UKR2"}], "next_cursor": None}])
+    cursors = []
+
+    def fake_get(url, params=None, headers=None, **kw):
+        assert headers["Authorization"] == "Bearer tok"
+        assert params["event_date"] == "2026-09-22|2026-10-22" and params["event_date_where"] == "BETWEEN"
+        cursors.append(params["cursor"])
+        return httpx.Response(200, json=next(pages), request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(httpx, "get", fake_get)
+    res = acled.fetch(ACLED_SRC, NOW)
+    assert res.ok and [r["event_id_cnty"] for r in res.records] == ["UKR1", "UKR2"]
+    assert cursors == [0, 99]
+    assert sent["form"]["grant_type"] == "password" and sent["form"]["client_id"] == "acled"
+
+
+def test_manual_anchor_dated_by_entry_and_goes_stale():
+    cfg = {"id": "anchor_fr_vigipirate", "country": "FR", "name": "Vigipirate", "url": "https://f",
+           "parser": "manual", "scale": ["vigilance", "vigilance renforcée", "alerte attentat"]}
+    entry = {"anchor_fr_vigipirate": {"raw": "vigilance renforcée", "since": date(2026, 6, 22),
+                                      "entered_on": date(2026, 10, 22)}}
+    fresh = anchors._read_one(cfg, NOW, entry)
+    assert fresh.status == "ok" and fresh.manual and fresh.as_of == datetime(2026, 10, 22, tzinfo=UTC)
+    later = anchors._read_one(cfg, NOW + timedelta(days=181), entry)
+    assert later.status == "stale" and "entered by hand on 2026-10-22" in later.error

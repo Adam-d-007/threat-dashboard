@@ -271,6 +271,30 @@ class Diff(Strict):
     source_changes: list[ValueChange] = Field(default_factory=list)
 
 
+class TesatYear(Strict):
+    data_year: int
+    attacks_total: int
+    attacks_completed: int | None = None
+    member_states_with_attacks: int | None = None
+    fatalities: int | None = None
+    arrests_total: int
+
+
+class Tesat(Strict):
+    """Europol TE-SAT yearly figures, typed in from the PDF (manual_anchors.yaml)."""
+
+    report_year: int
+    url: str
+    current: TesatYear
+    attacks_failed: int
+    attacks_foiled: int
+    attacks_by_ideology: dict[str, int]
+    arrests_by_ideology: dict[str, int]
+    slovakia_attacks: int
+    slovakia_arrests: int
+    previous: TesatYear | None = None
+
+
 class SourceHealth(Strict):
     id: str
     name: str
@@ -312,6 +336,7 @@ class Run(Strict):
     geopolitics: Geopolitics | None = None
     events: list[Event] = Field(default_factory=list, description="Events from the last 30 days")
     diff: Diff | None = None
+    tesat: Tesat | None = None
     sample: bool = Field(default=False, description="True for made-up sample data used to "
                          "develop the frontend; the site labels it on every page")
 

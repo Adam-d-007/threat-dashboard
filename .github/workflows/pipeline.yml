@@ -30,6 +30,10 @@ jobs:
       - run: uv sync --frozen --no-dev
 
       - name: Run the pipeline
+        env:
+          # Empty until Adam adds them; the acled source stays disabled until then.
+          ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
+          ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
         run: |
           slot=""
           if [ "${{ github.event_name }}" = "schedule" ]; then

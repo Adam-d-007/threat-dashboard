@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Sparkline } from "../charts/Sparkline";
-import { Banner, Card, Muted } from "../components/ui";
+import { ArticleLink, Banner, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { Item, Run, Theatre } from "../types/run";
@@ -79,9 +79,9 @@ export function GeopoliticsPage({ run }: { run: Run }) {
 function SourceLink({ item }: { item: Item | undefined }) {
   if (!item) return null;
   return (
-    <a href={item.url} target="_blank" rel="noreferrer" className="text-xs">
+    <ArticleLink href={item.url} className="text-xs text-link">
       [{item.domain}]
-    </a>
+    </ArticleLink>
   );
 }
 

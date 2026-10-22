@@ -4,6 +4,7 @@ import { Banner, Card, LevelBadge, Muted, Segmented, StatusPill } from "../compo
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { AnchorReading, Event, RegionAssessment, Run, Timeseries } from "../types/run";
+import { BaseRates } from "../terrorism/BaseRates";
 import { Incidents } from "../terrorism/Incidents";
 import { LatestReports } from "./LatestReports";
 
@@ -132,7 +133,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       />
 
       <Card title={t.baseRates}>
-        <Muted>{t.baseRatesPending}</Muted>
+        <BaseRates tesat={run.tesat} />
       </Card>
 
       {!assess && <LatestReports items={run.items} />}

@@ -4,7 +4,7 @@ import hashlib
 import html
 import re
 from datetime import UTC, datetime, timedelta
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from ..adapters.base import RawItem
 from ..models import Item
@@ -15,15 +15,19 @@ _SPACE = re.compile(r"\s+")
 
 
 def canonical_url(url: str) -> str:
-    """Lowercase scheme and host; drop utm_* parameters, AMP paths, fragments, trailing slashes."""
+    """Lowercase scheme and host; drop utm_* and amp parameters, AMP paths, fragments and
+    trailing slashes. Every other query parameter is kept exactly as written: some sites
+    (minv.sk/?tlacove-spravy&sprava=...) route on a bare key, and re-encoding it as
+    "tlacove-spravy=" opens their homepage instead of the article."""
     parts = urlsplit(url.strip())
-    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
-             if not k.lower().startswith("utm_") and k.lower() != "amp"]
+    kept = [p for p in parts.query.split("&")
+            if p and not p.split("=", 1)[0].lower().startswith("utm_")
+            and p.split("=", 1)[0].lower() != "amp"]
     path = re.sub(r"(/amp)+(?=/|$)", "", parts.path)
     if path.endswith(".amp"):
         path = path[:-4]
-    path = path.rstrip("/")
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query), ""))
+    path = path.rstrip("/") or "/"
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, "&".join(kept), ""))
 
 
 def item_id(canonical: str) -> str:

@@ -10,21 +10,43 @@ levels:
       https://www.sgdsn.gouv.fr/vigipirate, posture "été-automne 2026" (stade "vigilance
       renforcée", in effect since 22 June 2026). Update when SGDSN announces a new posture.
 
-# Europol TE-SAT, latest report. Fill from the PDF; leave null until then.
+# Europol TE-SAT, latest report: TE-SAT 2026 (published 13 July 2026), covering 2025.
+# Source: https://www.europol.europa.eu/cms/sites/default/files/documents/EU-TE-SAT-2026.pdf
+# Entered 2026-10-22 from the PDF text (pages 18-22). Totals checked: attacks by type add up
+# to 45 and arrests by type to 486.
 tesat:
-  report_year: null        # e.g. 2025 (covers attacks in 2024)
-  data_year: null
-  attacks_total: null      # completed + failed + foiled
-  attacks_completed: null
-  attacks_failed: null
-  attacks_foiled: null
-  arrests_total: null
-  by_ideology:             # attacks per TE-SAT category
-    jihadist: null
-    right_wing: null
-    left_anarchist: null
-    ethno_separatist: null
-    other: null
+  report_year: 2026
+  url: https://www.europol.europa.eu/cms/sites/default/files/documents/EU-TE-SAT-2026.pdf
+  data_year: 2025
+  attacks_total: 45          # p. 18: completed, failed and foiled, in 10 Member States
+  attacks_completed: 22
+  attacks_failed: 3
+  attacks_foiled: 20
+  member_states_with_attacks: 10
+  fatalities: 6              # p. 18; 5 jihadist, 1 right-wing (p. 19)
+  arrests_total: 486         # p. 18, across 21 Member States
+  attacks_by_ideology:       # p. 19
+    jihadist: 24
+    right_wing: 5
+    left_anarchist: 12
+    ethno_separatist: 0
+    other: 4
+  arrests_by_ideology:       # pp. 21-22, table total row
+    jihadist: 347
+    right_wing: 43
+    left_anarchist: 13
+    ethno_separatist: 34
+    other: 49
+  slovakia:
+    attacks: 0               # Slovakia is not among the 10 Member States reporting attacks
+    arrests: 0               # no Slovakia row in the 2025 arrests table (p. 22)
+  previous_year:             # 2024, as restated on p. 18 of the same report
+    data_year: 2024
+    attacks_total: 58
+    attacks_completed: 34
+    member_states_with_attacks: 14
+    fatalities: 5
+    arrests_total: 449
 
 # SIS annual report (Slovak threat context). Fill from the PDF; leave null until then.
 sis_annual:

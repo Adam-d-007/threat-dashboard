@@ -236,6 +236,18 @@ export type Anchors = AnchorReading[];
  * Events from the last 30 days
  */
 export type Events = Event[];
+export type ReportYear = number;
+export type Url4 = string;
+export type DataYear = number;
+export type AttacksTotal = number;
+export type AttacksCompleted = number | null;
+export type MemberStatesWithAttacks = number | null;
+export type Fatalities = number | null;
+export type ArrestsTotal = number;
+export type AttacksFailed = number;
+export type AttacksFoiled = number;
+export type SlovakiaAttacks = number;
+export type SlovakiaArrests = number;
 /**
  * True for made-up sample data used to develop the frontend; the site labels it on every page
  */
@@ -571,6 +583,7 @@ export interface Run {
   geopolitics: Geopolitics | null;
   events: Events;
   diff: Diff | null;
+  tesat: Tesat | null;
   sample: Sample;
 }
 /**
@@ -620,6 +633,42 @@ export interface SourceHealth {
 export interface Terrorism {
   SK: RegionAssessment;
   EU: RegionAssessment;
+}
+/**
+ * Europol TE-SAT yearly figures, typed in from the PDF (manual_anchors.yaml).
+ *
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "Tesat".
+ */
+export interface Tesat {
+  report_year: ReportYear;
+  url: Url4;
+  current: TesatYear;
+  attacks_failed: AttacksFailed;
+  attacks_foiled: AttacksFoiled;
+  attacks_by_ideology: AttacksByIdeology;
+  arrests_by_ideology: ArrestsByIdeology;
+  slovakia_attacks: SlovakiaAttacks;
+  slovakia_arrests: SlovakiaArrests;
+  previous: TesatYear | null;
+}
+/**
+ * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
+ * via the `definition` "TesatYear".
+ */
+export interface TesatYear {
+  data_year: DataYear;
+  attacks_total: AttacksTotal;
+  attacks_completed: AttacksCompleted;
+  member_states_with_attacks: MemberStatesWithAttacks;
+  fatalities: Fatalities;
+  arrests_total: ArrestsTotal;
+}
+export interface AttacksByIdeology {
+  [k: string]: number;
+}
+export interface ArrestsByIdeology {
+  [k: string]: number;
 }
 /**
  * timeseries.json: one row per region per run, never pruned.

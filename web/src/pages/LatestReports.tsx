@@ -1,4 +1,4 @@
-import { Card, Muted } from "../components/ui";
+import { ArticleLink, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDateTime } from "../lib/format";
 import type { Item } from "../types/run";
@@ -15,9 +15,9 @@ export function LatestReports({ items, limit = 40 }: { items: Item[]; limit?: nu
         <ul className="divide-y divide-line">
           {newest.map((item) => (
             <li key={item.id} className="py-2.5">
-              <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-ink hover:underline">
+              <ArticleLink href={item.url} className="font-medium text-ink hover:underline">
                 {item.title}
-              </a>
+              </ArticleLink>
               <div className="mt-0.5 text-xs text-muted">
                 {item.domain} · {item.tier} · {fmtDateTime(item.published_at, locale)}
                 {item.published_estimated && ` (${t.dateEstimated})`} · {item.lang}

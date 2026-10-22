@@ -139,7 +139,7 @@ def _events_and_items() -> tuple[list[Event], list[Item]]:
             items.append(Item(
                 id=iid, source_id="europol" if dom == "europol.europa.eu" else "tasr",
                 tier="A" if dom in ("europol.europa.eu", "minv.sk") else "B",
-                url=f"https://example.org/sample/{iid}", title=en(t_en), lang="en",
+                url="", title=en(t_en), lang="en",  # no address: sample items are not clickable
                 published_at=when + timedelta(hours=n), fetched_at=when + timedelta(hours=n + 1),
                 snippet="Sample item for frontend development. Not real.", domain=dom,
                 classification=Classification(

@@ -121,6 +121,18 @@ const en = {
   baseRates: "Base rates",
   baseRatesPending:
     "Europol TE-SAT yearly figures and GTD history (which ends in 2021) will appear here once they are entered.",
+  tesat: {
+    source: (report: number, year: number) => `Europol TE-SAT ${report}, figures for ${year}, EU Member States`,
+    attacks: "terrorist attacks",
+    split: (c: number, f: number, fo: number) => `${c} completed · ${f} failed · ${fo} foiled`,
+    arrests: "arrests",
+    deaths: "deaths",
+    previous: (year: number, attacks: number, arrests: number) => `${year}: ${attacks} attacks, ${arrests} arrests`,
+    byType: "Attacks by type",
+    slovakia: (attacks: number, arrests: number) =>
+      `Slovakia reported ${attacks} attacks and ${arrests} arrests for terrorism in that year.`,
+    gtdPending: "Long-term history from the Global Terrorism Database (which ends in 2021) will be added later.",
+  },
   latestReports: "Latest reports",
   dateEstimated: "date estimated",
   brief: "Daily brief",
@@ -302,6 +314,18 @@ const sk: Strings = {
   baseRates: "Dlhodobé počty",
   baseRatesPending:
     "Ročné údaje Europolu (TE-SAT) a historické údaje GTD (končia rokom 2021) sa tu zobrazia po ich doplnení.",
+  tesat: {
+    source: (report: number, year: number) => `Europol TE-SAT ${report}, údaje za rok ${year}, členské štáty EÚ`,
+    attacks: "teroristických útokov",
+    split: (c: number, f: number, fo: number) => `${c} dokonaných · ${f} neúspešných · ${fo} prekazených`,
+    arrests: "zadržaných",
+    deaths: "obetí",
+    previous: (year: number, attacks: number, arrests: number) => `${year}: ${attacks} útokov, ${arrests} zadržaných`,
+    byType: "Útoky podľa typu",
+    slovakia: (attacks: number, arrests: number) =>
+      `Slovensko v danom roku nahlásilo ${attacks} útokov a ${arrests} zadržaní za terorizmus.`,
+    gtdPending: "Dlhodobá história z Global Terrorism Database (končí rokom 2021) bude doplnená neskôr.",
+  },
   latestReports: "Najnovšie správy",
   dateEstimated: "dátum je odhadnutý",
   brief: "Denný prehľad",

@@ -97,6 +97,16 @@ export function StatusPill({ status }: { status: string }) {
   );
 }
 
+/** A link to an article, or plain text when there is no address (made-up sample items). */
+export function ArticleLink({ href, className = "", children }: { href?: string | null; className?: string; children: ReactNode }) {
+  if (!href) return <span className={className}>{children}</span>;
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className={className}>
+      {children}
+    </a>
+  );
+}
+
 export function Muted({ children }: { children: ReactNode }) {
   return <p className="text-sm text-muted">{children}</p>;
 }

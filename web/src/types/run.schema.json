@@ -1430,6 +1430,17 @@
           ],
           "default": null
         },
+        "tesat": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tesat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "sample": {
           "default": false,
           "description": "True for made-up sample data used to develop the frontend; the site labels it on every page",
@@ -1447,6 +1458,7 @@
         "geopolitics",
         "events",
         "diff",
+        "tesat",
         "sample"
       ],
       "title": "Run",
@@ -1671,6 +1683,141 @@
         "EU"
       ],
       "title": "Terrorism",
+      "type": "object"
+    },
+    "Tesat": {
+      "additionalProperties": false,
+      "description": "Europol TE-SAT yearly figures, typed in from the PDF (manual_anchors.yaml).",
+      "properties": {
+        "report_year": {
+          "title": "Report Year",
+          "type": "integer"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "current": {
+          "$ref": "#/$defs/TesatYear"
+        },
+        "attacks_failed": {
+          "title": "Attacks Failed",
+          "type": "integer"
+        },
+        "attacks_foiled": {
+          "title": "Attacks Foiled",
+          "type": "integer"
+        },
+        "attacks_by_ideology": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Attacks By Ideology",
+          "type": "object"
+        },
+        "arrests_by_ideology": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Arrests By Ideology",
+          "type": "object"
+        },
+        "slovakia_attacks": {
+          "title": "Slovakia Attacks",
+          "type": "integer"
+        },
+        "slovakia_arrests": {
+          "title": "Slovakia Arrests",
+          "type": "integer"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TesatYear"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "report_year",
+        "url",
+        "current",
+        "attacks_failed",
+        "attacks_foiled",
+        "attacks_by_ideology",
+        "arrests_by_ideology",
+        "slovakia_attacks",
+        "slovakia_arrests",
+        "previous"
+      ],
+      "title": "Tesat",
+      "type": "object"
+    },
+    "TesatYear": {
+      "additionalProperties": false,
+      "properties": {
+        "data_year": {
+          "title": "Data Year",
+          "type": "integer"
+        },
+        "attacks_total": {
+          "title": "Attacks Total",
+          "type": "integer"
+        },
+        "attacks_completed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attacks Completed"
+        },
+        "member_states_with_attacks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Member States With Attacks"
+        },
+        "fatalities": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fatalities"
+        },
+        "arrests_total": {
+          "title": "Arrests Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data_year",
+        "attacks_total",
+        "attacks_completed",
+        "member_states_with_attacks",
+        "fatalities",
+        "arrests_total"
+      ],
+      "title": "TesatYear",
       "type": "object"
     },
     "Theatre": {

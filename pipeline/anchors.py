@@ -19,6 +19,8 @@ from .adapters.dates import parse_local_date
 from .models import AnchorReading
 
 CONFIG = Path(__file__).parent / "config"
+# A hand-entered level older than this is shown as stale until someone checks it again.
+MANUAL_MAX_AGE_DAYS = 180
 log = logging.getLogger("pipeline.anchors")
 
 
@@ -85,8 +87,9 @@ def parse_mswia(html: str, today: date) -> dict:
               and re.search(r"[ąęłńóśźż]", s)]  # the Polish sentences, not their English copies
     exp = re.search(r"do (\d{1,2} [^\W\d_]+ \d{4}) r\.", national)
     expiry = parse_local_date(exp.group(1)) if exp else None
+    expired = expiry is not None and expiry < today
     return {"raw": raw, "detail": " | ".join(others) or None,
-            "expired": expiry is not None and expiry < today}
+            "stale_reason": f"the order behind this level expired on {expiry}" if expired else None}
 
 
 _FCDO = [("very likely", re.compile(r"very likely")), ("likely", re.compile(r"\blikely\b")),
@@ -111,6 +114,7 @@ def parse_fcdo(data: dict) -> dict:
 
 
 def _reading(cfg: dict, now: datetime, parsed: dict, manual: bool = False) -> AnchorReading:
+    """parsed may carry as_of (when the value was last confirmed) and stale_reason."""
     raw = parsed["raw"]
     if raw not in cfg["scale"]:
         raise AnchorError(f"value {raw!r} is not on the scale {cfg['scale']}")
@@ -119,8 +123,8 @@ def _reading(cfg: dict, now: datetime, parsed: dict, manual: bool = False) -> An
         id=cfg["id"], country=cfg["country"], name=cfg["name"], url=cfg["url"],
         scale=cfg["scale"], raw=raw, level=level,
         normalized=round((level - 1) / (len(cfg["scale"]) - 1), 3), since=parsed.get("since"),
-        as_of=now, status="stale" if parsed.get("expired") else "ok",
-        error="the order behind this level has expired" if parsed.get("expired") else None,
+        as_of=parsed.get("as_of", now), status="stale" if parsed.get("stale_reason") else "ok",
+        error=parsed.get("stale_reason"),
         text_hash=parsed.get("text_hash"), detail=parsed.get("detail"), manual=manual)
 
 
@@ -141,7 +145,14 @@ def _read_one(cfg: dict, now: datetime, manual_levels: dict) -> AnchorReading:
         entry = manual_levels.get(cfg["id"])
         if not entry:
             raise AnchorError("no value in manual_anchors.yaml")
-        return _reading(cfg, now, {"raw": entry["raw"], "since": entry.get("since")}, manual=True)
+        entered = entry["entered_on"]
+        old = (now.date() - entered).days > MANUAL_MAX_AGE_DAYS
+        return _reading(cfg, now, {
+            "raw": entry["raw"], "since": entry.get("since"),
+            # Dated by when it was typed in, never by the run, so the page does not imply a check.
+            "as_of": datetime(entered.year, entered.month, entered.day, tzinfo=UTC),
+            "stale_reason": f"entered by hand on {entered}; please check the official page"
+            if old else None}, manual=True)
     r = get(cfg["url"])
     if parser == "fcdo":
         return _reading(cfg, now, parse_fcdo(r.json()))

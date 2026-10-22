@@ -1,6 +1,7 @@
 """GDELT DOC 2.0 API, ArtList mode. Calls run one at a time, at least 5 s apart."""
 
 import json
+import threading
 import time
 from datetime import UTC, datetime
 
@@ -11,6 +12,8 @@ MIN_SPACING_S = 5.5
 RETRIES = 3
 BACKOFF_S = 20.0
 _last_call = 0.0
+# Several sources use GDELT; the lock keeps their calls one at a time, 5 s apart.
+_lock = threading.Lock()
 
 # GDELT reports languages by English name.
 LANGS = {
@@ -22,13 +25,14 @@ LANGS = {
 
 def _call(params: dict, url: str) -> dict:
     global _last_call
-    wait = _last_call + MIN_SPACING_S - time.monotonic()
-    if wait > 0:
-        time.sleep(wait)
-    try:
-        r = get(url, params=params, retries=RETRIES, backoff_s=BACKOFF_S)
-    finally:
-        _last_call = time.monotonic()
+    with _lock:
+        wait = _last_call + MIN_SPACING_S - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            r = get(url, params=params, retries=RETRIES, backoff_s=BACKOFF_S)
+        finally:
+            _last_call = time.monotonic()
     try:
         return json.loads(r.text) if r.text.strip() else {}
     except json.JSONDecodeError as e:

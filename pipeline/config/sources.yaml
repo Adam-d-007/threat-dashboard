@@ -204,7 +204,8 @@ sources:
     notes: >-
       Disabled: every request to www.pap.pl gets an Imperva Incapsula bot challenge, and the site
       sends "tdm-reservation: 1" (EU text-and-data-mining opt-out) and "X-Robots-Tag: noai". No
-      feed for the main news service could be verified.
+      feed for the main news service could be verified. The opt-out is respected, so PAP is not
+      read through GDELT either; Rzeczpospolita and Notes from Poland cover Poland instead.
 
   - id: ukrinform
     name: Ukrinform (English)
@@ -254,9 +255,10 @@ sources:
     enabled: true
     verified_on: 2026-10-22
     notes: >-
-      20 items, about 5 days. The feed answers our requests, but consilium.europa.eu's pages and
-      robots.txt sit behind a Cloudflare browser check, so the URL could only be taken from
-      third-party feed listings, not from the Council's own site. Adam to confirm in a browser.
+      20 items, about 5 days. consilium.europa.eu's pages and robots.txt sit behind a Cloudflare
+      browser check, so the URL was first found in third-party feed listings. Adam opened it in
+      a browser on 2026-10-22: it is served by consilium.europa.eu itself as the Council's
+      official press-release feed. Article pages block scripts but open fine in a browser.
 
   - id: eeas
     name: EEAS press material
@@ -371,7 +373,7 @@ sources:
     verified_on: 2026-10-22
     notes: >-
       Disabled: every request to mzv.sk, robots.txt included, gets a Cloudflare challenge (403).
-      No feed is documented. Ask MZV (info@mzv.sk) for a feed or to allow this User-Agent.
+      No feed is documented. Its articles come in through GDELT (source gdelt_outlets) instead.
 
   - id: euvsdisinfo
     name: EUvsDisinfo
@@ -385,7 +387,7 @@ sources:
     verified_on: 2026-10-22
     notes: >-
       Disabled: the site blocks this User-Agent (Cloudflare 403) and its robots.txt disallows
-      */feed/. Needs permission from EEAS / EUvsDisinfo.
+      */feed/. Its articles come in through GDELT (source gdelt_outlets) instead.
 
   # --- EU press --------------------------------------------------------------------------
 
@@ -456,7 +458,8 @@ sources:
     verified_on: 2026-10-22
     notes: >-
       Disabled: dw.com links no feed, and its robots.txt forbids automated data mining without
-      DW's written permission. rss.dw.com/xml/rss-en-all works but is only named by third parties.
+      DW's written permission, so DW is not read through GDELT either. Euronews covers Europe in
+      English instead.
 
   - id: euractiv
     name: Euractiv (now Rapporteur)
@@ -470,7 +473,7 @@ sources:
     verified_on: 2026-10-22
     notes: >-
       Disabled: euractiv.com redirects to rapporteur.com, whose robots.txt disallows /feed/, and
-      whose pages sit behind a Cloudflare block.
+      whose pages sit behind a Cloudflare block. Its articles come in through GDELT instead.
 
   # --- Analysis (context for the brief; never evidence that an event happened) ------------
 
@@ -546,7 +549,8 @@ sources:
     enabled: false
     verified_on: 2026-10-22
     notes: >-
-      Disabled: every page, robots.txt included, sits behind a Cloudflare managed challenge.
+      Disabled: every page, robots.txt included, sits behind a Cloudflare managed challenge, and
+      the co-publisher criticalthreats.org does too. Its articles come in through GDELT instead.
 
   - id: globsec
     name: GLOBSEC
@@ -560,7 +564,72 @@ sources:
     verified_on: 2026-10-22
     notes: >-
       Disabled: every page, robots.txt included, sits behind a Cloudflare managed challenge.
-      GLOBSEC is in Bratislava; asking them for a feed may be the only route.
+      Its articles come in through GDELT (source gdelt_outlets) instead.
+
+  # --- Replacements for blocked outlets --------------------------------------------------
+
+  - id: euronews
+    name: Euronews Europe
+    group: eu_press
+    tier: B
+    adapter: rss
+    urls: ["https://www.euronews.com/rss?level=theme&name=europe"]
+    lang: en
+    regions: [EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Linked from euronews.com/news/europe. 50 items, about 2 days. Replaces DW for European
+      coverage in English.
+
+  - id: rzeczpospolita
+    name: Rzeczpospolita
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls:
+      - https://www.rp.pl/rss/11-kraj
+      - https://www.rp.pl/rss/141-swiat
+    lang: pl
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Linked from rp.pl/kraj and rp.pl/swiat. 100 items each: national about 5 days, world about
+      2 days. With Notes from Poland, replaces PAP.
+
+  - id: notes_from_poland
+    name: Notes from Poland
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls: ["https://notesfrompoland.com/feed/"]
+    lang: en
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Homepage <link rel=alternate>. 12 items, about 6 days. English-language Polish news.
+
+  - id: gdelt_outlets
+    name: Blocked outlets via GDELT (MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv)
+    group: backbone
+    tier: C
+    adapter: gdelt_doc
+    urls: ["https://api.gdeltproject.org/api/v2/doc/doc"]
+    lang: multi
+    regions: [SK, EU]
+    enabled: true
+    verified_on: null
+    queries:
+      - id: blocked_outlets
+        query: "(domain:mzv.sk OR domain:globsec.org OR domain:understandingwar.org OR domain:euvsdisinfo.eu OR domain:euractiv.com OR domain:rapporteur.com)"
+    notes: >-
+      These sites block automated access with bot walls but state no ban on reuse, so their
+      headlines and links are taken from GDELT's index of them instead (tier C: seen only
+      through GDELT). DW and PAP are deliberately left out: DW forbids automated mining and PAP
+      sends an EU text-and-data-mining opt-out. Query not yet confirmed: GDELT refused every
+      test from this Mac on 2026-10-22 (HTTP 429); the first GitHub run will show.
 
   # --- Need accounts or approval before they can run ---------------------------------------
 
@@ -574,10 +643,14 @@ sources:
     regions: [SK, EU]
     enabled: false
     verified_on: null
+    acled:
+      days: 30
+      regions: [12, 11]   # Europe (incl. Ukraine and Russia), Middle East
     notes: >-
-      Waiting for Adam's myACLED account (registering with an @mcslovakia.com address). OAuth
-      password grant at acleddata.com/oauth/token; recent events need the Partner or Enterprise
-      tier, Research gets a 12-month lag. Adapter not written until the API can be called.
+      Waiting for Adam's myACLED account (registering with an @mcslovakia.com address). To
+      switch on: add the ACLED_EMAIL and ACLED_PASSWORD secrets, then set enabled: true.
+      Recent events need the Partner or Enterprise tier; Research gets a 12-month lag. The
+      adapter follows ACLED's documentation but has not been run against the real API yet.
 
   - id: reliefweb
     name: ReliefWeb (OCHA)

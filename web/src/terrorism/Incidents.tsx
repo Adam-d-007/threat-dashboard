@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { Card, Muted } from "../components/ui";
+import { ArticleLink, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { Event, Item } from "../types/run";
@@ -137,9 +137,9 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
             <tr key={e.id} id={`evt-${e.id}`} className="scroll-mt-24 align-top target:bg-surface-2">
               <td className="whitespace-nowrap px-2 py-2 tabular text-ink-2">{fmtDate(e.date, locale)}</td>
               <td className="px-2 py-2">
-                <a href={urlOf.get(e.item_ids[0]) ?? "#"} target="_blank" rel="noreferrer" className="font-medium">
+                <ArticleLink href={urlOf.get(e.item_ids[0])} className="font-medium">
                   {pick(e.title_en, e.title_sk)}
-                </a>
+                </ArticleLink>
                 <div className="text-xs text-muted">
                   {e.place?.name ?? e.country} · {e.country}
                 </div>

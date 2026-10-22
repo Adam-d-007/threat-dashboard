@@ -16,7 +16,7 @@ import yaml
 from pydantic import ValidationError
 
 from . import anchors as anchor_reader
-from .adapters import gdelt_doc, html_scrape, json_api, rss
+from .adapters import acled, gdelt_doc, html_scrape, json_api, rss
 from .adapters.base import FetchResult
 from .health import run_status, source_health
 from .models import (
@@ -28,6 +28,8 @@ from .models import (
     RunCounts,
     RunInfo,
     SourceHealth,
+    Tesat,
+    TesatYear,
     ValueChange,
 )
 from .process.dedupe import dedupe
@@ -59,13 +61,16 @@ def fetch_all(sources: list[dict], queries: list[dict], since: datetime, now: da
         if use_fixtures:
             return fixture_fetch(src)
         if src["adapter"] == "gdelt_doc":
-            return gdelt_doc.fetch(src, queries, since, now)
+            # A source may carry its own queries (e.g. outlets only reachable through GDELT).
+            return gdelt_doc.fetch(src, src.get("queries") or queries, since, now)
         if src["adapter"] == "rss":
             return rss.fetch(src)
         if src["adapter"] == "html_scrape":
             return html_scrape.fetch(src)
         if src["adapter"] == "json_api":
             return json_api.fetch(src)
+        if src["adapter"] == "acled":
+            return acled.fetch(src, now)
         raise ValueError(f"unknown adapter {src['adapter']!r} for {src['id']}")
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -111,7 +116,7 @@ def normalize_all(sources: list[dict], results: dict[str, FetchResult], now: dat
 
 def fixture_fetch(src: dict) -> FetchResult:
     """Sources without a fixture file return an empty, successful result."""
-    if src["adapter"] == "gdelt_doc":
+    if src["adapter"] == "gdelt_doc" and (FIXTURES / f"{src['id']}.json").exists():
         items = gdelt_doc.parse(json.loads((FIXTURES / f"{src['id']}.json").read_text()))
     elif (FIXTURES / f"{src['id']}.xml").exists():
         items = rss.parse((FIXTURES / f"{src['id']}.xml").read_bytes())
@@ -140,6 +145,23 @@ def diff(prev_run: dict | None, anchors: list[AnchorReading],
     source_changes = [ValueChange(id=h.id, value_from=prev_sources[h.id], value_to=h.status)
                       for h in health if h.id in prev_sources and prev_sources[h.id] != h.status]
     return Diff(anchor_changes=anchor_changes, source_changes=source_changes)
+
+
+def load_tesat() -> Tesat | None:
+    """TE-SAT figures from manual_anchors.yaml, or None while they are not filled in."""
+    t = yaml.safe_load((CONFIG / "manual_anchors.yaml").read_text()).get("tesat") or {}
+    if t.get("attacks_total") is None:
+        return None
+    year = {k: t.get(k) for k in ("data_year", "attacks_total", "attacks_completed",
+                                  "member_states_with_attacks", "fatalities", "arrests_total")}
+    prev = t.get("previous_year")
+    return Tesat(report_year=t["report_year"], url=t["url"], current=TesatYear(**year),
+                 attacks_failed=t["attacks_failed"], attacks_foiled=t["attacks_foiled"],
+                 attacks_by_ideology=t["attacks_by_ideology"],
+                 arrests_by_ideology=t["arrests_by_ideology"],
+                 slovakia_attacks=t["slovakia"]["attacks"],
+                 slovakia_arrests=t["slovakia"]["arrests"],
+                 previous=TesatYear(**prev) if prev else None)
 
 
 def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
@@ -205,10 +227,12 @@ def main(argv: list[str] | None = None) -> int:
                    counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
                                     after_dedupe=len(unique), in_window=len(in_window)))
     run = Run(schema_version=SCHEMA_VERSION, run=info, sources=health, items=in_window,
-              anchors=anchors, diff=diff(prev["latest"], anchors, health))
+              anchors=anchors, diff=diff(prev["latest"], anchors, health), tesat=load_tesat())
 
     try:
         state.write(args.state_dir, run, seen, finished)
+        if (res := results.get("acled")) and res.ok:
+            state.write_acled(args.state_dir, res.records, finished)
     except ValidationError:
         log.exception("run failed validation; latest.json left unchanged")
         run.run.status = "failed"
