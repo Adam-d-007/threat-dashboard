@@ -1,0 +1,23 @@
+name: acled-check
+
+# Run by hand once the ACLED secrets exist: reports which ACLED data the account can read.
+# Prints counts and ACLED's restriction notes only, never the credentials.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
+      - run: uv sync --frozen --no-dev
+      - name: Check ACLED access
+        env:
+          ACLED_EMAIL: ${{ secrets.ACLED_EMAIL }}
+          ACLED_PASSWORD: ${{ secrets.ACLED_PASSWORD }}
+        run: uv run python -m pipeline.tools.acled_check
