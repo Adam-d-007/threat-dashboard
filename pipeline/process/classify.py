@@ -6,7 +6,7 @@ import logging
 
 from pydantic import ValidationError
 
-from ..llm.client import LlmClient, LlmUnavailable
+from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable
 from ..llm.prompts import CLASSIFY_SYSTEM, classify_user, retry_user
 from ..llm.schemas import Batch, ItemLabel
 from ..models import Classification, Item
@@ -80,12 +80,12 @@ def _ask(client: LlmClient, batch: list[Item]) -> dict[str, ItemLabel]:
     user = classify_user(batch)
     prompt = user
     for attempt in (1, 2):
-        text = client.complete_json(CLASSIFY_SYSTEM, prompt)
         try:
+            text = client.complete_json(CLASSIFY_SYSTEM, prompt)
             parsed = Batch.model_validate(json.loads(text))
             ids = {i.id for i in batch}
             return {lab.id: lab for lab in parsed.items if lab.id in ids}
-        except (json.JSONDecodeError, ValidationError) as e:
+        except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
             if attempt == 2:
                 raise
             log.warning("batch rejected, retrying once: %s", str(e)[:200])
@@ -116,7 +116,7 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
                 labels = _ask(client, batch)
             except LlmUnavailable:
                 log.warning("no LLM available; rules for the remaining items")
-            except (json.JSONDecodeError, ValidationError) as e:
+            except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
                 stats["batches_failed"] += 1
                 log.warning("batch failed twice, rules instead: %s", str(e)[:200])
         for item in batch:
