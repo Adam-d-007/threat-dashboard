@@ -55,6 +55,7 @@ def parse(data: dict) -> list[RawItem]:
 def fetch(source: dict, queries: list[dict], since: datetime, until: datetime) -> FetchResult:
     items: list[RawItem] = []
     errors: list[str] = []
+    succeeded: list[str] = []
     http_status = None
     for q in queries:
         params = {
@@ -67,8 +68,10 @@ def fetch(source: dict, queries: list[dict], since: datetime, until: datetime) -
             data = _call(params, source["urls"][0])
             http_status = 200
             items.extend(parse(data))
+            succeeded.append(q["id"])
         except FetchError as e:
             http_status = e.http_status
             errors.append(f"{q['id']}: {e}")
     return FetchResult(source_id=source["id"], ok=not errors, items=items,
-                       http_status=http_status, error="; ".join(errors) or None)
+                       http_status=http_status, error="; ".join(errors) or None,
+                       parts=[q["id"] for q in queries], parts_ok=succeeded)

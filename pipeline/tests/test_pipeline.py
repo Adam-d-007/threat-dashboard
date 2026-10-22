@@ -894,6 +894,24 @@ def test_collector_records_health_per_source(tmp_path):
     assert health["tasr"]["error"] is None and "gdelt_doc" not in health  # fixtures: RSS only
 
 
+def test_gdelt_counts_as_ok_once_every_query_succeeded_across_runs():
+    from pipeline.adapters.base import FetchResult
+    qs = ["a", "b"]
+    t1, t2 = NOW - timedelta(hours=1), NOW
+
+    def res(ok_parts):
+        return {"gdelt_doc": FetchResult(source_id="gdelt_doc", ok=ok_parts == qs,
+                                         error=None if ok_parts == qs else "x: HTTP 429",
+                                         parts=qs, parts_ok=ok_parts)}
+    h1 = collect.update_health({}, res(["a"]), t1)["gdelt_doc"]
+    assert h1["last_success"] is None and "429" in h1["error"]  # b has never succeeded
+    h2 = collect.update_health({"gdelt_doc": h1}, res(["b"]), t2)["gdelt_doc"]
+    assert h2["last_success"] == t1.isoformat()  # both have now succeeded; a is the older
+    fresh = pipeline_main.collected_health(
+        [{"id": "gdelt_doc"}], [], {"gdelt_doc": h2}, NOW - timedelta(days=1), NOW)
+    assert fresh["gdelt_doc"].ok
+
+
 def test_pipeline_takes_gdelt_health_from_the_collector():
     src = [{"id": "gdelt_doc", "name": "GDELT", "tier": "C", "group": "backbone"}]
     item = _item(1, "Terror story", "x.com", source_id="gdelt_doc", tier="C")
