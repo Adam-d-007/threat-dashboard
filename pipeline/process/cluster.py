@@ -54,6 +54,55 @@ def _matches(item: Item, e: Event) -> bool:
         fold(c.summary_en), fold(e.title_en)) >= SUMMARY_MIN
 
 
+def _same_incident(a: Event, b: Event) -> bool:
+    """The item rule, applied between two stored events."""
+    if set(a.event_keys) & set(b.event_keys):
+        return True
+    if a.event_type != b.event_type or a.country != b.country:
+        return False
+    if abs((a.date - b.date).days) > MAX_DAYS:
+        return False
+    if a.place and b.place and a.place.precision == "city" and b.place.precision == "city":
+        return km(a.place, b.place) <= MAX_KM
+    return fuzz.token_sort_ratio(fold(a.title_en), fold(b.title_en)) >= SUMMARY_MIN
+
+
+def _absorb(keep: Event, gone: Event) -> None:
+    for attr in ("item_ids", "event_keys", "domains"):
+        target = getattr(keep, attr)
+        target.extend(x for x in getattr(gone, attr) if x not in target)
+    keep.has_tier_a = keep.has_tier_a or gone.has_tier_a
+    keep.corroborated = keep.has_tier_a or len(keep.domains) >= 2
+    keep.severity = max(keep.severity, gone.severity)
+    if keep.ideology == "unknown":
+        keep.ideology = gone.ideology
+    if SK_RANK[gone.sk_link] > SK_RANK[keep.sk_link]:
+        keep.sk_link = gone.sk_link
+    if gone.place and (keep.place is None
+                       or (keep.place.precision != "city" and gone.place.precision == "city")):
+        keep.place = gone.place
+    keep.date = min(keep.date, gone.date)
+    keep.first_seen = min(keep.first_seen, gone.first_seen)
+    keep.last_updated = max(keep.last_updated, gone.last_updated)
+
+
+def merge_events(events: list[Event], now: datetime) -> tuple[list[Event], dict[str, str]]:
+    """Merge recent events that turn out to be one incident (an earlier split, or a later
+    report bridging two halves). Returns (events, {merged id: kept id})."""
+    recent_from = (now - timedelta(days=7)).date()
+    merged: dict[str, str] = {}
+    kept: list[Event] = []
+    for e in sorted(events, key=lambda e: e.first_seen):
+        target = next((k for k in kept if k.date >= recent_from and e.date >= recent_from
+                       and _same_incident(k, e)), None)
+        if target:
+            _absorb(target, e)
+            merged[e.id] = target.id
+        else:
+            kept.append(e)
+    return kept, merged
+
+
 def _new_event(item: Item, now: datetime) -> Event:
     c = item.classification
     return Event(
@@ -103,4 +152,8 @@ def cluster(items: list[Item], events: list[Event], now: datetime) -> tuple[list
             new_ids.append(event.id)
         _add(event, item, now)
         item.event_id = event.id
-    return events, new_ids
+    events, merged = merge_events(events, now)
+    for item in items:
+        if item.event_id in merged:
+            item.event_id = merged[item.event_id]
+    return events, [i for i in new_ids if i not in merged]

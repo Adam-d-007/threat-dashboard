@@ -797,3 +797,21 @@ def test_reports_without_a_place_join_by_similar_summary_only():
         _label(3, key=None, **spy, summary_en="German police arrested two men suspected of spying for China at a defence firm in Munich")]})])
     _, events, _, _ = pipeline_main.understand([a, b, c], {}, llm, {}, [], NOW)
     assert sorted(len(e.domains) for e in events) == [1, 2]  # Russia case merged, China case apart
+
+
+def test_split_events_from_an_earlier_run_are_merged():
+    from pipeline.models import Event
+    from pipeline.process.cluster import cluster
+
+    def ev(eid, title, domains, place=None):
+        return Event(id=eid, title_en=title, event_type="arrest", ideology="state_linked",
+                     severity=1, date=date(2026, 10, 22), country="DE", place=place,
+                     sk_link="none", item_ids=[eid + "_i"], domains=domains, has_tier_a=False,
+                     corroborated=len(domains) >= 2, first_seen=NOW, last_updated=NOW)
+    a = ev("evt_a", "German police arrested a Ukrainian citizen suspected of spying for Russia, allegedly collecting sensitive information", ["aktuality.sk", "rp.pl"])
+    b = ev("evt_b", "German prosecutors arrested a Ukrainian national suspected of spying for Russia and gathering defence-related information", ["euronews.com"])
+    c = ev("evt_c", "German police arrested two men suspected of spying for China at a defence firm in Munich", ["dw.com"])
+    events, new_ids = cluster([], [a, b, c], NOW)
+    assert [e.id for e in events] == ["evt_a", "evt_c"]
+    assert events[0].domains == ["aktuality.sk", "rp.pl", "euronews.com"]
+    assert events[0].item_ids == ["evt_a_i", "evt_b_i"]
