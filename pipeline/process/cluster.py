@@ -1,19 +1,26 @@
 """Stage 8, events: reports of the same incident become one event.
 
 An item joins an event when they share an LLM event_key, or have the same event type and
-country, places within 50 km and dates within one day. Events persist in events.json for 90
-days, so a story covered over several days stays one event. An event is corroborated with two
-or more independent domains, or one Tier A source. Unclassified items never enter."""
+country, dates within one day, and either places within 50 km or, when one side has no place,
+clearly similar English summaries (token_sort_ratio >= 66; measured 2026-10-22: two reports of
+one arrest scored 70, a different arrest in the same country 60). Events persist in
+events.json for 90 days, so a story covered over several days stays one event. An event is
+corroborated with two or more independent domains, or one Tier A source. Unclassified items
+never enter."""
 
 import hashlib
 import math
 from datetime import datetime, timedelta
 
+from rapidfuzz import fuzz
+
 from ..models import Event, Item, Place
+from .prefilter import fold
 
 DOMAINS = {"terrorism", "hybrid", "unrest"}
 MAX_KM = 50
 MAX_DAYS = 1
+SUMMARY_MIN = 66
 KEEP_DAYS = 90
 SK_RANK = {"none": 0, "indirect": 1, "direct": 2}
 
@@ -41,7 +48,10 @@ def _matches(item: Item, e: Event) -> bool:
     if abs((item.published_at.date() - e.date).days) > MAX_DAYS:
         return False
     place = c.places[0] if c.places else None
-    return bool(place and e.place and km(place, e.place) <= MAX_KM)
+    if place and e.place and place.precision == "city" and e.place.precision == "city":
+        return km(place, e.place) <= MAX_KM
+    return bool(c.summary_en) and fuzz.token_sort_ratio(
+        fold(c.summary_en), fold(e.title_en)) >= SUMMARY_MIN
 
 
 def _new_event(item: Item, now: datetime) -> Event:

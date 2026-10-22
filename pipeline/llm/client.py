@@ -1,11 +1,13 @@
 """LLM access: Gemini first, Groq as fallback, JSON out.
 
 Keys come from GEMINI_API_KEY and GROQ_API_KEY (GitHub secrets). Each provider is limited to
-its configured requests per minute. Error policy, from the first live run (2026-10-22):
-- 429, 5xx and network errors are temporary ("model overloaded"): retry after 10, 30 and 60 s;
-  if that fails, the next provider answers this request. A provider is dropped for the rest
-  of the run only after two requests in a row failed that way.
-- 401, 403 and 404 (bad key, unknown model) drop the provider at once.
+its configured requests per minute. Error policy, from the first live runs (2026-10-22, when
+gemini-3.8-flash answered 503 "overloaded" for minutes):
+- 429, 5xx and network errors are temporary: retry after 5 and 15 s, then try the provider's
+  next model (e.g. gemini-2.5-flash), then the next provider. A provider whose every model
+  failed a request is dropped for the rest of the run.
+- 401 and 403 (bad key) drop the provider at once; 404 skips to its next model.
+- All LLM work in a run stops after max_seconds, so a run stays inside its time budget.
 - An answer that is not valid JSON is the model's fault, not the provider's: LlmBadOutput
   goes back to the caller, which retries once with the error and then uses the rules.
 When no provider is left, LlmUnavailable is raised and the caller falls back to rules. The
@@ -26,12 +28,11 @@ log = logging.getLogger("pipeline.llm")
 
 GEMINI = "https://generativelanguage.googleapis.com/v1beta"
 GROQ = "https://api.groq.com/openai/v1"
-TIMEOUT_S = 120
-RETRY_WAITS_S = (10, 30, 60)
+TIMEOUT_S = 45
+RETRY_WAITS_S = (5, 15)
 MAX_OUTPUT_TOKENS = 8192
 TRANSIENT = {429, 500, 502, 503, 504, None}
-FATAL = {401, 403, 404}
-DROP_AFTER = 2  # consecutive failed requests
+FATAL = {401, 403}
 _SKIP = re.compile(r"lite|image|tts|live|audio|embedding|exp|thinking|vision|guard")
 
 
@@ -54,14 +55,19 @@ def _version(name: str) -> tuple[float, ...]:
     return (float(m.group(1)),) if m else (0.0,)
 
 
-def pick_model(available: list[str], prefer: list[str], family: str | None) -> str | None:
-    """The first preferred model that exists, else the newest stable model of the family."""
-    for p in prefer:
-        if p in available:
-            return p
+def pick_models(available: list[str], prefer: list[str], family: str | None) -> list[str]:
+    """Preferred models that exist, in order, then the newest stable model of the family."""
+    out = [p for p in prefer if p in available]
     pool = [m for m in available if (family is None or family in m) and not _SKIP.search(m)]
     stable = [m for m in pool if "preview" not in m] or pool
-    return max(stable, key=_version) if stable else None
+    if stable and (newest := max(stable, key=_version)) not in out:
+        out.append(newest)
+    return out
+
+
+def pick_model(available: list[str], prefer: list[str], family: str | None) -> str | None:
+    models = pick_models(available, prefer, family)
+    return models[0] if models else None
 
 
 @dataclass
@@ -71,10 +77,14 @@ class _Provider:
     rpm: int
     prefer: list[str]
     family: str | None
-    model: str | None = None
+    models: list[str] | None = None
+    model_index: int = 0
     last_call: float = 0.0
     dead: bool = False
-    failures: int = 0
+
+    @property
+    def model(self) -> str | None:
+        return self.models[self.model_index] if self.models else None
 
 
 @dataclass
@@ -83,6 +93,11 @@ class LlmClient:
     calls: int = 0
     providers: list[_Provider] = field(default_factory=list)
     used: list[str] = field(default_factory=list)
+    started: float = field(default_factory=time.monotonic)
+
+    @property
+    def out_of_time(self) -> bool:
+        return time.monotonic() - self.started > self.cfg.get("max_seconds", 480)
 
     @classmethod
     def from_env(cls, cfg: dict) -> "LlmClient":
@@ -97,7 +112,7 @@ class LlmClient:
 
     @property
     def available(self) -> bool:
-        return any(not p.dead for p in self.providers)
+        return not self.out_of_time and any(not p.dead for p in self.providers)
 
     def usage(self) -> dict:
         return {"provider": self.used[-1].split(":")[0] if self.used else None,
@@ -107,28 +122,36 @@ class LlmClient:
                 or bool(self.used and self.used[0].split(":")[0] != "gemini")}
 
     def complete_json(self, system: str, user: str) -> str:
-        """Raw JSON text from the first provider that answers. Counts one call per request."""
+        """Raw JSON text from the first provider and model that answers."""
         for p in self.providers:
             if p.dead:
                 continue
             try:
-                if p.model is None:
-                    p.model = self._resolve_model(p)
-                text = self._call_with_retry(p, system, user)
+                if p.models is None:
+                    p.models = self._resolve_models(p)
             except _ProviderError as e:
-                p.failures += 1
-                if e.status in FATAL or e.status == "no-model" or p.failures >= DROP_AFTER:
-                    p.dead = True
-                    log.warning("%s dropped for the rest of the run: %s", p.name, e)
-                else:
-                    log.warning("%s failed this request, trying the next provider: %s", p.name, e)
+                p.dead = True
+                log.warning("%s dropped: cannot list models: %s", p.name, e)
                 continue
-            p.failures = 0
-            self.used.append(f"{p.name}:{p.model}")
-            return text
+            while p.model_index < len(p.models):
+                if self.out_of_time:
+                    raise LlmUnavailable("LLM time budget for this run used up")
+                try:
+                    text = self._call_with_retry(p, system, user)
+                    self.used.append(f"{p.name}:{p.model}")
+                    return text
+                except _ProviderError as e:
+                    if e.status in FATAL:
+                        log.warning("%s dropped (bad key?): %s", p.name, e)
+                        p.model_index = len(p.models)
+                        break
+                    log.warning("%s %s failed, trying the next model: %s", p.name, p.model, e)
+                    p.model_index += 1
+            p.dead = True
+            log.warning("%s dropped for the rest of the run: no model answered", p.name)
         raise LlmUnavailable("no LLM provider answered")
 
-    def _resolve_model(self, p: _Provider) -> str:
+    def _resolve_models(self, p: _Provider) -> list[str]:
         if p.name == "gemini":
             r = self._http("GET", f"{GEMINI}/models", p, params={"pageSize": 1000})
             names = [m["name"].removeprefix("models/") for m in r.json().get("models", [])
@@ -136,20 +159,20 @@ class LlmClient:
         else:
             r = self._http("GET", f"{GROQ}/models", p)
             names = [m["id"] for m in r.json().get("data", [])]
-        model = pick_model(names, p.prefer, p.family)
-        if model is None:
-            raise _ProviderError("no suitable model in the provider's model list", "no-model")
-        if model not in p.prefer:
-            log.warning("%s: preferred models %s not available; using %s", p.name, p.prefer, model)
-        log.info("%s model: %s", p.name, model)
-        return model
+        models = pick_models(names, p.prefer, p.family)
+        if not models:
+            raise _ProviderError("no suitable model in the provider's model list")
+        if models[0] not in p.prefer:
+            log.warning("%s: preferred models %s not available", p.name, p.prefer)
+        log.info("%s models, in order: %s", p.name, models)
+        return models
 
     def _call_with_retry(self, p: _Provider, system: str, user: str) -> str:
         for wait in (*RETRY_WAITS_S, None):
             try:
                 return self._call(p, system, user)
             except _ProviderError as e:
-                if wait is None or e.status not in TRANSIENT:
+                if wait is None or e.status not in TRANSIENT or self.out_of_time:
                     raise
                 log.info("%s answered %s; retrying in %d s", p.name, e.status, wait)
                 time.sleep(wait)

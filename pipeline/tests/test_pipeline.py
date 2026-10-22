@@ -714,8 +714,8 @@ def test_injection_text_stays_inside_the_data_block():
 
 # --- LLM client error policy (simulated HTTP) ------------------------------------------
 
-def _llm_client(monkeypatch, script):
-    """script: list of (provider, status, body) answered in order for generate calls."""
+def _llm_client(monkeypatch, script, gemini_models=("gemini-3.8-flash",)):
+    """script: list of (url fragment, status, body) answered in order for generate calls."""
     from pipeline.llm import client as llm
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("GROQ_API_KEY", "q")
@@ -725,17 +725,19 @@ def _llm_client(monkeypatch, script):
     def fake_request(method, url, **kw):
         req = httpx.Request(method, url)
         if url.endswith("/models"):
-            body = ({"models": [{"name": "models/gemini-3.8-flash",
-                                 "supportedGenerationMethods": ["generateContent"]}]}
+            body = ({"models": [{"name": f"models/{m}", "supportedGenerationMethods": ["generateContent"]}
+                                for m in gemini_models]}
                     if "googleapis" in url else {"data": [{"id": "openai/gpt-oss-120b"}]})
             return httpx.Response(200, json=body, request=req)
-        provider, status, body = queue.pop(0)
-        assert provider in url
+        frag, status, body = queue.pop(0)
+        assert frag in url, (frag, url)
         return httpx.Response(status, json=body, request=req)
 
     monkeypatch.setattr(httpx, "request", fake_request)
-    cfg = {"gemini": {"prefer": ["gemini-3.8-flash"], "family": "flash", "requests_per_minute": 6000},
-           "groq": {"prefer": ["openai/gpt-oss-120b"], "requests_per_minute": 6000}}
+    cfg = {"gemini": {"prefer": ["gemini-3.8-flash", "gemini-2.5-flash"], "family": "flash",
+                      "requests_per_minute": 6000},
+           "groq": {"prefer": ["openai/gpt-oss-120b"], "requests_per_minute": 6000},
+           "max_seconds": 480}
     return llm, llm.LlmClient.from_env(cfg)
 
 
@@ -743,14 +745,30 @@ GEMINI_OK = {"candidates": [{"content": {"parts": [{"text": '{"items": []}'}]}}]
 GROQ_OK = {"choices": [{"message": {"content": '{"items": []}'}}]}
 
 
-def test_overloaded_gemini_is_retried_then_groq_answers_and_gemini_stays(monkeypatch):
-    llm, c = _llm_client(monkeypatch, [("googleapis", 503, {})] * 4 + [("groq", 200, GROQ_OK),
-                                       ("googleapis", 200, GEMINI_OK)])
-    assert c.complete_json("s", "u") == '{"items": []}'   # 4 Gemini attempts, then Groq
-    gemini = c.providers[0]
-    assert not gemini.dead and gemini.failures == 1
-    assert c.complete_json("s", "u") == '{"items": []}'   # Gemini is tried again and answers
-    assert gemini.failures == 0 and c.calls == 6
+def test_overloaded_model_falls_back_to_the_next_gemini_model(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [("3.8-flash", 503, {})] * 3 + [("2.5-flash", 200, GEMINI_OK),
+                                       ("2.5-flash", 200, GEMINI_OK)],
+                         gemini_models=("gemini-3.8-flash", "gemini-2.5-flash"))
+    assert c.complete_json("s", "u") == '{"items": []}'   # 3 tries on 3.8, then 2.5 answers
+    assert c.complete_json("s", "u") == '{"items": []}'   # and 2.5 stays in use
+    assert c.usage()["model"] == "gemini-2.5-flash" and c.calls == 5
+
+
+def test_gemini_down_on_every_model_is_dropped_and_groq_answers(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [("googleapis", 503, {})] * 3 + [("groq", 200, GROQ_OK),
+                                       ("groq", 200, GROQ_OK)])
+    c.complete_json("s", "u")
+    assert c.providers[0].dead
+    c.complete_json("s", "u")  # straight to Groq, no more waiting on Gemini
+    assert c.calls == 5 and c.usage()["provider"] == "groq"
+
+
+def test_llm_stops_when_the_time_budget_is_used(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [])
+    c.started -= 10_000
+    assert not c.available
+    with pytest.raises(llm.LlmUnavailable, match="time budget"):
+        c.complete_json("s", "u")
 
 
 def test_bad_key_drops_the_provider_at_once(monkeypatch):
@@ -765,3 +783,17 @@ def test_groq_invalid_json_is_bad_output_not_a_dead_provider(monkeypatch):
     with pytest.raises(llm.LlmBadOutput):
         c.complete_json("s", "u")
     assert not c.providers[1].dead
+
+
+def test_reports_without_a_place_join_by_similar_summary_only():
+    a = _item(1, "Nemecké úrady zatkli ukrajinského občana pre špionáž pre Rusko", "aktuality.sk")
+    b = _item(2, "Germany arrests Ukrainian national on suspicion of spying for Russia", "euronews.com", lang="en", hours=3)
+    c = _item(3, "German police arrest two men spying for China in Munich", "dw.com", lang="en", hours=4)
+    spy = dict(domain="hybrid", event_type="arrest", ideology="state_linked", countries=["DE"],
+               sk_link="none", places=[])
+    llm = FakeLlm([json.dumps({"items": [
+        _label(1, key=None, **spy, summary_en="German police arrested a Ukrainian citizen suspected of spying for Russia, allegedly collecting sensitive information"),
+        _label(2, key=None, **spy, summary_en="German prosecutors arrested a Ukrainian national suspected of spying for Russia and gathering defence-related information"),
+        _label(3, key=None, **spy, summary_en="German police arrested two men suspected of spying for China at a defence firm in Munich")]})])
+    _, events, _, _ = pipeline_main.understand([a, b, c], {}, llm, {}, [], NOW)
+    assert sorted(len(e.domains) for e in events) == [1, 2]  # Russia case merged, China case apart

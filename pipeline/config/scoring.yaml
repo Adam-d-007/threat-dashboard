@@ -11,6 +11,7 @@ llm:
     prefer: [openai/gpt-oss-120b, llama-3.3-70b-versatile]
     requests_per_minute: 10
   batch_size: 25            # items per classification call
+  max_seconds: 480          # all LLM work per run; then rules take over
   budget:
     classify: 30            # calls per run; the spec's total is 40 to 45
     assess: 10
