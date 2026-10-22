@@ -48,8 +48,9 @@ reports, but no dashboard indicator. That is the core of the product.
       UK FCDO for the EU-27; France entered by hand (its sites block automated reading)
 - [x] Hourly RSS collector with a 48-hour buffer
 - [x] TE-SAT 2026 figures entered and shown
-- [ ] **ACLED**: adapter written from the docs and switched off; waiting for credentials and
-      the tier check (`pipeline/tools/acled_check.py`)
+- [ ] **ACLED**: adapter written and switched off. Sign-in works (secrets set 2026-10-22), but
+      the read endpoint answers 403: the account has no API access. Waiting for ACLED to
+      grant access (email to access@acleddata.com)
 - [ ] **ReliefWeb**: adapter written and tested against the documented format; waiting for the
       approved appname (requested 2026-10-22)
 - [x] **GDELT GKG files**: daily counts per theme and country in baselines.json (live on GitHub,
