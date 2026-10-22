@@ -1,8 +1,8 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { ArticleLink, Card, Muted } from "../components/ui";
+import { ArticleLink, Card, Muted, Segmented } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
-import type { Event, Item } from "../types/run";
+import type { Event, Item, Tesat } from "../types/run";
 
 const IncidentMap = lazy(() => import("../map/IncidentMap"));
 
@@ -16,9 +16,11 @@ export function Incidents({
   center,
   zoom,
   asOf,
+  tesat,
 }: {
   events: Event[];
   items: Item[];
+  tesat: Tesat | null;
   center: [number, number];
   zoom: number;
   /** The run's finish time: the 90-day window counts back from it, not from the viewer's clock. */
@@ -85,7 +87,7 @@ export function Incidents({
       </Card>
 
       <Card title={t.ideologyMix}>
-        <IdeologyMix events={events} asOf={asOf} />
+        <IdeologyMix events={events} asOf={asOf} tesat={tesat} />
       </Card>
     </div>
   );
@@ -164,28 +166,83 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
 
 /** Events per TE-SAT ideology category, last 90 days. One series, so one colour and no legend;
  * every bar carries its count, which doubles as the table view. */
-function IdeologyMix({ events, asOf }: { events: Event[]; asOf: string }) {
+// Event types that correspond to TE-SAT's completed, failed and foiled attacks.
+const ATTACK_TYPES = new Set(["attack", "attempted_attack", "plot_disrupted"]);
+
+/** Ideology shares of our 90-day events beside Europol TE-SAT's shares for its latest year:
+ * attacks against attacks, arrests against arrests. Shares, because the counts differ in
+ * scale (90 days of one region against a full year of the EU). */
+function IdeologyMix({ events, asOf, tesat }: { events: Event[]; asOf: string; tesat: Tesat | null }) {
   const { t } = useLang();
+  const [kind, setKind] = useState<"attacks" | "arrests">("attacks");
   const cutoff = new Date(asOf).getTime() - 90 * 86_400_000;
-  const counts = new Map<string, number>();
+  const ours = new Map<string, number>();
   for (const e of events) {
-    if (new Date(e.date).getTime() >= cutoff) counts.set(e.ideology, (counts.get(e.ideology) ?? 0) + 1);
+    const match = kind === "attacks" ? ATTACK_TYPES.has(e.event_type) : e.event_type === "arrest";
+    if (match && new Date(e.date).getTime() >= cutoff) ours.set(e.ideology, (ours.get(e.ideology) ?? 0) + 1);
   }
+  const theirs = new Map(Object.entries(tesat ? (kind === "attacks" ? tesat.attacks_by_ideology : tesat.arrests_by_ideology) : {}));
+  const oursTotal = [...ours.values()].reduce((a, b) => a + b, 0);
+  const theirsTotal = [...theirs.values()].reduce((a, b) => a + b, 0);
   const rows = Object.keys(t.ideologies)
-    .map((k) => ({ k, n: counts.get(k) ?? 0 }))
-    .filter((r) => r.n > 0)
-    .sort((a, b) => b.n - a.n);
-  if (rows.length === 0) return <Muted>{t.noEvents}</Muted>;
-  const max = Math.max(...rows.map((r) => r.n));
+    .map((k) => ({
+      k,
+      n: ours.get(k) ?? 0,
+      m: theirs.get(k),
+      a: oursTotal ? (ours.get(k) ?? 0) / oursTotal : 0,
+      b: theirsTotal && theirs.has(k) ? (theirs.get(k) ?? 0) / theirsTotal : null,
+    }))
+    .filter((r) => r.n > 0 || (r.m ?? 0) > 0)
+    .sort((x, y) => Math.max(y.a, y.b ?? 0) - Math.max(x.a, x.b ?? 0));
+  const pct = (v: number) => `${Math.round(v * 100)} %`;
+  const bar = (v: number, color: string) => (
+    <span className="block h-2.5 rounded-r" style={{ width: `${Math.max(v * 100, v > 0 ? 1 : 0)}%`, background: color }} />
+  );
   return (
-    <ul className="space-y-2">
-      {rows.map((r) => (
-        <li key={r.k} className="grid grid-cols-[minmax(8rem,14rem)_1fr_2rem] items-center gap-3 text-sm">
-          <span className="text-ink-2">{t.ideologies[r.k]}</span>
-          <span className="h-3 rounded-r" style={{ width: `${(r.n / max) * 100}%`, background: "var(--series-1)" }} />
-          <span className="text-right font-semibold tabular">{r.n}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Segmented
+          label={t.mix.label}
+          value={kind}
+          onChange={setKind}
+          options={[
+            { value: "attacks", label: t.mix.attacks },
+            { value: "arrests", label: t.mix.arrests },
+          ]}
+        />
+        <div className="flex flex-wrap gap-4 text-xs text-ink-2">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: "var(--series-1)" }} />
+            {t.mix.ours(oursTotal)}
+          </span>
+          {tesat && (
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ background: "var(--series-2)" }} />
+              {t.mix.theirs(tesat.report_year, tesat.current.data_year, theirsTotal)}
+            </span>
+          )}
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <Muted>{t.noEvents}</Muted>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((r) => (
+            <li key={r.k} className="grid grid-cols-[minmax(7rem,13rem)_1fr_7.5rem] items-center gap-x-3 text-sm">
+              <span className="text-ink-2">{t.ideologies[r.k]}</span>
+              <span className="space-y-1" title={`${r.n} / ${oursTotal} · TE-SAT ${r.m ?? "–"} / ${theirsTotal}`}>
+                {bar(r.a, "var(--series-1)")}
+                {tesat && (r.b === null ? <span className="block h-2.5 text-[10px] leading-none text-muted">{t.mix.notInTesat}</span> : bar(r.b, "var(--series-2)"))}
+              </span>
+              <span className="text-right text-xs tabular text-ink-2">
+                <span className="font-semibold text-ink">{oursTotal ? pct(r.a) : "–"}</span>
+                {tesat && ` · ${r.b === null ? "–" : pct(r.b)}`}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-muted">{t.mix.note}</p>
+    </div>
   );
 }

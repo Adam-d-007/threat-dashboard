@@ -132,6 +132,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         center={region === "SK" ? [48.7, 19.5] : [50.5, 12]}
         zoom={region === "SK" ? 6 : 4}
         asOf={run.run.finished_at}
+        tesat={run.tesat}
       />
 
       <Card title={t.baseRates}>

@@ -168,6 +168,24 @@ describe("Phase 5: every panel renders in each special case", () => {
     terrorism: { ...base.terrorism, SK: { ...base.terrorism.SK, ...patch } },
   });
 
+  it("compares the ideology mix with TE-SAT, attacks and arrests separately", async () => {
+    const evt = (id: string, event_type: string, ideology: string) => ({ ...base.events[0], id, event_type, ideology });
+    mockFetch({
+      ...realRun,
+      events: [evt("a", "plot_disrupted", "jihadist"), evt("b", "attack", "right_wing"), evt("c", "arrest", "jihadist")],
+    });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("This dashboard, last 90 days (2)")).toBeInTheDocument();
+    expect(screen.getByText("TE-SAT 2026, EU 2025 (45)")).toBeInTheDocument();
+    // Jihadist: 1 of our 2 attacks against 24 of TE-SAT's 45.
+    const row = (name: string) => screen.getAllByText(name).find((e) => e.closest("li"))!.closest("li");
+    expect(row("Jihadist")).toHaveTextContent("50 % · 53 %");
+    expect(row("Right-wing")).toHaveTextContent("50 % · 11 %");
+    await userEvent.click(screen.getByRole("button", { name: "Arrests" }));
+    expect(screen.getByText("This dashboard, last 90 days (1)")).toBeInTheDocument();
+    expect(screen.getByText("TE-SAT 2026, EU 2025 (486)")).toBeInTheDocument();
+  });
+
   it("no events", async () => {
     mockFetch({ ...base, events: [], items: [] });
     renderAt("2026-10-22T14:00:00Z");
