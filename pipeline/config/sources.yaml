@@ -184,11 +184,13 @@ sources:
     urls: ["https://telex.hu/rss"]
     lang: hu
     regions: [SK, EU]
-    enabled: true
+    enabled: false
     verified_on: 2026-10-22
     notes: >-
       Linked from the telex.hu homepage. 50 items, about 17 h. Titles ending in "(x)" are paid
       advertisements and are dropped.
+      Disabled 2026-10-22: works from a home connection but answers GitHub's servers
+      with HTTP 403. Index.hu covers Hungary instead.
     exclude_title: '\(x\)\s*$'
 
   - id: pap
@@ -268,7 +270,7 @@ sources:
     urls: ["https://www.eeas.europa.eu/eeas/press-material_en"]
     lang: en
     regions: [EU]
-    enabled: true
+    enabled: false
     verified_on: 2026-10-22
     html:
       item: div.related-grid div.card
@@ -280,6 +282,8 @@ sources:
     notes: >-
       No feed. About 36 items over 2 days, most of them EU delegation releases from around the
       world. The HQ-only filter is disallowed by robots.txt (Crawl-delay 10; one request per run).
+      Disabled 2026-10-22: answers GitHub's servers with HTTP 403. High Representative
+      statements also appear in the Council feed (consilium).
 
   - id: nato
     name: NATO news
@@ -525,7 +529,7 @@ sources:
     urls: ["https://ecfr.eu/analysis/"]
     lang: en
     regions: [EU]
-    enabled: true
+    enabled: false
     verified_on: 2026-10-22
     html:
       item: article.tease
@@ -537,6 +541,8 @@ sources:
       tz: Europe/Berlin   # the attribute has no offset; site time zone assumed
     notes: >-
       The advertised feed (ecfr.eu/feed/) is blocked by Cloudflare; the analysis list is not.
+      Disabled 2026-10-22: GitHub's servers get a bot wall ("One moment, please").
+      ECFR articles come in through GDELT (gdelt_outlets) instead.
 
   - id: isw
     name: Institute for the Study of War
@@ -611,8 +617,22 @@ sources:
     notes: >-
       Homepage <link rel=alternate>. 12 items, about 6 days. English-language Polish news.
 
+  - id: index_hu
+    name: Index.hu (24 óra)
+    group: regional_press
+    tier: B
+    adapter: rss
+    urls: ["https://index.hu/24ora/rss/"]
+    lang: hu
+    regions: [SK, EU]
+    enabled: true
+    verified_on: 2026-10-22
+    notes: >-
+      Homepage <link rel=alternate>. About 60 items covering 6 to 7 hours. Replaces Telex, which
+      GitHub's servers cannot reach.
+
   - id: gdelt_outlets
-    name: Blocked outlets via GDELT (MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv)
+    name: Blocked outlets via GDELT (ECFR, MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv)
     group: backbone
     tier: C
     adapter: gdelt_doc
@@ -623,13 +643,14 @@ sources:
     verified_on: null
     queries:
       - id: blocked_outlets
-        query: "(domain:mzv.sk OR domain:globsec.org OR domain:understandingwar.org OR domain:euvsdisinfo.eu OR domain:euractiv.com OR domain:rapporteur.com)"
+        query: "(domain:ecfr.eu OR domain:mzv.sk OR domain:globsec.org OR domain:understandingwar.org OR domain:euvsdisinfo.eu OR domain:euractiv.com OR domain:rapporteur.com)"
     notes: >-
       These sites block automated access with bot walls but state no ban on reuse, so their
       headlines and links are taken from GDELT's index of them instead (tier C: seen only
       through GDELT). DW and PAP are deliberately left out: DW forbids automated mining and PAP
-      sends an EU text-and-data-mining opt-out. Query not yet confirmed: GDELT refused every
-      test from this Mac on 2026-10-22 (HTTP 429); the first GitHub run will show.
+      sends an EU text-and-data-mining opt-out. Tested 2026-10-22 over 7 days: GDELT held 4 ECFR
+      articles and none from the other domains, so in practice this mainly carries ECFR; the
+      others are kept in the query in case GDELT starts indexing them.
 
   # --- Need accounts or approval before they can run ---------------------------------------
 
