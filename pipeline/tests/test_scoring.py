@@ -339,13 +339,34 @@ def test_bulk_replays_count_real_media_and_still_raise_the_index(incident_id):
         assert max(a.index for a in after) > before.index, (incident_id, region)
 
 
+def settled_rows(now):
+    """A month of quiet runs before now, so scoring is past its provisional period."""
+    rows, state = [], {"regions": {}, "anchor_history": {}}
+    start = now - timedelta(days=30)
+    for n in range(60):
+        t = start + timedelta(hours=12 * n)
+        _, row = score_region("SK", f"s{n}", quiet_events(t), ANCHORS, {}, rows, state, None, t,
+                              CFG, 0)
+        rows.append(row)
+    return rows
+
+
+def test_the_brake_is_off_while_the_score_is_provisional():
+    # No history: provisional. Arrests only, so no floor and no cap get involved: the reading
+    # is level 1, and a stored level 2 from a since-corrected run is not held.
+    arrests = [e for e in quiet_events(NOW) if e.event_type == "arrest"]
+    state = {"regions": {"SK": {"level": 2, "index": 40, "below_runs": 0}}, "anchor_history": {}}
+    a, _ = score_region("SK", "p", arrests, ANCHORS, {}, [], state, None, NOW, CFG, 0)
+    assert a.provisional and a.rules_level == 1 and a.level == 1
+
+
 def test_bratislava_reaches_level_3_and_drops_back_only_after_hysteresis():
     runs = simulate(2, incident=_incident("SK", 4, "direct"))["SK"]
     assert max(a.level for _, a in runs[-4:]) >= 3
     # Weeks later: a direct-link event from 20 days ago still lifts the cap, but P is back
     # below 0.50 - 0.03. The level waits 4 runs below the threshold before falling.
-    rows, state = [], {"regions": {"SK": {"level": 3, "index": 60, "below_runs": 0}},
-                       "anchor_history": {}}
+    rows = settled_rows(NOW)
+    state = {"regions": {"SK": {"level": 3, "index": 60, "below_runs": 0}}, "anchor_history": {}}
     levels = []
     for n in range(6):
         t = NOW + timedelta(hours=12 * n)
@@ -358,7 +379,7 @@ def test_bratislava_reaches_level_3_and_drops_back_only_after_hysteresis():
 
 def test_a_cap_overrides_hysteresis():
     """Gates are hard bounds: with no qualifying event left, the cap applies at once."""
-    rows, state = [], {"regions": {"SK": {"level": 3, "index": 60, "below_runs": 0}},
-                       "anchor_history": {}}
+    rows = settled_rows(NOW)
+    state = {"regions": {"SK": {"level": 3, "index": 60, "below_runs": 0}}, "anchor_history": {}}
     a, _ = score_region("SK", "y", quiet_events(NOW), ANCHORS, {}, rows, state, None, NOW, CFG, 0)
     assert a.level == 2 and "cap_sk_2" in {g.id for g in a.gates}
