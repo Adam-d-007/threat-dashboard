@@ -821,6 +821,9 @@ def test_a_severe_incident_is_not_placed_in_the_sources_country_by_assumption():
     items = [jordan, bratislava, minor]
     classify(items, FakeLlm([json.dumps({"items": labels})]), LLM_CFG, {})
     assert [i.classification.countries for i in items] == [[], ["SK"], ["SK"]]
+    # The Jordan report is set aside: its summary would repeat the made-up place.
+    assert not jordan.classification.relevant and jordan.classification.summary_en is None
+    assert bratislava.classification.relevant
 
 
 def test_a_changed_prompt_relabels_cached_items(monkeypatch):

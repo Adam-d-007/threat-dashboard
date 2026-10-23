@@ -59,8 +59,10 @@ proximity:
     near: {countries: [GB, NO, IS, LI, AL, BA, GE, MD, ME, MK, RS, TR, UA, XK], value: 0.3}
 
 anchors:
-  SK: {anchor_sk_sis: 0.4, anchor_pl_mswia: 0.3}  # Austria publishes none
-  SK_travel_weight: 0.3     # mean of every government's travel advice for Slovakia
+  # SIS 0.4 -> 0.2 (Adam, 2026-10-23): its level has not changed since 2017, so it carries
+  # little information about the present; the weight moved to travel advice, which does move.
+  SK: {anchor_sk_sis: 0.2, anchor_pl_mswia: 0.3}  # Austria publishes none
+  SK_travel_weight: 0.5     # mean of every government's travel advice for Slovakia
   EU:
     travel_weight: 0.5      # mean of every government's travel advice across the EU-27
     national_weight: 0.5    # mean of the published national levels
