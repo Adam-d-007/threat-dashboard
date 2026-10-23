@@ -79,12 +79,16 @@ HOME = {"sk": ("SK", ("sloven", "slovak", "bratislav")), "cs": ("CZ", ("cesk", "
 def assumed_home_country(item: Item, c: Classification, place_refs: list) -> bool:
     """A severe incident placed in the source's own country although the item names no place
     and never mentions that country: the model assumed it. On 2026-10-23 a TASR headline about
-    a church shooting in Jordan, with no place in it, became seven deaths in Slovakia."""
+    a church shooting in Jordan, with no place in it, became seven deaths in Slovakia, with the
+    place "Slovakia" made up. So a place counts only if the item's text names it (by the start
+    of the name, since Slovak inflects: "Bratislava" appears as "v Bratislave")."""
     home = HOME.get(item.lang)
-    if not home or c.severity < 3 or c.countries != [home[0]] or place_refs:
+    if not home or c.severity < 3 or c.countries != [home[0]]:
         return False
     text = fold(f"{item.title} {item.snippet}")
-    return not any(word in text for word in home[1])
+    named = [r for r in place_refs
+             if (n := fold(r.get("name") or "")) and n[:max(4, len(n) - 2)] in text]
+    return not named and not any(word in text for word in home[1])
 
 
 def _from_label(label: ItemLabel) -> Classification:
