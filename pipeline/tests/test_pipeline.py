@@ -772,19 +772,19 @@ def test_event_persists_across_runs_and_far_places_stay_apart():
 
 
 def test_relabelled_reports_rebuild_or_drop_their_stored_event():
-    item = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    item = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos cez Bratislavu z roku 2017", "dennikn.sk")
     _, events, _, _ = pipeline_main.understand(
         [item], {"s": "x"}, FakeLlm([json.dumps({"items": [_label(1, severity=3)]})]), {}, [],
         NOW)
     assert events[0].severity == 3
     # The same report, labelled again under a newer prompt: only background, no incident.
-    again = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    again = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos cez Bratislavu z roku 2017", "dennikn.sk")
     calm = _label(1, severity=0, event_type="other", relevant=False)
     _, events2, _, _ = pipeline_main.understand(
         [again], {"s": "x"}, FakeLlm([json.dumps({"items": [calm]})]), {}, events, NOW)
     assert events2 == []
     # Labelled as a lesser incident instead: the event follows (severity can go down).
-    third = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    third = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos cez Bratislavu z roku 2017", "dennikn.sk")
     _, events3, _, _ = pipeline_main.understand(
         [third], {"s": "x"}, FakeLlm([json.dumps({"items": [_label(1, severity=1)]})]), {},
         events, NOW)
@@ -812,8 +812,11 @@ def test_a_severe_incident_is_not_placed_in_the_sources_country_by_assumption():
                       "nepretržite strieľali päť minút predtým než z miesta útoku utiekli.")
     bratislava = _item(2, "Streľba v Bratislave: dvaja mŕtvi", "teraz.sk")
     minor = _item(3, "Polícia zadržala muža, ktorý sa vyhrážal útokom na školu", "teraz.sk")
-    labels = [_label(1, event_type="attack", severity=4, countries=["SK"], places=[]),
-              _label(2, event_type="attack", severity=4, countries=["SK"], places=[]),
+    # The model made up the place "Slovakia" for the Jordan item; Bratislava is real.
+    labels = [_label(1, event_type="attack", severity=4, countries=["SK"],
+                     places=[{"name": "Slovakia", "country": "SK"}]),
+              _label(2, event_type="attack", severity=4, countries=["SK"],
+                     places=[{"name": "Bratislava", "country": "SK"}]),
               _label(3, event_type="arrest", severity=1, countries=["SK"], places=[])]
     items = [jordan, bratislava, minor]
     classify(items, FakeLlm([json.dumps({"items": labels})]), LLM_CFG, {})
