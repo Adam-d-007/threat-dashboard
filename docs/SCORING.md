@@ -60,6 +60,9 @@ Each incident from the last 60 days counts as:
 - **Only terrorism outside the EU and NATO.** There, sabotage, drone and missile strikes and
   unrest do not count, because in Ukraine and Russia they are acts of war, not terrorism.
   Inside the EU and NATO, state-linked sabotage still counts.
+- **Labels can be corrected.** When the classification instructions change, the reports still
+  in the window are labelled again, and an incident whose reports are all among them is rebuilt
+  from the new labels (or dropped, if none of them is an incident any more).
 - **Corroboration:** 1.0 when two independent outlets or one official source report it; 0.6 for
   a single quality outlet; 0.3 for a single item seen only through GDELT.
 - **Age:** an incident's weight halves about every 7 days.

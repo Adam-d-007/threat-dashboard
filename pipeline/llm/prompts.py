@@ -26,7 +26,9 @@ Each entry has exactly these fields:
   ethno_separatist | state_linked | other | unknown. Use unknown unless the item says.
 - severity: 0 not an incident; 1 arrest or disrupted plot; 2 attempted or failed attack;
   3 attack without deaths; 4 attack with 1 to 4 deaths; 5 attack with 5 or more deaths.
-  Vandalism, graffiti and damage to monuments with no one hurt are at most 1
+  Vandalism, graffiti and damage to monuments with no one hurt are at most 1. An item that
+  only mentions an earlier incident as background (an anniversary, a trial, a meeting with
+  someone linked to it) is not a new incident: event_type other, severity 0
 - sk_link: direct (happened in Slovakia, targets Slovakia or Slovaks, or Slovak authorities
   act on it) | indirect (neighbouring country or clear relevance to Slovakia) | none
 - countries: ISO 3166-1 alpha-2 codes of the countries where it happened (max 6)

@@ -747,6 +747,37 @@ def test_event_persists_across_runs_and_far_places_stay_apart():
     assert by_place["Bratislava"].domains == ["teraz.sk", "sme.sk"] and len(new_ids) == 1
 
 
+def test_relabelled_reports_rebuild_or_drop_their_stored_event():
+    item = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    _, events, _, _ = pipeline_main.understand(
+        [item], {"s": "x"}, FakeLlm([json.dumps({"items": [_label(1, severity=3)]})]), {}, [],
+        NOW)
+    assert events[0].severity == 3
+    # The same report, labelled again under a newer prompt: only background, no incident.
+    again = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    calm = _label(1, severity=0, event_type="other", relevant=False)
+    _, events2, _, _ = pipeline_main.understand(
+        [again], {"s": "x"}, FakeLlm([json.dumps({"items": [calm]})]), {}, events, NOW)
+    assert events2 == []
+    # Labelled as a lesser incident instead: the event follows (severity can go down).
+    third = _item(1, "Lídri EÚ a Tô Lâm, teroristický únos z roku 2017", "dennikn.sk")
+    _, events3, _, _ = pipeline_main.understand(
+        [third], {"s": "x"}, FakeLlm([json.dumps({"items": [_label(1, severity=1)]})]), {},
+        events, NOW)
+    assert [(e.id, e.severity) for e in events3] == [(events[0].id, 1)]
+
+
+def test_a_changed_prompt_relabels_cached_items(monkeypatch):
+    from pipeline.process import classify as cl
+    items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
+    cache = {}
+    cl.classify(items, FakeLlm([json.dumps({"items": [_label(1)]})]), LLM_CFG, cache)
+    monkeypatch.setattr(cl, "PROMPT_ID", "newprompt")
+    llm = FakeLlm([json.dumps({"items": [_label(1)]})])
+    _, stats = cl.classify([_item(1, "Teroristický útok vo Viedni", "a.sk")], llm, LLM_CFG, cache)
+    assert llm.calls == 1 and stats["cached"] == 0 and cache["1"]["prompt"] == "newprompt"
+
+
 def test_invalid_answer_is_retried_once_then_rules():
     items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
     ok = FakeLlm(["not json", json.dumps({"items": [_label(1)]})])

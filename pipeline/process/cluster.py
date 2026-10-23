@@ -149,10 +149,32 @@ def _add(e: Event, item: Item, now: datetime) -> None:
     e.last_updated = now
 
 
+def refresh(events: list[Event], items: list[Item], now: datetime) -> list[Event]:
+    """Stored events whose every report is in this run are rebuilt from the current labels,
+    so a corrected classification also corrects the event (severity otherwise only rises).
+    An event none of whose reports is still an incident is dropped."""
+    present = {i.id: i for i in items}
+    out = []
+    for e in events:
+        if not e.item_ids or not all(i in present for i in e.item_ids):
+            out.append(e)
+            continue
+        members = sorted((present[i] for i in e.item_ids if eligible(present[i])),
+                         key=lambda i: i.published_at)
+        if not members:
+            continue
+        fresh = _new_event(members[0], now).model_copy(
+            update={"id": e.id, "first_seen": e.first_seen})
+        for m in members:
+            _add(fresh, m, now)
+        out.append(fresh)
+    return out
+
+
 def cluster(items: list[Item], events: list[Event], now: datetime) -> tuple[list[Event], list[str]]:
     """Assign items to events (setting item.event_id). Returns (all kept events, new ids)."""
     cutoff = (now - timedelta(days=KEEP_DAYS)).date()
-    events = [e for e in events if e.date >= cutoff]
+    events = refresh([e for e in events if e.date >= cutoff], items, now)
     new_ids = []
     for item in sorted(filter(eligible, items), key=lambda i: i.published_at):
         event = next((e for e in events if item.id in e.item_ids), None) or \
