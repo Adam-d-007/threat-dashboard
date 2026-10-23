@@ -136,8 +136,8 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 
 ## Waiting on Adam
 
-- [ ] Outside hourly timer for the collector (SETUP.md step 8): GitHub skips most hourly runs
-- [ ] Send the ACLED Partner-tier request (research only, not the dashboard)
+- [x] Outside hourly timer for the collector (SETUP.md step 8): cron-job.org, from 2026-10-23
+- [x] ACLED Partner-tier request sent (research only, not the dashboard); waiting for ACLED
 
 Step-by-step instructions: [SETUP.md](SETUP.md).
 
