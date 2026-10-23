@@ -139,6 +139,10 @@ export type SkLink1 = "none" | "indirect" | "direct";
 export type Topic = ("terrorism" | "hybrid" | "cyber" | "unrest" | "geopolitics" | "other") | null;
 export type ItemIds1 = string[];
 /**
+ * Article URLs of its reports, so the page can link every incident, also after its items leave the run
+ */
+export type Urls = string[];
+/**
  * LLM incident keys seen
  */
 export type EventKeys = string[];
@@ -479,6 +483,7 @@ export interface Event {
   sk_link: SkLink1;
   topic: Topic;
   item_ids: ItemIds1;
+  urls: Urls;
   event_keys: EventKeys;
   domains: Domains;
   has_tier_a: HasTierA;

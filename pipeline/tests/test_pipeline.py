@@ -130,6 +130,16 @@ def test_source_turns_stale_after_six_empty_runs_only_if_it_had_items():
     assert h.status == "ok" and h.zero_runs == 8
 
 
+def test_item_urls_are_found_in_stored_runs_but_not_the_index(tmp_path):
+    from pipeline.store import state
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    (runs / "index.json").write_text(json.dumps({"runs": ["2026-10-23T04"]}))
+    (runs / "2026-10-23T04.json").write_text(json.dumps(
+        {"items": [{"id": "a", "url": "https://dennikn.sk/minuta/1"}, {"id": "b", "url": "x"}]}))
+    assert state.item_urls_from_runs(tmp_path, {"a"}) == {"a": "https://dennikn.sk/minuta/1"}
+
+
 def test_window_start():
     assert window_start(None, NOW) == NOW - timedelta(hours=36)
     prev = {"run": {"status": "ok", "started_at": "2026-10-22T04:05:00+00:00"}}
@@ -446,6 +456,7 @@ def test_fcdo_rejects_redirects_and_unknown_wording():
 
 US_RSS = """<rss><channel>
 <item><title>Slovakia - Level 1: Exercise Normal Precautions</title>
+<link>https://travel.state.gov/x/destination.svk.html</link>
 <category>Level 1: Exercise Normal Precautions</category><category>LO</category>
 <category>advisory</category></item>
 <item><title>France - Level 2: Exercise Increased Caution</title>
@@ -456,11 +467,16 @@ US_RSS = """<rss><channel>
 def test_travel_advice_parsers_read_each_format():
     fips = {"LO": "SK", "FR": "FR"}
     assert anchors.parse_us_state(US_RSS, fips) == {
-        "SK": {"raw": "Level 1", "detail": "Slovakia - Level 1: Exercise Normal Precautions"},
-        "FR": {"raw": "Level 2", "detail": "France - Level 2: Exercise Increased Caution"}}
+        "SK": {"raw": "Level 1", "detail": "Slovakia - Level 1: Exercise Normal Precautions",
+               "url": "https://travel.state.gov/x/destination.svk.html"},
+        "FR": {"raw": "Level 2", "detail": "France - Level 2: Exercise Increased Caution",
+               "url": None}}
     ca = {"data": {"SK": {"advisory-state": 0,
-                          "eng": {"advisory-text": "Exercise normal security precautions"}}}}
-    assert anchors.parse_ca_gc(ca)["SK"]["raw"] == "normal precautions"
+                          "eng": {"advisory-text": "Exercise normal security precautions",
+                                  "url-slug": "slovakia"}}}}
+    assert anchors.parse_ca_gc(ca)["SK"] == {
+        "raw": "normal precautions", "detail": "Exercise normal security precautions",
+        "url": "https://travel.gc.ca/destinations/slovakia"}
     flags = dict.fromkeys(["warning", "partialWarning", "situationWarning",
                            "situationPartWarning"], False)
     de = {"response": {"lastModified": 1, "1": {"countryCode": "SK", **flags},
@@ -469,11 +485,15 @@ def test_travel_advice_parsers_read_each_format():
     assert {k: v["raw"] for k, v in anchors.parse_de_aa(de).items()} == {
         "SK": "keine Warnung", "UA": "Reisewarnung", "IL": "Teilreisewarnung"}
     nz = ('{&quot;code&quot;:&quot;sk&quot;,&quot;link&quot;:{&quot;title&quot;:&quot;Slovakia'
-          '&quot;},&quot;region&quot;:&quot;Europe&quot;,&quot;adviceLevel&quot;:&quot;low'
-          '&quot;},{"code":"bg","link":{"title":"Bulgaria"},"region":"Europe",'
-          '"adviceLevel":"normal"}')
+          ' (Slovak Republic)&quot;,&quot;href&quot;:&quot;/destinations/slovakia&quot;},'
+          '&quot;region&quot;:&quot;Europe&quot;,&quot;adviceLevel&quot;:&quot;low&quot;},'
+          '{"code":"bg","link":{"title":"Bulgaria","href":"/destinations/bulgaria"},'
+          '"region":"Europe","adviceLevel":"normal"}')
     assert anchors.parse_nz_safetravel(nz) == {
-        "SK": {"raw": "Level 1", "detail": None}, "BG": {"raw": "Level 1", "detail": "no advisory"}}
+        "SK": {"raw": "Level 1", "detail": None,
+               "url": "https://www.safetravel.govt.nz/destinations/slovakia"},
+        "BG": {"raw": "Level 1", "detail": "no advisory",
+               "url": "https://www.safetravel.govt.nz/destinations/bulgaria"}}
     with pytest.raises(anchors.AnchorError, match="extreme"):
         anchors.parse_nz_safetravel(nz.replace('"normal"', '"extreme"'))
     nl = {"introduction": "<p>De kleurcode van het reisadvies voor Slowakije is groen. U kunt</p>"}
@@ -733,6 +753,7 @@ def test_one_incident_in_three_languages_becomes_one_event():
     assert sorted(e.domains) == ["bbc.co.uk", "ct24.ceskatelevize.cz", "teraz.sk"]
     assert e.corroborated and e.place.name == "Bratislava" and e.sk_link == "direct"
     assert e.topic == "terrorism"
+    assert len(e.urls) == 3 and all(u.startswith("https://") for u in e.urls)
     assert all(i.event_id == e.id for i in kept)
 
 
@@ -792,6 +813,32 @@ def test_a_changed_prompt_relabels_cached_items(monkeypatch):
     llm = FakeLlm([json.dumps({"items": [_label(1)]})])
     _, stats = cl.classify([_item(1, "Teroristický útok vo Viedni", "a.sk")], llm, LLM_CFG, cache)
     assert llm.calls == 1 and stats["cached"] == 0 and cache["1"]["prompt"] == "newprompt"
+
+
+def test_one_severe_attack_reported_many_ways_is_one_incident():
+    titles = ["Útok strelnou zbraňou pri Paríži, jeden mŕtvy", "Teroristický útok: streľba z auta",
+              "Streľba v Yvelines, polícia vyšetruje terorizmus", "Útok pri Paríži, strelec zadržaný"]
+    items = [_item(i, t, f"s{i}.sk") for i, t in enumerate(titles)]
+    # The summaries the model gave for one shooting near Paris on 2026-10-23.
+    summaries = ["A man shot from a car near Paris, also firing at a playground.",
+                 "French prosecutors opened a hate-crime probe after a deadly drive-by shooting.",
+                 "A shooting in Yvelines, west of Paris, left one dead and several injured.",
+                 "Anti-terrorism police investigated a shooting near Paris that left one dead."]
+    labels = [_label(i, key=f"shooting-variant-{i}", place=("Paris", "FR"), event_type="attack",
+                     severity=4, countries=["FR"], places=[], summary_en=summaries[i])
+              for i in range(4)]
+    _, events, _, _ = pipeline_main.understand(
+        items, {"s": "x"}, FakeLlm([json.dumps({"items": labels})]), {}, [], NOW)
+    assert len(events) == 1 and len(events[0].urls) == 4
+    # Two severe attacks with towns 400 km apart on the same day stay two incidents.
+    far = [_item(10, "Útok v Paríži", "a.sk"), _item(11, "Útok v Lyone", "b.sk")]
+    far_labels = [_label(10, key="a", place=("Paris", "FR"), event_type="attack", severity=4,
+                         countries=["FR"]),
+                  _label(11, key="b", place=("Lyon", "FR"), event_type="attack", severity=4,
+                         countries=["FR"])]
+    _, events2, _, _ = pipeline_main.understand(
+        far, {"s": "x"}, FakeLlm([json.dumps({"items": far_labels})]), {}, [], NOW)
+    assert len(events2) == 2
 
 
 def test_invalid_answer_is_retried_once_then_rules():

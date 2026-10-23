@@ -6,6 +6,14 @@ import type { Event, Item, Tesat } from "../types/run";
 
 const IncidentMap = lazy(() => import("../map/IncidentMap"));
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 type Filters = { minSeverity: number; type: string; ideology: string; corroboratedOnly: boolean };
 type SortKey = "date" | "severity" | "sources";
 
@@ -97,6 +105,9 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
   const { t, pick, locale } = useLang();
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "date", desc: true });
   const urlOf = new Map(items.map((i) => [i.id, i.url]));
+  // Runs before 2026-10-23 stored no URLs on events: fall back to this run's items.
+  const linksOf = (e: Event) =>
+    e.urls?.length ? e.urls : e.item_ids.map((id) => urlOf.get(id)).filter((u): u is string => !!u);
   const rows = [...events].sort((a, b) => {
     const v =
       sort.key === "date"
@@ -139,11 +150,20 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
             <tr key={e.id} id={`evt-${e.id}`} className="scroll-mt-24 align-top target:bg-surface-2">
               <td className="whitespace-nowrap px-2 py-2 tabular text-ink-2">{fmtDate(e.date, locale)}</td>
               <td className="px-2 py-2">
-                <ArticleLink href={urlOf.get(e.item_ids[0])} className="font-medium">
+                <ArticleLink href={linksOf(e)[0]} className="font-medium">
                   {pick(e.title_en, e.title_sk)}
                 </ArticleLink>
                 <div className="text-xs text-muted">
                   {e.place?.name ?? e.country} · {e.country}
+                  {linksOf(e).length > 0 && " · "}
+                  {linksOf(e).map((u, i) => (
+                    <span key={u}>
+                      {i > 0 && ", "}
+                      <ArticleLink href={u} className="text-link">
+                        {hostOf(u)}
+                      </ArticleLink>
+                    </span>
+                  ))}
                 </div>
               </td>
               <td className="px-2 py-2 text-ink-2">{t.eventTypes[e.event_type]}</td>

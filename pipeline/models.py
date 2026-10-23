@@ -100,6 +100,9 @@ class Event(Strict):
                                  "that, else the first report's domain; None on events stored "
                                  "before 2026-10-23")
     item_ids: list[str]
+    urls: list[str] = Field(default_factory=list, description="Article URLs of its reports, "
+                            "so the page can link every incident, also after its items leave "
+                            "the run")
     event_keys: list[str] = Field(default_factory=list, description="LLM incident keys seen")
     domains: list[str]
     has_tier_a: bool

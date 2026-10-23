@@ -133,7 +133,8 @@ def parse_us_state(xml: str, fips: dict[str, str]) -> dict[str, dict]:
         codes = [fips[c] for c in cats if c in fips]
         if len(levels) == 1 and len(codes) == 1:
             out[codes[0]] = {"raw": f"Level {levels[0]}",
-                             "detail": _space(item.findtext("title") or "")}
+                             "detail": _space(item.findtext("title") or ""),
+                             "url": (item.findtext("link") or "").strip() or None}
     return out
 
 
@@ -143,7 +144,9 @@ _CA = ["normal precautions", "high degree of caution", "avoid non-essential trav
 
 def parse_ca_gc(data: dict) -> dict[str, dict]:
     """advisory-state 0 to 3, named as on travel.gc.ca."""
-    return {cc: {"raw": _CA[c["advisory-state"]], "detail": c["eng"]["advisory-text"]}
+    return {cc: {"raw": _CA[c["advisory-state"]], "detail": c["eng"]["advisory-text"],
+                 "url": f"https://travel.gc.ca/destinations/{c['eng']['url-slug']}"
+                 if c["eng"].get("url-slug") else None}
             for cc, c in data["data"].items()}
 
 
@@ -168,16 +171,18 @@ _NZ = {"normal": "Level 1", "low": "Level 1", "medium": "Level 2", "high": "Leve
 def parse_nz_safetravel(page: str) -> dict[str, dict]:
     """The destinations page embeds every country's adviceLevel. 'normal' means New Zealand
     issues no advisory; it counts as level 1 (checked on the Bulgaria and Slovakia pages)."""
-    pairs = re.findall(r'"code":"([a-z]{2})","link":\{[^}]*\},"region":"[^"]*",'
-                       r'"adviceLevel":"([^"]*)"', htmllib.unescape(page))
+    pairs = re.findall(r'"code":"([a-z]{2})","link":\{[^}]*?"href":"([^"]*)"[^}]*\},'
+                       r'"region":"[^"]*","adviceLevel":"([^"]*)"', htmllib.unescape(page))
     if not pairs:
         raise AnchorError("no adviceLevel entries found")
     out = {}
-    for code, level in pairs:
+    for code, href, level in pairs:
         if level not in _NZ:
             raise AnchorError(f"unknown adviceLevel {level!r}")
         out[code.upper()] = {"raw": _NZ[level],
-                             "detail": "no advisory" if level == "normal" else None}
+                             "detail": "no advisory" if level == "normal" else None,
+                             "url": f"https://www.safetravel.govt.nz{href}"
+                             if href.startswith("/") else None}
     return out
 
 
@@ -251,7 +256,8 @@ def read_travel(cfg: dict, eu: list[str], fips: dict[str, str], prev: dict, now:
     countries = [cc for cc in (eu if cfg["countries"] == "eu" else cfg["countries"])
                  if cc != cfg["issuer"]]
     cfgs = [{"id": f"anchor_{cfg['id']}_{cc.lower()}", "country": cc, "name": cfg["name"],
-             "url": cfg["page"], "scale": cfg["scale"], "kind": "travel",
+             "url": (cfg.get("pages") or {}).get(cc, cfg["page"]), "scale": cfg["scale"],
+             "kind": "travel",
              "issuer": cfg["issuer"]} for cc in countries]
     try:
         parsed = _travel_parse(cfg, get(cfg["url"]), fips)
@@ -276,8 +282,8 @@ def _reading(cfg: dict, now: datetime, parsed: dict, manual: bool = False) -> An
         raise AnchorError(f"value {raw!r} is not on the scale {cfg['scale']}")
     level = cfg["scale"].index(raw) + 1
     return AnchorReading(
-        id=cfg["id"], country=cfg["country"], name=cfg["name"], url=cfg["url"],
-        scale=cfg["scale"], raw=raw, level=level,
+        id=cfg["id"], country=cfg["country"], name=cfg["name"],
+        url=parsed.get("url") or cfg["url"], scale=cfg["scale"], raw=raw, level=level,
         normalized=round((level - 1) / (len(cfg["scale"]) - 1), 3), since=parsed.get("since"),
         as_of=parsed.get("as_of", now), status="stale" if parsed.get("stale_reason") else "ok",
         error=parsed.get("stale_reason"),
@@ -311,7 +317,7 @@ def _read_one(cfg: dict, now: datetime, manual_levels: dict) -> AnchorReading:
             "as_of": datetime(entered.year, entered.month, entered.day, tzinfo=UTC),
             "stale_reason": f"entered by hand on {entered}; please check the official page"
             if old else None}, manual=True)
-    r = get(cfg["url"])
+    r = get(cfg.get("api", cfg["url"]))
     if parser == "fcdo":
         return _reading(cfg, now, parse_fcdo(r.json()))
     html = r.content.decode("utf-8")  # SIS sends no charset header; all four pages are UTF-8
@@ -332,8 +338,9 @@ def anchor_configs() -> list[dict]:
     f = conf["fcdo"]
     for cc, slug in f["countries"].items():
         out.append({"id": f"anchor_fcdo_{cc.lower()}", "country": cc, "name": "FCDO travel advice",
-                    "parser": "fcdo", "url": f["url"] + slug, "scale": f["scale"],
-                    "kind": "travel", "issuer": "GB"})
+                    "parser": "fcdo", "api": f["url"] + slug,
+                    "url": f"https://www.gov.uk/foreign-travel-advice/{slug}",
+                    "scale": f["scale"], "kind": "travel", "issuer": "GB"})
     return out
 
 

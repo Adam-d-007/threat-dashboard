@@ -742,6 +742,14 @@
           "title": "Item Ids",
           "type": "array"
         },
+        "urls": {
+          "description": "Article URLs of its reports, so the page can link every incident, also after its items leave the run",
+          "items": {
+            "type": "string"
+          },
+          "title": "Urls",
+          "type": "array"
+        },
         "event_keys": {
           "description": "LLM incident keys seen",
           "items": {
@@ -807,6 +815,7 @@
         "sk_link",
         "topic",
         "item_ids",
+        "urls",
         "event_keys",
         "domains",
         "has_tier_a",

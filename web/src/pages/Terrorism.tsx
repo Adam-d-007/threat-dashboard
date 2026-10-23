@@ -77,7 +77,8 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
 
         {national.length > 0 && (
           <div>
-            <h2 className="mb-2 text-sm font-medium text-muted">{t.anchors}</h2>
+            <h2 className="text-sm font-medium text-muted">{t.anchors}</h2>
+            <p className="mb-2 max-w-3xl text-xs text-muted">{t.anchorsExplain}</p>
             <div className="flex flex-wrap gap-2">
               {national.map((a) => (
                 <AnchorChip key={a.id} a={a} />
@@ -87,8 +88,9 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         )}
         {travelSk.length + travelByIssuer.length > 0 && (
           <div>
-            <h2 className="mb-2 text-sm font-medium text-muted">{t.travelAdvice(travelSk.length || travelByIssuer.length)}</h2>
-            <div className="flex flex-wrap gap-2">
+            <h2 className="text-sm font-medium text-muted">{t.travelAdvice(travelSk.length || travelByIssuer.length)}</h2>
+            <p className="mb-2 max-w-3xl text-xs text-muted">{region === "SK" ? t.travelExplainSK : t.travelExplainEU}</p>
+            <div className="flex flex-wrap items-start gap-2">
               {travelSk.map((a) => (
                 <AnchorChip key={a.id} a={a} />
               ))}
@@ -101,16 +103,14 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       </section>
 
       <div className="space-y-2">
-        {assess?.disagreement && <Banner tone="warn">{t.banners.disagreement}</Banner>}
+        {assess?.disagreement && <Banner tone="info">{t.banners.disagreement}</Banner>}
         {assess?.llm.status === "fallback" && <Banner tone="warn">{t.banners.llmFallback}</Banner>}
         {assess && assess.gates.length > 0 && (
           <Banner tone="info">
             {t.banners.gates}
             <ul className="mt-1 list-disc pl-5">
               {assess.gates.map((g) => (
-                <li key={g.id}>
-                  {t.gateNames[g.id] ?? g.id} <span className="text-muted">({g.effect})</span>
-                </li>
+                <li key={g.id}>{t.gateNames[g.id] ?? g.id}</li>
               ))}
             </ul>
           </Banner>
@@ -245,18 +245,18 @@ function OfficialCard({ region, sis }: { region: Region; sis: AnchorReading | nu
 }
 
 function AnchorChip({ a }: { a: AnchorReading }) {
-  const { locale } = useLang();
+  const { t } = useLang();
   const n = a.scale.length;
   return (
     <a
       href={a.url}
       target="_blank"
       rel="noreferrer"
-      className="group flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink no-underline hover:bg-surface-2"
-      title={a.as_of ? fmtDate(a.as_of, locale) : undefined}
+      className="group flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink no-underline hover:border-ink-2 hover:bg-surface-2"
+      title={a.level ? t.chipTitle(a.name, a.raw ?? "", a.level, n) : a.name}
     >
       <span className="font-semibold">{a.kind === "travel" ? a.issuer : a.country}</span>
-      <span className="text-ink-2">{a.name}</span>
+      <span className="text-ink-2 group-hover:underline">{a.name}</span>
       {a.level ? (
         <span className="flex items-center gap-2">
           <span className="flex gap-[2px]" aria-hidden>
@@ -272,29 +272,48 @@ function AnchorChip({ a }: { a: AnchorReading }) {
       ) : (
         <StatusPill status={a.status} />
       )}
+      <span aria-hidden className="text-muted group-hover:text-ink">
+        ↗
+      </span>
     </a>
   );
 }
 
-/** One government's travel advice for the EU states, counted per level, highest first. */
+/** One government's travel advice for the EU states, counted per level, highest first; opens
+ * to every country with a link to that government's page for it. */
 function TravelSummary({ anchors }: { anchors: AnchorReading[] }) {
   const scale = anchors[0].scale;
   const counts = scale.map((raw) => ({ raw, n: anchors.filter((a) => a.raw === raw).length })).reverse();
+  const sorted = [...anchors].sort((x, y) => (y.level ?? 0) - (x.level ?? 0) || x.country.localeCompare(y.country));
   return (
-    <a
-      href="#sources"
-      className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink no-underline hover:bg-surface-2"
-    >
-      <span className="font-semibold">{anchors[0].issuer}</span>
-      <span className="text-ink-2">{anchors[0].name.replace(" travel advice", "")}</span>
-      {counts
-        .filter((c) => c.n > 0)
-        .map((c) => (
-          <span key={c.raw}>
-            <span className="font-semibold tabular">{c.n}</span> <span className="text-ink-2">{c.raw}</span>
-          </span>
+    <details className="group rounded-lg border border-line bg-surface text-sm text-ink open:basis-full hover:border-ink-2">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-surface-2">
+        <span className="font-semibold">{anchors[0].issuer}</span>
+        <span className="text-ink-2">{anchors[0].name.replace(" travel advice", "")}</span>
+        {counts
+          .filter((c) => c.n > 0)
+          .map((c) => (
+            <span key={c.raw}>
+              <span className="font-semibold tabular">{c.n}</span> <span className="text-ink-2">{c.raw}</span>
+            </span>
+          ))}
+        <span aria-hidden className="text-muted transition-transform group-open:rotate-90">
+          ▸
+        </span>
+      </summary>
+      <ul className="grid gap-x-6 gap-y-1 border-t border-line px-3 py-2 sm:grid-cols-2 lg:grid-cols-3">
+        {sorted.map((a) => (
+          <li key={a.id} className="flex justify-between gap-3">
+            <a href={a.url} target="_blank" rel="noreferrer" className="text-link">
+              {a.country} ↗
+            </a>
+            <span className="text-ink-2">
+              {a.raw ?? "–"} <span className="text-muted tabular">{a.level ? `${a.level}/${a.scale.length}` : ""}</span>
+            </span>
+          </li>
         ))}
-    </a>
+      </ul>
+    </details>
   );
 }
 

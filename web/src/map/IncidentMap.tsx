@@ -1,6 +1,6 @@
-import "leaflet/dist/leaflet.css";
-import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
+import { CircleMarker, Popup } from "react-leaflet";
 import { useChartColors } from "../charts/colors";
+import { MapFrame } from "./MapFrame";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { Event } from "../types/run";
@@ -11,12 +11,7 @@ export default function IncidentMap({ events, center, zoom }: { events: Event[];
   const { t, pick, locale } = useLang();
   const c = useChartColors();
   return (
-    <MapContainer center={center} zoom={zoom} scrollWheelZoom={false} className="h-80 w-full rounded-lg sm:h-96">
-      <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={12}
-      />
+    <MapFrame center={center} zoom={zoom}>
       {events
         .filter((e) => e.place)
         .map((e) => (
@@ -33,7 +28,13 @@ export default function IncidentMap({ events, center, zoom }: { events: Event[];
             }}
           >
             <Popup>
-              <strong>{pick(e.title_en, e.title_sk)}</strong>
+              {e.urls?.[0] ? (
+                <a href={e.urls[0]} target="_blank" rel="noreferrer">
+                  <strong>{pick(e.title_en, e.title_sk)}</strong> ↗
+                </a>
+              ) : (
+                <strong>{pick(e.title_en, e.title_sk)}</strong>
+              )}
               <br />
               {fmtDate(e.date, locale)} · {e.place!.name} · {t.eventTypes[e.event_type]} · {t.tableCols.severity}{" "}
               {e.severity}
@@ -42,6 +43,6 @@ export default function IncidentMap({ events, center, zoom }: { events: Event[];
             </Popup>
           </CircleMarker>
         ))}
-    </MapContainer>
+    </MapFrame>
   );
 }

@@ -145,7 +145,7 @@ describe("App with sample scores", () => {
     expect(screen.getByText("Dashboard indicator")).toBeInTheDocument();
     expect(screen.getByText("37")).toBeInTheDocument();
     expect(screen.getByText("What makes up the index")).toBeInTheDocument();
-    expect(screen.getByText(/Floor 2: corroborated attack/)).toBeInTheDocument();
+    expect(screen.getByText(/It cannot fall below 2: a confirmed attack/)).toBeInTheDocument();
   });
 
   it("folds each government's travel advice into one chip on the EU view", async () => {
@@ -261,7 +261,7 @@ describe("Phase 5: every panel renders in each special case", () => {
   it("disagreement", async () => {
     mockFetch(withSK({ disagreement: true }));
     renderAt("2026-10-22T14:00:00Z");
-    expect(await screen.findByText(/The rules and the language model disagree/)).toBeInTheDocument();
+    expect(await screen.findByText(/The language model reads the situation differently from the rules/)).toBeInTheDocument();
   });
 
   it("a failed source", async () => {

@@ -29,8 +29,18 @@ const en = {
   index: "Index",
   changeSinceLast: (d: number) => `${d > 0 ? "+" : ""}${d} since last run`,
   noChange: "no change since last run",
+  mapFull: "Full screen",
+  mapExit: "Close",
   anchors: "Official levels elsewhere",
+  anchorsExplain:
+    "Threat levels that other countries declare for their own territory. 2/4 means the second of four steps, where 1 is the lowest. Click one to open the official page.",
   travelAdvice: (n: number) => `Travel advice from ${n} ${n === 1 ? "government" : "governments"}`,
+  travelExplainSK:
+    "How other governments rate security for their citizens travelling to Slovakia: an independent second opinion. The first step of each scale (e.g. Level 1, groen) means normal precautions. Together they make up 30% of the official levels component. Click one to open that government's page.",
+  travelExplainEU:
+    "How other governments rate security for travel to each of the 27 member states, counted per level. Together they make up half of the official levels component. Open a chip for the list of countries and their pages.",
+  chipTitle: (name: string, raw: string, level: number, n: number) =>
+    `${name}: ${raw}, step ${level} of ${n} (1 is the lowest). Opens the official page.`,
   notComputedTitle: "The indicator is not computed yet",
   provisional: "Provisional",
   provisionalNote: (d: string) =>
@@ -41,16 +51,16 @@ const en = {
     "SAMPLE DATA. Everything on this page is made up for design work and means nothing.",
   banners: {
     disagreement:
-      "The rules and the language model disagree (by two levels, or by one at level 3 or above). The level and index shown follow the rules.",
-    gates: "Rules that limited the level in this run:",
+      "The language model reads the situation differently from the rules (two levels apart, or one level at level 3 or above). In that case the rules decide the level and index shown. This is not an error.",
+    gates: "Why the level is where it is:",
     llmFallback: "The language model was unavailable. This run uses rules only.",
     sourcesFailing: (n: number) => `${n} source${n === 1 ? "" : "s"} failed in this run.`,
   },
   gateNames: {
-    floor_eu_attack_30d: "Floor 2: corroborated attack in an EU or NATO state in the last 30 days",
-    cap_sk_2: "Cap at 2: no qualifying event with a direct Slovak link",
-    cap_sk_3: "Cap at 3: no imminent direct threat confirmed by an official source",
-    cap_eu_3: "Cap at 3: no mass-casualty attack or wave of attacks in 7 days",
+    floor_eu_attack_30d: "It cannot fall below 2: a confirmed attack happened in an EU or NATO state in the last 30 days.",
+    cap_sk_2: "It cannot rise above 2: no recent incident is directly linked to Slovakia.",
+    cap_sk_3: "It cannot rise above 3: no official source has confirmed an imminent threat to Slovakia.",
+    cap_eu_3: "It cannot rise above 3: there was no mass-casualty attack or series of attacks in the last 7 days.",
   } as Record<string, string>,
   history: "Index history",
   ranges: { "30": "30 days", "90": "90 days", "365": "1 year", all: "All" } as Record<string, string>,
@@ -267,8 +277,18 @@ const sk: Strings = {
   index: "Index",
   changeSinceLast: (d: number) => `${d > 0 ? "+" : ""}${d} od poslednej aktualizácie`,
   noChange: "bez zmeny od poslednej aktualizácie",
+  mapFull: "Celá obrazovka",
+  mapExit: "Zavrieť",
   anchors: "Oficiálne úrovne v iných krajinách",
+  anchorsExplain:
+    "Stupne ohrozenia, ktoré iné štáty vyhlasujú pre svoje územie. Údaj 2/4 znamená druhý zo štyroch stupňov, pričom 1 je najnižší. Kliknutím otvoríte oficiálnu stránku.",
   travelAdvice: (n: number) => `Cestovné odporúčania ${n} ${n === 1 ? "vlády" : "vlád"}`,
+  travelExplainSK:
+    "Ako iné vlády hodnotia bezpečnosť pre svojich občanov cestujúcich na Slovensko: nezávislý druhý názor. Prvý stupeň každej stupnice (napr. Level 1, groen) znamená bežnú opatrnosť. Spolu tvoria 30 % zložky oficiálnych úrovní. Kliknutím otvoríte stránku danej vlády.",
+  travelExplainEU:
+    "Ako iné vlády hodnotia bezpečnosť pri cestách do jednotlivých 27 členských štátov, spočítané podľa stupňa. Spolu tvoria polovicu zložky oficiálnych úrovní. Po rozbalení uvidíte zoznam krajín s odkazmi.",
+  chipTitle: (name: string, raw: string, level: number, n: number) =>
+    `${name}: ${raw}, stupeň ${level} z ${n} (1 je najnižší). Otvorí oficiálnu stránku.`,
   notComputedTitle: "Ukazovateľ sa zatiaľ nepočíta",
   provisional: "Predbežný",
   provisionalNote: (d: string) =>
@@ -279,8 +299,8 @@ const sk: Strings = {
     "UKÁŽKOVÉ ÚDAJE. Všetko na tejto stránke je vymyslené pre potreby návrhu a nemá žiadny význam.",
   banners: {
     disagreement:
-      "Pravidlá a jazykový model sa nezhodujú (o dve úrovne, alebo o jednu pri úrovni 3 a vyššej). Zobrazená úroveň aj index sa riadia pravidlami.",
-    gates: "Pravidlá, ktoré v tejto aktualizácii obmedzili úroveň:",
+      "Jazykový model hodnotí situáciu inak než pravidlá (o dva stupne, alebo o jeden pri stupni 3 a vyššom). V takom prípade o zobrazenej úrovni aj indexe rozhodujú pravidlá. Nejde o chybu.",
+    gates: "Prečo je úroveň práve taká:",
     llmFallback: "Jazykový model nebol dostupný. Táto aktualizácia používa len pravidlá.",
     sourcesFailing: (n: number) =>
       n === 1
@@ -288,10 +308,10 @@ const sk: Strings = {
         : `Počet zdrojov, ktoré v tejto aktualizácii zlyhali: ${n}.`,
   },
   gateNames: {
-    floor_eu_attack_30d: "Spodná hranica 2: potvrdený útok v štáte EÚ alebo NATO za posledných 30 dní",
-    cap_sk_2: "Strop 2: žiadna kvalifikovaná udalosť s priamym prepojením na Slovensko",
-    cap_sk_3: "Strop 3: žiadna bezprostredná priama hrozba potvrdená oficiálnym zdrojom",
-    cap_eu_3: "Strop 3: žiadny útok s hromadnými obeťami ani séria útokov za 7 dní",
+    floor_eu_attack_30d: "Nemôže klesnúť pod 2: za posledných 30 dní bol v štáte EÚ alebo NATO potvrdený útok.",
+    cap_sk_2: "Nemôže stúpnuť nad 2: žiadny nedávny incident nie je priamo spojený so Slovenskom.",
+    cap_sk_3: "Nemôže stúpnuť nad 3: žiadny oficiálny zdroj nepotvrdil bezprostrednú hrozbu pre Slovensko.",
+    cap_eu_3: "Nemôže stúpnuť nad 3: za posledných 7 dní nedošlo k útoku s hromadnými obeťami ani k sérii útokov.",
   },
   history: "Vývoj indexu",
   ranges: { "30": "30 dní", "90": "90 dní", "365": "1 rok", all: "Všetko" },
