@@ -91,8 +91,11 @@ published per country, and each source is read once per run). A government never
 country. Other ministries were checked and left out: their sites forbid or block automated
 reading, or build the page in the browser (see `pipeline/config/anchors.yaml`).
 
-- **Slovakia:** SIS 40%, Poland 30%, the mean of all travel advice for Slovakia 30%. Austria
-  publishes no level.
+- **Slovakia:** SIS 20%, Poland 30%, the mean of all travel advice for Slovakia 50%. Austria
+  publishes no level. SIS had 40% until 2026-10-23: its level has not changed since August
+  2017, so it says little about the present, while the travel advice of nine governments moves
+  with events. The indicator still uses the NBAC scale and its definitions, and the SIS level is
+  still shown beside it.
 - **EU:** the mean of all travel advice across the 27 states (50%) and the mean of the published
   national levels of France, Belgium, the Netherlands and Poland (50%).
 - **Rise bonus:** +0.15 when any of them rose in the last 30 days.
@@ -186,14 +189,15 @@ components, so they test the events, official levels, gates and smoothing, not t
 
 | Window | Slovakia: level/index before → first run after | EU: same | Gates |
 |---|---|---|---|
-| Quiet 30 days | level 2, index 30 | level 2, index 44 | floor 2 |
-| Bratislava, 12 Oct 2022 (2 killed, Slovakia) | 2/30 → 3/66 | 2/44 → 3/67 | Slovak cap at 2 lifted |
-| Vienna, 2 Nov 2020 (4 killed, neighbour) | 2/30 → 3/64 | 2/44 → 3/67 | Slovak cap at 2 lifted |
-| Solingen, 23 Aug 2024 (3 killed, no Slovak link) | 2/30 → 2/42 | 2/44 → 3/67 | Slovak cap at 2 holds the level |
-| Villach, 15 Feb 2025 (1 killed, neighbour) | 2/30 → 3/64 | 2/44 → 3/67 | Slovak cap at 2 lifted |
+| Quiet 30 days | level 2, index 28 | level 2, index 44 | floor 2 |
+| Bratislava, 12 Oct 2022 (2 killed, Slovakia) | 2/28 → 3/64 | 2/44 → 3/67 | Slovak cap at 2 lifted |
+| Vienna, 2 Nov 2020 (4 killed, neighbour) | 2/28 → 3/62 | 2/44 → 3/67 | Slovak cap at 2 lifted |
+| Solingen, 23 Aug 2024 (3 killed, no Slovak link) | 2/28 → 2/40 | 2/44 → 3/67 | Slovak cap at 2 holds the level |
+| Villach, 15 Feb 2025 (1 killed, neighbour) | 2/28 → 3/62 | 2/44 → 3/67 | Slovak cap at 2 lifted |
 
 Every replay raises the index within one run. The quiet month keeps Slovakia at level 2 with an
-index of 30, the bottom of the spec's 30 to 45 target.
+index of 28: just under the spec's 30 to 45 target since SIS went to 20%, but inside level 2's
+own band (25 to 50), which is what the test now checks.
 
 ### Replays with real media counts
 
@@ -207,10 +211,10 @@ against its highest value in the two days after, with the Slovak floor at 8 (bel
 
 | Window | Slovakia | EU |
 |---|---|---|
-| Bratislava, 12 Oct 2022 | 2/24 → 3/52, M 0.00 → max 0.88 | 2/44 → 3/63, M 0.50 → max 0.52 |
-| Vienna, 2 Nov 2020 | 2/30 → 3/64, no M (see below) | 2/44 → 3/67, no M |
-| Solingen, 23 Aug 2024 | 2/31 → 2/40, M 0.38 → max 0.38 | 2/44 → 3/63, M 0.51 → max 0.60 |
-| Villach, 15 Feb 2025 | 2/29 → 3/55, M 0.21 → max 0.21 | 2/44 → 3/64, M 0.54 → max 0.54 |
+| Bratislava, 12 Oct 2022 | 2/22 → 2/36, M 0.00 → max 0.88 | 2/44 → 3/63, M 0.50 → max 0.52 |
+| Vienna, 2 Nov 2020 | 2/28 → 3/62, no M (see below) | 2/44 → 3/67, no M |
+| Solingen, 23 Aug 2024 | 2/29 → 2/38, M 0.38 → max 0.38 | 2/44 → 3/63, M 0.51 → max 0.60 |
+| Villach, 15 Feb 2025 | 2/27 → 3/53, M 0.21 → max 0.21 | 2/44 → 3/64, M 0.54 → max 0.54 |
 
 What the real counts show:
 
@@ -225,7 +229,10 @@ What the real counts show:
   had no Slovak TERROR article in the sample. With the floor at 1 (the first setting), four
   stray articles gave M = 0.85 before Solingen and Villach, Bratislava's real rise (to 36
   articles two days after) barely showed (0.85 to 0.90), and the quiet Slovak index rose from
-  30 to 36. With the floor at 8 (set on 2026-10-22): the quiet index is 29 to 31;
+  30 to 36. With the floor at 8 (set on 2026-10-22): the quiet index is 27 to 29 (with SIS at
+  20%); in the Bratislava replay Slovakia reaches level 3 in the second run after the attack (12
+  hours later; the first with SIS at 40%), without the language model, which would likely react
+  in the first;
   Bratislava's M climbs 0, 0.21, 0.61, 0.88 over two days; Solingen, with no Slovak link,
   keeps Slovakia at level 2 with M at most 0.38.
 

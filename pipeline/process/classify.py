@@ -172,7 +172,10 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
     for item in items:
         c = item.classification
         if c and c.status == "llm" and assumed_home_country(item, c, places.get(item.id, [])):
-            log.info("%s: no place and no mention of %s; country dropped", item.id, c.countries)
-            item.classification = c.model_copy(update={"countries": []})
+            # Its summary repeats the made-up place, so the report is set aside entirely; the
+            # same story arrives correctly placed from other outlets.
+            log.info("%s: no place and no mention of %s; report set aside", item.id, c.countries)
+            item.classification = c.model_copy(update={
+                "countries": [], "relevant": False, "summary_en": None, "summary_sk": None})
     log.info("classified: %s", stats)
     return places, stats
