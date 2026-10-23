@@ -233,22 +233,57 @@ def run_gkg(src: dict, baselines: dict, now: datetime) -> FetchResult:
 
 
 COLLECTED_FRESH = timedelta(hours=6)
+# GDELT queries catch up from their own last success, up to 24 hours back (collect.py and
+# topup_gdelt), so a query loses nothing until it has failed for a day: that is its limit.
+GDELT_FRESH = timedelta(hours=24)
 
 
 def collected_health(sources: list[dict], buffered: list[Item], health: dict[str, dict],
                      since: datetime, now: datetime) -> dict[str, FetchResult]:
-    """Health for sources fetched by the hourly collector: ok when one of its runs in the last
-    6 hours succeeded; the item count is the source's buffered items in this run's window."""
+    """Health for sources fetched by the hourly collector: ok when a run succeeded within
+    6 hours (RSS) or, for GDELT queries, each query within 24 hours; the item count is the
+    source's buffered items in this run's window."""
     out = {}
     for s in sources:
         h = health.get(s["id"], {})
+        fresh = GDELT_FRESH if s.get("adapter") == "gdelt_doc" else COLLECTED_FRESH
         last = datetime.fromisoformat(h["last_success"]) if h.get("last_success") else None
-        ok = last is not None and now - last <= COLLECTED_FRESH
+        ok = last is not None and now - last <= fresh
         count = sum(1 for i in buffered if i.source_id == s["id"] and i.published_at >= since)
         out[s["id"]] = FetchResult(source_id=s["id"], ok=ok, item_count=count,
                                    error=None if ok else (h.get("error") or
-                                                          "no successful collector run in 6 h"))
+                                   f"no successful run in {fresh.total_seconds() / 3600:.0f} h"))
     return out
+
+
+def topup_gdelt(sources: list[dict], queries: list[dict], health: dict[str, dict],
+                now: datetime) -> tuple[dict[str, FetchResult], dict[str, dict]]:
+    """GitHub skips many hourly collector runs, so the pipeline itself runs any GDELT query
+    with no success within COLLECTED_FRESH, from that query's last success (at most a day
+    back). Returns (results, health with those successes merged). The merge is in memory
+    only: rss_buffer.json stays the collector's file."""
+    health = {k: dict(v) for k, v in health.items()}
+    results = {}
+    for src in sources:
+        qs = src.get("queries") or queries
+        h = health.setdefault(src["id"], {})
+        parts = dict(h.get("parts") or {})
+        stale = [q for q in qs if q["id"] not in parts
+                 or now - datetime.fromisoformat(parts[q["id"]]) > COLLECTED_FRESH]
+        if not stale:
+            continue
+        since = max(now - timedelta(hours=24),
+                    min((datetime.fromisoformat(parts[q["id"]]) for q in stale
+                         if q["id"] in parts), default=now - timedelta(hours=24)))
+        log.info("%s: the pipeline runs %d stale GDELT queries itself", src["id"], len(stale))
+        res = gdelt_doc.fetch(src, stale, since, now)
+        parts |= dict.fromkeys(res.parts_ok, now.isoformat())
+        h["parts"] = parts
+        if all(q["id"] in parts for q in qs):
+            h["last_success"] = min(parts[q["id"]] for q in qs)
+        h["error"] = res.error
+        results[src["id"]] = res
+    return results, health
 
 
 def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
@@ -312,9 +347,14 @@ def main(argv: list[str] | None = None) -> int:
         buffered, buffer_ok = [], False
     log.info("buffer     items=%d", len(buffered))
     if not args.fixtures:
-        results |= collected_health([s for s in enabled if s not in fetched], buffered,
-                                    state.load_buffer_full(args.state_dir).health
-                                    if buffer_ok else {}, since, started)
+        collected = [s for s in enabled if s not in fetched]
+        health = state.load_buffer_full(args.state_dir).health if buffer_ok else {}
+        topped, health = topup_gdelt([s for s in collected if s["adapter"] == "gdelt_doc"],
+                                     queries, health, started)
+        items += normalize_all([s for s in collected if s["id"] in topped], topped, started,
+                               seen)
+        results |= collected_health(collected, buffered + [i for i in items if i.source_id
+                                                         in topped], health, since, started)
 
     unique = dedupe(items + buffered)
     # Remember when undated items were first seen, so later runs keep the same date.

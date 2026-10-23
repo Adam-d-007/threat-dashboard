@@ -18,8 +18,16 @@ const EU27 = new Set(
   "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" "),
 );
 
+// NATO members outside the EU; with the EU-27 they are where every kind of incident counts.
+const NATO_NON_EU = new Set(["AL", "CA", "IS", "ME", "MK", "NO", "TR", "GB", "US"]);
+
+/** The incidents the score counts (pipeline/score/components.py): outside the EU and NATO only
+ * terrorism, so acts of war in Ukraine or Russia are not listed as attacks. */
 function regionEvents(events: Event[], region: Region): Event[] {
-  return region === "EU" ? events : events.filter((e) => EU27.has(e.country) || e.sk_link === "direct");
+  const counted = events.filter(
+    (e) => EU27.has(e.country) || NATO_NON_EU.has(e.country) || e.topic === "terrorism",
+  );
+  return region === "EU" ? counted : counted.filter((e) => EU27.has(e.country) || e.sk_link === "direct");
 }
 
 export function TerrorismPage({ run, region, timeseries }: { run: Run; region: Region; timeseries: Timeseries | null }) {

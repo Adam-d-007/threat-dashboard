@@ -113,29 +113,41 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
             todo.append(item)
     stats = {"cached": len(items) - len(todo), "llm": 0, "rules": 0, "batches_failed": 0}
     size, budget = cfg["batch_size"], cfg["budget"]["classify"]
-    for start in range(0, len(todo), size):
-        batch = todo[start:start + size]
-        labels: dict[str, ItemLabel] = {}
-        if client and client.available and client.calls < budget:
-            try:
-                labels = _ask(client, batch)
-            except LlmUnavailable:
-                log.warning("no LLM available; rules for the remaining items")
-            except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
-                stats["batches_failed"] += 1
-                log.warning("batch failed twice, rules instead: %s", str(e)[:200])
-        for item in batch:
-            label = labels.get(item.id)
-            if label:
-                item.classification = _from_label(label)
-                places[item.id] = [p.model_dump() for p in label.places]
-                cache[item.id] = {"classification": item.classification.model_dump(mode="json"),
-                                  "places": places[item.id], "at": item.published_at.isoformat(),
-                                  "prompt": PROMPT_ID}
-                stats["llm"] += 1
-            else:
-                item.classification = rules_label(item)
-                places[item.id] = []
-                stats["rules"] += 1
+    pending, unlabelled = todo, []
+    for attempt in (1, 2):
+        skipped = []
+        for start in range(0, len(pending), size):
+            batch = pending[start:start + size]
+            labels: dict[str, ItemLabel] = {}
+            if client and client.available and client.calls < budget:
+                try:
+                    labels = _ask(client, batch)
+                except LlmUnavailable:
+                    log.warning("no LLM available; rules for the remaining items")
+                except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
+                    stats["batches_failed"] += 1
+                    log.warning("batch failed twice, rules instead: %s", str(e)[:200])
+            for item in batch:
+                label = labels.get(item.id)
+                if label:
+                    item.classification = _from_label(label)
+                    places[item.id] = [p.model_dump() for p in label.places]
+                    cache[item.id] = {"classification": item.classification.model_dump(
+                        mode="json"), "places": places[item.id],
+                        "at": item.published_at.isoformat(), "prompt": PROMPT_ID}
+                    stats["llm"] += 1
+                elif labels and attempt == 1:
+                    skipped.append(item)  # the model answered the batch but left this one out
+                else:
+                    unlabelled.append(item)
+        if not skipped:
+            break
+        log.info("%d items were left out of the model's answers; asking once more",
+                 len(skipped))
+        pending = skipped
+    for item in unlabelled:
+        item.classification = rules_label(item)
+        places[item.id] = []
+        stats["rules"] += 1
     log.info("classified: %s", stats)
     return places, stats

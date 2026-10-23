@@ -221,6 +221,21 @@ describe("Phase 5: every panel renders in each special case", () => {
     expect(screen.getByTitle("2019: no data")).toBeInTheDocument();
   });
 
+  it("does not list acts of war outside the EU and NATO as incidents", async () => {
+    window.location.hash = "#terrorism-eu";
+    const e0 = base.events[0];
+    const events = [
+      { ...e0, id: "war", title_en: "Drone strike on Kharkiv", country: "UA", topic: "hybrid" },
+      { ...e0, id: "ter", title_en: "Bombing in Kyiv claimed by a terrorist group", country: "UA", topic: "terrorism" },
+      { ...e0, id: "pl", title_en: "Sabotage on a Polish railway", country: "PL", topic: "hybrid" },
+    ];
+    mockFetch({ ...base, events });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText("Bombing in Kyiv claimed by a terrorist group")).toBeInTheDocument();
+    expect(screen.getByText("Sabotage on a Polish railway")).toBeInTheDocument();
+    expect(screen.queryByText("Drone strike on Kharkiv")).not.toBeInTheDocument();
+  });
+
   it("filters the geopolitics map by theatre", async () => {
     window.location.hash = "#geopolitics";
     mockFetch(base);
