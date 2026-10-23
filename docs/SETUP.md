@@ -14,7 +14,7 @@ Where things stand (2026-10-22):
 | 5. GTD | Optional; the tool is ready, waiting for your download |
 | 6. Permission requests | Optional; not sent |
 | 7. Keyword review | Done (Adam checked the Slovak and Czech terms, 2026-10-22) |
-| 8. Hourly timer | Recommended: GitHub skips most hourly collector runs |
+| 8. Hourly timer | Done: cron-job.org starts the collector at :35 every hour (2026-10-23) |
 
 All Terminal commands are run from the project folder:
 
@@ -174,6 +174,11 @@ hour. A free outside timer can start it through GitHub's API.
    - Request body: `{"ref":"main"}`
 3. Save, then use "Test run": the answer should be HTTP 204, and a new collect run appears under
    Actions within a minute. Tell Claude, who checks the runs.
+
+Set up on 2026-10-23 (first test run: HTTP 204, collector started at 13:59 UTC). **When the
+token expires (in a year), make a new one and paste it into the job; at the same time check
+GitHub's current API version**, because `2022-11-28` is deprecated and stops working on
+10 March 2028.
 
 The token is stored at cron-job.org. It can start, cancel and re-run workflows of this one
 repository and read their logs, nothing else: no code, no secrets. If it leaks, delete it on
