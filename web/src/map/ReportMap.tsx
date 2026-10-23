@@ -1,6 +1,6 @@
-import "leaflet/dist/leaflet.css";
-import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
+import { CircleMarker, Popup } from "react-leaflet";
 import { useChartColors } from "../charts/colors";
+import { MapFrame } from "./MapFrame";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
 import type { Item } from "../types/run";
@@ -10,12 +10,7 @@ export default function ReportMap({ items }: { items: Item[] }) {
   const { locale } = useLang();
   const c = useChartColors();
   return (
-    <MapContainer center={[48, 22]} zoom={3} scrollWheelZoom={false} className="h-80 w-full rounded-lg sm:h-96">
-      <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={12}
-      />
+    <MapFrame center={[48, 22]} zoom={3}>
       {items.flatMap((i) =>
         (i.classification?.places ?? []).map((p, n) => (
           <CircleMarker
@@ -35,6 +30,6 @@ export default function ReportMap({ items }: { items: Item[] }) {
           </CircleMarker>
         )),
       )}
-    </MapContainer>
+    </MapFrame>
   );
 }

@@ -21,7 +21,6 @@
   --series-3: #199e70;
   --series-4: #c98500;
   --sample: #9085e9;
-  --map-filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
 }
 
 :root[data-theme="light"] {
@@ -41,7 +40,6 @@
   --series-3: #1baf7a;
   --series-4: #eda100;
   --sample: #6250d6;
-  --map-filter: none;
 }
 
 :root {
@@ -94,9 +92,6 @@ body {
   font-family: var(--font-sans);
 }
 
-.leaflet-tile-pane {
-  filter: var(--map-filter);
-}
 
 /* The method page renders docs/SCORING.md. */
 .method-doc {

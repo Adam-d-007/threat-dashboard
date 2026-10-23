@@ -127,6 +127,19 @@ def write_baselines(state_dir: Path, baselines: dict) -> None:
 CLASSIFIED_DAYS = 7
 
 
+def item_urls_from_runs(state_dir: Path, wanted: set[str]) -> dict[str, str]:
+    """URLs of the wanted item ids, from the stored runs (runs/<id>.json; index.json is the run
+    picker's list, not a run)."""
+    found: dict[str, str] = {}
+    for path in sorted((state_dir / "runs").glob("*.json"), reverse=True):
+        if path.name == "index.json":
+            continue
+        for item in (_read(path) or {}).get("items", []):
+            if item["id"] in wanted and item.get("url"):
+                found.setdefault(item["id"], item["url"])
+    return found
+
+
 def load_classified(state_dir: Path) -> dict[str, dict]:
     """LLM labels from earlier runs, by item id, so an item is sent to the LLM only once."""
     return (_read(state_dir / "classified.json") or {}).get("items", {})

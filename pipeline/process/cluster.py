@@ -21,6 +21,10 @@ DOMAINS = {"terrorism", "hybrid", "unrest"}
 MAX_KM = 50
 MAX_DAYS = 1
 SUMMARY_MIN = 66
+# Severe attacks (severity 3+) are rare: two of the same type in one country within a day are
+# treated as one incident unless both have towns more than MAX_KM apart. On 2026-10-23 one
+# shooting near Paris, reported with differing wording and mostly no town, became six events.
+SEVERE = 3
 KEEP_DAYS = 90
 SK_RANK = {"none": 0, "indirect": 1, "direct": 2}
 TIER_RANK = {"A": 0, "B": 1, "C": 2}
@@ -55,6 +59,8 @@ def _matches(item: Item, e: Event) -> bool:
     place = c.places[0] if c.places else None
     if place and e.place and place.precision == "city" and e.place.precision == "city":
         return km(place, e.place) <= MAX_KM
+    if c.severity >= SEVERE and e.severity >= SEVERE:
+        return True
     return bool(c.summary_en) and fuzz.token_sort_ratio(
         fold(c.summary_en), fold(e.title_en)) >= SUMMARY_MIN
 
@@ -69,11 +75,13 @@ def _same_incident(a: Event, b: Event) -> bool:
         return False
     if a.place and b.place and a.place.precision == "city" and b.place.precision == "city":
         return km(a.place, b.place) <= MAX_KM
+    if a.severity >= SEVERE and b.severity >= SEVERE:
+        return True
     return fuzz.token_sort_ratio(fold(a.title_en), fold(b.title_en)) >= SUMMARY_MIN
 
 
 def _absorb(keep: Event, gone: Event) -> None:
-    for attr in ("item_ids", "event_keys", "domains"):
+    for attr in ("item_ids", "urls", "event_keys", "domains"):
         target = getattr(keep, attr)
         target.extend(x for x in getattr(gone, attr) if x not in target)
     keep.has_tier_a = keep.has_tier_a or gone.has_tier_a
@@ -127,6 +135,8 @@ def _add(e: Event, item: Item, now: datetime) -> None:
     c = item.classification
     if item.id not in e.item_ids:
         e.item_ids.append(item.id)
+    if item.url and item.url not in e.urls:
+        e.urls.append(item.url)
     if c.event_key and c.event_key not in e.event_keys:
         e.event_keys.append(c.event_key)
     for d in [item.domain, *item.also_reported_by]:

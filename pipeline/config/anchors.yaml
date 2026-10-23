@@ -72,6 +72,7 @@ travel:
     parser: de_aa
     url: https://www.auswaertiges-amt.de/opendata/travelwarning
     page: https://www.auswaertiges-amt.de/de/reiseundsicherheit/reise-und-sicherheitshinweise
+    pages: {SK: "https://www.auswaertiges-amt.de/de/service/laender/slowakei-node"}
     scale: [keine Warnung, Teilreisewarnung, Reisewarnung]
     countries: eu
   - id: nz
@@ -95,7 +96,7 @@ travel:
     name: MOFA Japan
     parser: jp_mofa
     url: https://www.ezairyu.mofa.go.jp/opendata/country/0421L.xml
-    page: https://www.anzen.mofa.go.jp/
+    page: https://www.anzen.mofa.go.jp/info/pcinfectionspothazardinfo_184.html   # Slovakia
     scale: [no warning, Level 1, Level 2, Level 3, Level 4]
     countries: [SK]
   - id: cz

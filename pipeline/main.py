@@ -371,6 +371,15 @@ def main(argv: list[str] | None = None) -> int:
     kept, events, new_event_ids, cstats = understand(
         in_window, groups, client, cache, state.load_events(args.state_dir), started)
     relevant = [i for i in kept if i.classification and i.classification.relevant]
+    # Events stored before they carried URLs get them from any report still at hand, including
+    # the previous run's items (reports that have since left the buffer).
+    url_of = {i["id"]: i["url"] for i in (prev["latest"] or {}).get("items", []) if i.get("url")}
+    url_of |= {i.id: i.url for i in unique if i.url}
+    missing = {i for e in events for i in e.item_ids if i not in url_of and not e.urls}
+    if missing:
+        url_of |= state.item_urls_from_runs(args.state_dir, missing)
+    for e in events:
+        e.urls.extend(u for u in (url_of.get(i) for i in e.item_ids) if u and u not in e.urls)
     recent = (started - timedelta(days=30)).date()
 
     cfg_score = yaml.safe_load((CONFIG / "scoring.yaml").read_text())
