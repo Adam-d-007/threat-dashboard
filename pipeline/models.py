@@ -291,8 +291,8 @@ class TesatYear(Strict):
 
 class GtdYear(Strict):
     year: int
-    incidents: int
-    deaths: int
+    incidents: int | None = Field(description="None for a year the GTD has no data for (1993)")
+    deaths: int | None
 
 
 class Gtd(Strict):

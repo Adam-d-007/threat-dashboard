@@ -211,11 +211,14 @@ describe("Phase 5: every panel renders in each special case", () => {
     const yr = (year: number, incidents: number) => ({ year, incidents, deaths: 0 });
     const gtd = { source: "https://www.start.umd.edu/gtd/", data_ends: 2021, generated: "2026-10-22",
       SK: [yr(2020, 0), yr(2021, 1)], EU: [yr(2020, 30), yr(2021, 12)] };
+    gtd.SK.unshift({ year: 2019, incidents: null, deaths: null } as never);
     mockFetch({ ...realRun, gtd });
     renderAt("2026-10-22T14:00:00Z");
     expect(await screen.findByText("Terrorist incidents per year in Slovakia")).toBeInTheDocument();
     expect(screen.getByText("1 incident in all; most in 2021 (1)")).toBeInTheDocument();
     expect(screen.getByText(/GTD data ends in 2021/)).toBeInTheDocument();
+    expect(screen.getByText(/No data for 2019/)).toBeInTheDocument();
+    expect(screen.getByTitle("2019: no data")).toBeInTheDocument();
   });
 
   it("filters the geopolitics map by theatre", async () => {

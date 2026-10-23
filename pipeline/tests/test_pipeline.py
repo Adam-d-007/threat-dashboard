@@ -1023,7 +1023,9 @@ def test_gtd_aggregates_count_slovakia_and_the_eu_and_refuse_unknown_names():
     eu = {y["year"]: y for y in out["EU"]}
     assert eu[1990] == {"year": 1990, "incidents": 1, "deaths": 2}
     assert eu[1992]["incidents"] == 1 and eu[2021]["incidents"] == 1
-    assert sum(y["incidents"] for y in out["SK"]) == 1  # Czechoslovakia is not Slovakia
+    assert sum(y["incidents"] or 0 for y in out["SK"]) == 1  # Czechoslovakia is not Slovakia
+    assert eu[1993] == {"year": 1993, "incidents": None, "deaths": None}  # lost, not zero
+    assert out["SK"][0]["year"] == 1993  # Slovakia's series starts with the country
     with pytest.raises(SystemExit, match="Atlantis"):
         g.aggregate(rows + [{"iyear": "2000", "country_txt": "Atlantis",
                              "region_txt": "Western Europe", "nkill": "0"}])

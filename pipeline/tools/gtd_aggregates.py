@@ -43,6 +43,12 @@ OUTSIDE = {
     "Azerbaijan", "Georgia", "Turkey", "Northern Ireland",
 }
 EUROPE = {"Western Europe", "Eastern Europe"}
+# START lost the 1993 records and the GTD has none for that year (see its codebook): those
+# years are written as no data (null), never as zero.
+NO_DATA_YEARS = {1993}
+# Slovakia exists from 1 January 1993; earlier incidents are Czechoslovakia's, so its series
+# starts then rather than showing zeros for years it was not a country.
+FIRST_YEAR = {"SK": 1993}
 
 
 def rows(path: Path):
@@ -85,8 +91,12 @@ def aggregate(records) -> dict:
     if not years["EU"]:
         raise SystemExit("No EU incidents found: is this the GTD file?")
     first, last = min(years["EU"]), max(years["EU"])
-    series = {region: [{"year": y, **years[region].get(y, {"incidents": 0, "deaths": 0})}
-                       for y in range(first, last + 1)] for region in years}
+    def row(region: str, y: int) -> dict:
+        if y in NO_DATA_YEARS:
+            return {"year": y, "incidents": None, "deaths": None}
+        return {"year": y, **years[region].get(y, {"incidents": 0, "deaths": 0})}
+    series = {region: [row(region, y) for y in range(FIRST_YEAR.get(region, first), last + 1)]
+              for region in years}
     return {"source": SOURCE, "data_ends": last, "generated": datetime.now(UTC).date().isoformat(),
             "SK": series["SK"], "EU": series["EU"]}
 
@@ -97,8 +107,8 @@ def main() -> None:
     data = aggregate(rows(Path(sys.argv[1])))
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(data, indent=1) + "\n")
-    eu = sum(y["incidents"] for y in data["EU"])
-    sk = sum(y["incidents"] for y in data["SK"])
+    eu = sum(y["incidents"] or 0 for y in data["EU"])
+    sk = sum(y["incidents"] or 0 for y in data["SK"])
     print(f"wrote {OUT}: {data['EU'][0]['year']}-{data['data_ends']}, EU {eu} incidents, "
           f"Slovakia {sk}")
 

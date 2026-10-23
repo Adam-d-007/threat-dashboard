@@ -1,0 +1,404 @@
+{
+ "source": "https://www.start.umd.edu/data-tools/GTD",
+ "data_ends": 2020,
+ "generated": "2026-10-23",
+ "SK": [
+  {
+   "year": 1993,
+   "incidents": null,
+   "deaths": null
+  },
+  {
+   "year": 1994,
+   "incidents": 1,
+   "deaths": 0
+  },
+  {
+   "year": 1995,
+   "incidents": 3,
+   "deaths": 3
+  },
+  {
+   "year": 1996,
+   "incidents": 5,
+   "deaths": 1
+  },
+  {
+   "year": 1997,
+   "incidents": 4,
+   "deaths": 2
+  },
+  {
+   "year": 1998,
+   "incidents": 2,
+   "deaths": 1
+  },
+  {
+   "year": 1999,
+   "incidents": 1,
+   "deaths": 0
+  },
+  {
+   "year": 2000,
+   "incidents": 1,
+   "deaths": 0
+  },
+  {
+   "year": 2001,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2002,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2003,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2004,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2005,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2006,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2007,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2008,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2009,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2010,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2011,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2012,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2013,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2014,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2015,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2016,
+   "incidents": 1,
+   "deaths": 0
+  },
+  {
+   "year": 2017,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2018,
+   "incidents": 1,
+   "deaths": 2
+  },
+  {
+   "year": 2019,
+   "incidents": 0,
+   "deaths": 0
+  },
+  {
+   "year": 2020,
+   "incidents": 0,
+   "deaths": 0
+  }
+ ],
+ "EU": [
+  {
+   "year": 1970,
+   "incidents": 47,
+   "deaths": 12
+  },
+  {
+   "year": 1971,
+   "incidents": 48,
+   "deaths": 2
+  },
+  {
+   "year": 1972,
+   "incidents": 82,
+   "deaths": 63
+  },
+  {
+   "year": 1973,
+   "incidents": 99,
+   "deaths": 85
+  },
+  {
+   "year": 1974,
+   "incidents": 111,
+   "deaths": 174
+  },
+  {
+   "year": 1975,
+   "incidents": 241,
+   "deaths": 54
+  },
+  {
+   "year": 1976,
+   "incidents": 380,
+   "deaths": 59
+  },
+  {
+   "year": 1977,
+   "incidents": 628,
+   "deaths": 92
+  },
+  {
+   "year": 1978,
+   "incidents": 627,
+   "deaths": 150
+  },
+  {
+   "year": 1979,
+   "incidents": 775,
+   "deaths": 167
+  },
+  {
+   "year": 1980,
+   "incidents": 453,
+   "deaths": 303
+  },
+  {
+   "year": 1981,
+   "incidents": 328,
+   "deaths": 89
+  },
+  {
+   "year": 1982,
+   "incidents": 304,
+   "deaths": 85
+  },
+  {
+   "year": 1983,
+   "incidents": 295,
+   "deaths": 86
+  },
+  {
+   "year": 1984,
+   "incidents": 398,
+   "deaths": 107
+  },
+  {
+   "year": 1985,
+   "incidents": 396,
+   "deaths": 199
+  },
+  {
+   "year": 1986,
+   "incidents": 362,
+   "deaths": 103
+  },
+  {
+   "year": 1987,
+   "incidents": 297,
+   "deaths": 88
+  },
+  {
+   "year": 1988,
+   "incidents": 308,
+   "deaths": 65
+  },
+  {
+   "year": 1989,
+   "incidents": 287,
+   "deaths": 53
+  },
+  {
+   "year": 1990,
+   "incidents": 258,
+   "deaths": 44
+  },
+  {
+   "year": 1991,
+   "incidents": 466,
+   "deaths": 322
+  },
+  {
+   "year": 1992,
+   "incidents": 508,
+   "deaths": 85
+  },
+  {
+   "year": 1993,
+   "incidents": null,
+   "deaths": null
+  },
+  {
+   "year": 1994,
+   "incidents": 349,
+   "deaths": 45
+  },
+  {
+   "year": 1995,
+   "incidents": 329,
+   "deaths": 64
+  },
+  {
+   "year": 1996,
+   "incidents": 484,
+   "deaths": 42
+  },
+  {
+   "year": 1997,
+   "incidents": 313,
+   "deaths": 28
+  },
+  {
+   "year": 1998,
+   "incidents": 89,
+   "deaths": 9
+  },
+  {
+   "year": 1999,
+   "incidents": 162,
+   "deaths": 5
+  },
+  {
+   "year": 2000,
+   "incidents": 197,
+   "deaths": 43
+  },
+  {
+   "year": 2001,
+   "incidents": 145,
+   "deaths": 19
+  },
+  {
+   "year": 2002,
+   "incidents": 99,
+   "deaths": 8
+  },
+  {
+   "year": 2003,
+   "incidents": 97,
+   "deaths": 3
+  },
+  {
+   "year": 2004,
+   "incidents": 54,
+   "deaths": 196
+  },
+  {
+   "year": 2005,
+   "incidents": 76,
+   "deaths": 3
+  },
+  {
+   "year": 2006,
+   "incidents": 91,
+   "deaths": 6
+  },
+  {
+   "year": 2007,
+   "incidents": 51,
+   "deaths": 13
+  },
+  {
+   "year": 2008,
+   "incidents": 132,
+   "deaths": 3
+  },
+  {
+   "year": 2009,
+   "incidents": 162,
+   "deaths": 14
+  },
+  {
+   "year": 2010,
+   "incidents": 76,
+   "deaths": 6
+  },
+  {
+   "year": 2011,
+   "incidents": 46,
+   "deaths": 6
+  },
+  {
+   "year": 2012,
+   "incidents": 141,
+   "deaths": 18
+  },
+  {
+   "year": 2013,
+   "incidents": 123,
+   "deaths": 5
+  },
+  {
+   "year": 2014,
+   "incidents": 117,
+   "deaths": 6
+  },
+  {
+   "year": 2015,
+   "incidents": 232,
+   "deaths": 170
+  },
+  {
+   "year": 2016,
+   "incidents": 173,
+   "deaths": 161
+  },
+  {
+   "year": 2017,
+   "incidents": 178,
+   "deaths": 41
+  },
+  {
+   "year": 2018,
+   "incidents": 107,
+   "deaths": 25
+  },
+  {
+   "year": 2019,
+   "incidents": 108,
+   "deaths": 17
+  },
+  {
+   "year": 2020,
+   "incidents": 194,
+   "deaths": 32
+  }
+ ]
+}

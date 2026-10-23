@@ -161,11 +161,13 @@ const en = {
     sk: "Slovakia",
     eu: "the EU-27",
     title: (where: string) => `Terrorist incidents per year in ${where}`,
-    summary: (total: number, year: number, n: number) =>
-      `${total} ${total === 1 ? "incident" : "incidents"} in all; most in ${year} (${n})`,
+    summary: (total: number, shown: string, year: number, n: number) =>
+      `${shown} ${total === 1 ? "incident" : "incidents"} in all; most in ${year} (${n})`,
     bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidents, ${deaths} deaths`,
+    noData: (year: number) => `${year}: no data`,
+    missing: (years: string) => `No data for ${years}: START lost those records (dashed gap, not zero).`,
     ends: (year: number) =>
-      `GTD data ends in ${year}. Yearly counts made by this dashboard: today's 27 member states for every year, failed attacks included, Czechoslovakia counted for the EU only (method in pipeline/tools/gtd_aggregates.py).`,
+      `GTD data ends in ${year}. Yearly counts made by this dashboard: today's 27 member states for every year, failed attacks included, Czechoslovakia counted for the EU only, Slovakia from 1993 (method in pipeline/tools/gtd_aggregates.py).`,
   },
   latestReports: "Latest reports",
   dateEstimated: "date estimated",
@@ -231,7 +233,7 @@ const en = {
   theme: { dark: "Dark", light: "Light" },
   footer: "Dashboard indicator computed from open sources. Not an official threat assessment.",
   attribution:
-    "Map data © OpenStreetMap contributors. Place names from GeoNames (CC BY 4.0). Media counts from the GDELT Project. Base rates from Europol TE-SAT.",
+    "Map data © OpenStreetMap contributors. Place names from GeoNames (CC BY 4.0). Media counts from the GDELT Project. Base rates from Europol TE-SAT and START's Global Terrorism Database.",
 };
 
 export type Strings = typeof en;
@@ -401,11 +403,13 @@ const sk: Strings = {
     sk: "na Slovensku",
     eu: "v EÚ-27",
     title: (where: string) => `Teroristické incidenty podľa rokov ${where}`,
-    summary: (total: number, year: number, n: number) =>
-      `Spolu ${total} ${total === 1 ? "incident" : total >= 2 && total <= 4 ? "incidenty" : "incidentov"}; najviac v roku ${year} (${n})`,
+    summary: (total: number, shown: string, year: number, n: number) =>
+      `Spolu ${shown} ${total === 1 ? "incident" : total >= 2 && total <= 4 ? "incidenty" : "incidentov"}; najviac v roku ${year} (${n})`,
     bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidentov, ${deaths} obetí`,
+    noData: (year: number) => `${year}: bez údajov`,
+    missing: (years: string) => `Za rok ${years} údaje chýbajú: START tieto záznamy stratil (prerušovaný rámik, nie nula).`,
     ends: (year: number) =>
-      `Údaje GTD končia rokom ${year}. Ročné súčty pripravil tento prehľad: pre každý rok súčasných 27 členských štátov, vrátane neúspešných útokov, Česko-Slovensko len v súčte za EÚ (postup v pipeline/tools/gtd_aggregates.py).`,
+      `Údaje GTD končia rokom ${year}. Ročné súčty pripravil tento prehľad: pre každý rok súčasných 27 členských štátov, vrátane neúspešných útokov, Česko-Slovensko len v súčte za EÚ, Slovensko od roku 1993 (postup v pipeline/tools/gtd_aggregates.py).`,
   },
   latestReports: "Najnovšie správy",
   dateEstimated: "dátum je odhadnutý",
@@ -471,7 +475,7 @@ const sk: Strings = {
   theme: { dark: "Tmavý", light: "Svetlý" },
   footer: "Ukazovateľ dashboardu vypočítaný z otvorených zdrojov. Nejde o oficiálne hodnotenie hrozby.",
   attribution:
-    "Mapové údaje © prispievatelia OpenStreetMap. Názvy miest z GeoNames (CC BY 4.0). Počty článkov z projektu GDELT. Dlhodobé počty z Europol TE-SAT.",
+    "Mapové údaje © prispievatelia OpenStreetMap. Názvy miest z GeoNames (CC BY 4.0). Počty článkov z projektu GDELT. Dlhodobé počty z Europol TE-SAT a z Global Terrorism Database (START).",
 };
 
 const STRINGS: Record<Lang, Strings> = { en, sk };
