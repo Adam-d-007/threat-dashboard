@@ -41,7 +41,7 @@ const en = {
     "SAMPLE DATA. Everything on this page is made up for design work and means nothing.",
   banners: {
     disagreement:
-      "The rules and the language model disagree by more than one level. The level shown is the rules level.",
+      "The rules and the language model disagree (by two levels, or by one at level 3 or above). The level and index shown follow the rules.",
     gates: "Rules that limited the level in this run:",
     llmFallback: "The language model was unavailable. This run uses rules only.",
     sourcesFailing: (n: number) => `${n} source${n === 1 ? "" : "s"} failed in this run.`,
@@ -279,7 +279,7 @@ const sk: Strings = {
     "UKÁŽKOVÉ ÚDAJE. Všetko na tejto stránke je vymyslené pre potreby návrhu a nemá žiadny význam.",
   banners: {
     disagreement:
-      "Pravidlá a jazykový model sa líšia o viac ako jednu úroveň. Zobrazená je úroveň podľa pravidiel.",
+      "Pravidlá a jazykový model sa nezhodujú (o dve úrovne, alebo o jednu pri úrovni 3 a vyššej). Zobrazená úroveň aj index sa riadia pravidlami.",
     gates: "Pravidlá, ktoré v tejto aktualizácii obmedzili úroveň:",
     llmFallback: "Jazykový model nebol dostupný. Táto aktualizácia používa len pravidlá.",
     sourcesFailing: (n: number) =>

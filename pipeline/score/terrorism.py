@@ -120,7 +120,10 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     candidate, shown = gates.apply(raw_level, b)
     disagreement = llm.status == "ok" and disagree(llm.level, rules_level)
     if disagreement:
+        # The level follows the rules, so the index does too: otherwise level 2 could show
+        # with an index of 51, inside level 3's band (seen on 2026-10-23).
         candidate, shown = rules_level, rules_gates
+        p = p_rules
 
     prev = scoring["regions"].get(region)
     level, below = candidate, 0
