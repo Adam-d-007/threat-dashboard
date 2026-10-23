@@ -27,11 +27,15 @@ export function GtdHistory({ gtd, region }: { gtd: Gtd; region: "SK" | "EU" }) {
         <span>{years[0].year}</span>
         <span>{years[years.length - 1].year}</span>
       </div>
-      <p className="mt-2 text-xs text-muted">
-        {t.gtd.ends(gtd.data_ends)}{" "}
-        <ArticleLink href={gtd.source} className="text-link">
-          START, Global Terrorism Database
-        </ArticleLink>
+      <p className="mt-2 text-xs text-muted">{t.gtd.ends(gtd.data_ends)}</p>
+      {/* Citation and notice worded exactly as the GTD licence (section 4) requires. */}
+      <p className="mt-1 text-xs text-muted">
+        START (National Consortium for the Study of Terrorism and Responses to Terrorism). (2022). Global
+        Terrorism Database, 1970 - 2020 [data file].{" "}
+        <ArticleLink href="https://www.start.umd.edu/data-tools/GTD" className="text-link">
+          https://www.start.umd.edu/data-tools/GTD
+        </ArticleLink>{" "}
+        Copyright University of Maryland 2022.
       </p>
     </div>
   );

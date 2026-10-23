@@ -164,7 +164,8 @@ const en = {
     summary: (total: number, year: number, n: number) =>
       `${total} ${total === 1 ? "incident" : "incidents"} in all; most in ${year} (${n})`,
     bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidents, ${deaths} deaths`,
-    ends: (year: number) => `GTD data ends in ${year}. Today's 27 member states for every year; failed attacks included.`,
+    ends: (year: number) =>
+      `GTD data ends in ${year}. Yearly counts made by this dashboard: today's 27 member states for every year, failed attacks included, Czechoslovakia counted for the EU only (method in pipeline/tools/gtd_aggregates.py).`,
   },
   latestReports: "Latest reports",
   dateEstimated: "date estimated",
@@ -403,7 +404,8 @@ const sk: Strings = {
     summary: (total: number, year: number, n: number) =>
       `Spolu ${total} ${total === 1 ? "incident" : total >= 2 && total <= 4 ? "incidenty" : "incidentov"}; najviac v roku ${year} (${n})`,
     bar: (year: number, n: number, deaths: number) => `${year}: ${n} incidentov, ${deaths} obetí`,
-    ends: (year: number) => `Údaje GTD končia rokom ${year}. Pre každý rok súčasných 27 členských štátov; vrátane neúspešných útokov.`,
+    ends: (year: number) =>
+      `Údaje GTD končia rokom ${year}. Ročné súčty pripravil tento prehľad: pre každý rok súčasných 27 členských štátov, vrátane neúspešných útokov, Česko-Slovensko len v súčte za EÚ (postup v pipeline/tools/gtd_aggregates.py).`,
   },
   latestReports: "Najnovšie správy",
   dateEstimated: "dátum je odhadnutý",
