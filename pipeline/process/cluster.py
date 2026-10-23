@@ -80,6 +80,8 @@ def _absorb(keep: Event, gone: Event) -> None:
     keep.best_tier = _best(keep.best_tier, gone.best_tier)
     keep.corroborated = keep.has_tier_a or len(keep.domains) >= 2
     keep.severity = max(keep.severity, gone.severity)
+    if gone.topic == "terrorism":
+        keep.topic = "terrorism"
     if keep.ideology == "unknown":
         keep.ideology = gone.ideology
     if SK_RANK[gone.sk_link] > SK_RANK[keep.sk_link]:
@@ -116,7 +118,7 @@ def _new_event(item: Item, now: datetime) -> Event:
         title_en=c.summary_en or item.title, title_sk=c.summary_sk,
         event_type=c.event_type, ideology=c.ideology, severity=c.severity,
         date=item.published_at.date(), country=c.countries[0],
-        place=c.places[0] if c.places else None, sk_link=c.sk_link, item_ids=[],
+        place=c.places[0] if c.places else None, sk_link=c.sk_link, topic=c.domain, item_ids=[],
         event_keys=[], domains=[], has_tier_a=False, corroborated=False,
         first_seen=now, last_updated=now)
 
@@ -134,6 +136,8 @@ def _add(e: Event, item: Item, now: datetime) -> None:
     e.best_tier = _best(e.best_tier, item.tier)
     e.corroborated = e.has_tier_a or len(e.domains) >= 2
     e.severity = max(e.severity, c.severity)
+    if c.domain == "terrorism":
+        e.topic = "terrorism"
     if e.ideology == "unknown" and c.ideology != "unknown":
         e.ideology = c.ideology
     if SK_RANK[c.sk_link] > SK_RANK[e.sk_link]:

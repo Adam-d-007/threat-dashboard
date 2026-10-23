@@ -57,6 +57,9 @@ Each incident from the last 60 days counts as:
 - **Proximity, Slovakia:** 1.0 in Slovakia; 0.5 in Czechia, Austria, Hungary, Poland and
   Ukraine; 0.25 elsewhere in the EU; 0.7 outside the EU only with a direct Slovak link.
 - **Proximity, EU:** 1.0 in a member state; 0.3 in the UK, EEA and candidate countries.
+- **Only terrorism outside the EU and NATO.** There, sabotage, drone and missile strikes and
+  unrest do not count, because in Ukraine and Russia they are acts of war, not terrorism.
+  Inside the EU and NATO, state-linked sabotage still counts.
 - **Corroboration:** 1.0 when two independent outlets or one official source report it; 0.6 for
   a single quality outlet; 0.3 for a single item seen only through GDELT.
 - **Age:** an incident's weight halves about every 7 days.
@@ -225,8 +228,11 @@ What the real counts show:
 - A single deadly attack anywhere in the EU lifts the EU to level 3. Is that the intended
   reading of NBAC level 3 ("a terrorist act committed in an EU or NATO state that may affect
   security")?
-- Ukraine sits at proximity 0.5 for Slovakia. Acts of war are classified as geopolitics, not
-  terrorism, so they should not inflate the index; this needs checking on live data.
+- Ukraine sits at proximity 0.5 for Slovakia. Live data on 2026-10-23 showed the risk was
+  real: Russian drone and missile strikes were labelled hybrid incidents and lifted the EU to
+  level 3. Since then incidents outside the EU and NATO count only when labelled terrorism, and
+  the classification prompt names war strikes as geopolitics. Check after four weeks that real
+  terrorism in Ukraine is still labelled as such.
 - The weights (35/15/20/30) are judgement calls and are reviewed with four weeks of data.
 - The Slovak media floor of 8 was set from four replays; check it against live counts, which
   read all 96 files a day rather than one an hour.
