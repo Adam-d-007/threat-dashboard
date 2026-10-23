@@ -146,10 +146,14 @@ def test_forced_disagreement_keeps_the_gated_rules_level():
         _, row = score_region("SK", f"r{n}", quiet_events(t), ANCHORS, {}, rows, state, None, t,
                               CFG, 0)
         rows.append(row)
-    a, _ = score_region("SK", "r60", quiet_events(NOW), ANCHORS, {}, rows, state, LoudLlm(),
-                        NOW, CFG, 5)
+    prev_index = state["regions"]["SK"]["index"]
+    a, row = score_region("SK", "r60", quiet_events(NOW), ANCHORS, {}, rows, state, LoudLlm(),
+                          NOW, CFG, 5)
     assert a.llm.status == "ok" and a.llm.level == 4
     assert a.disagreement and a.rules_level == 2 and a.level == a.rules_level
+    # The index follows the rules as well: smoothed from the rules-only pressure.
+    rules_index = round(100 * row["components"]["p_rules"])
+    assert a.index == round(0.5 * rules_index + 0.5 * prev_index)
 
 
 def test_outside_the_eu_and_nato_only_terrorism_counts():
