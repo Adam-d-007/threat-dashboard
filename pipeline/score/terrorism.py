@@ -127,7 +127,11 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
 
     prev = scoring["regions"].get(region)
     level, below = candidate, 0
-    if prev and candidate < prev["level"]:
+    # The brake (hysteresis) needs a settled baseline. While E is provisional there is none, and
+    # the brake held levels that came from since-corrected labels three times on 2026-10-23,
+    # so until then the level follows the current reading.
+    provisional = e_comp.inputs.get("status") in ("warming_up", "provisional")
+    if prev and candidate < prev["level"] and not provisional:
         # Down only after 4 runs in a row at least 0.03 below the current level's threshold.
         threshold = cfg["thresholds"][prev["level"] - 2]
         below = prev.get("below_runs", 0) + 1 if p <= threshold - cfg["hysteresis"]["margin"] \
@@ -159,7 +163,6 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     # Until E has its two weeks of history it is measured against the few days there are, so
     # the level is provisional: shown, but labelled as such.
     first = min((r["at"] for r in region_rows), default=now.isoformat())[:10]
-    provisional = e_comp.inputs.get("status") in ("warming_up", "provisional")
     assessment = RegionAssessment(
         region=region, level=level, index=index, provisional=provisional,
         available_from=(date.fromisoformat(first)

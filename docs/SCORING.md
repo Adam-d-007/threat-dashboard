@@ -163,6 +163,9 @@ language model can move the index, but it cannot move the level against the rule
   the threshold. A gate can still force it down at once: when the event that lifted a cap leaves
   its window, the cap applies immediately, because the NBAC definition no longer supports the
   higher level.
+- **Not while provisional:** in the first 14 days the level follows each run's reading without
+  this delay. The delay assumes a settled baseline; without one it held levels that came from
+  since-corrected labels (three times on 2026-10-23).
 
 ## Where the build differs from the spec
 
