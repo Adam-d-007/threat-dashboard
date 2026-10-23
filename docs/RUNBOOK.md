@@ -16,9 +16,12 @@ Where to look:
 A scheduled run was missed. Check, in order:
 
 1. **Actions → pipeline.** Is the latest run failed, or is there no run since the last slot?
-2. **Scheduled runs dropped.** GitHub can delay or drop scheduled runs under load; each run has
-   two backup slots (+30 and +60 minutes) for that reason. If all three were dropped, start a
-   run by hand: Actions → pipeline → Run workflow → branch `main` → Run workflow.
+2. **Scheduled runs dropped.** GitHub can delay or drop scheduled runs under load (the 04:05
+   slot once started at 09:16). Each run has two backup slots, and every collector run starts
+   the pipeline when its slot is more than 20 minutes overdue (the "Start the pipeline if its
+   slot is overdue" step in a collect run's log says what it did). If neither ran, start a run
+   by hand: Actions → pipeline → Run workflow → branch `main` → Run workflow. The outside timer
+   in SETUP.md step 8 keeps the collector, and so the watchdog, running every hour.
 3. **Workflows disabled after 60 days.** In a public repository, GitHub disables scheduled
    workflows when there has been no repository activity for 60 days. GitHub's documentation
    does not define "activity", and it is not confirmed whether the pipeline's own commits (made

@@ -14,6 +14,7 @@ Where things stand (2026-10-22):
 | 5. GTD | Optional; the tool is ready, waiting for your download |
 | 6. Permission requests | Optional; not sent |
 | 7. Keyword review | Done (Adam checked the Slovak and Czech terms, 2026-10-22) |
+| 8. Hourly timer | Recommended: GitHub skips most hourly collector runs |
 
 All Terminal commands are run from the project folder:
 
@@ -150,3 +151,31 @@ ending in `!` must match a whole word.
 1. Open `pipeline/config/keywords.yaml` and read the `sk` and `cs` lists.
 2. Tell Claude any word that is missing (how Slovak and Czech media write about attacks,
    arrests, extremism, sabotage, espionage), and any term that catches too much.
+
+## Step 8. An outside timer for the hourly collector (recommended)
+
+GitHub starts scheduled workflows late or not at all when it is busy: on the night of
+22 to 23 October only 4 of about 15 hourly collector runs happened, and the 04:05 pipeline slot
+started at 09:16. The collector now starts the pipeline itself when a slot is overdue, so the
+pipeline is covered whenever the collector runs. What remains is to make the collector run every
+hour. A free outside timer can start it through GitHub's API.
+
+1. **Create a token that can only start workflows in this repository.** On GitHub: your photo
+   → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new
+   token. Name it `cron-collector`, choose an expiry (up to a year; note the date), Repository
+   access → Only select repositories → `threat-dashboard`, Permissions → Repository permissions →
+   **Actions: Read and write**. Nothing else. Generate it and copy it.
+2. **Create a free account at cron-job.org** and add a cron job:
+   - URL: `https://api.github.com/repos/Adam-d-007/threat-dashboard/actions/workflows/collect.yml/dispatches`
+   - Schedule: every hour, at minute 35
+   - Advanced → Request method: **POST**
+   - Headers: `Authorization: Bearer <the token>`, `Accept: application/vnd.github+json`,
+     `X-GitHub-Api-Version: 2022-11-28`
+   - Request body: `{"ref":"main"}`
+3. Save, then use "Test run": the answer should be HTTP 204, and a new collect run appears under
+   Actions within a minute. Tell Claude, who checks the runs.
+
+The token is stored at cron-job.org. It can start, cancel and re-run workflows of this one
+repository and read their logs, nothing else: no code, no secrets. If it leaks, delete it on
+GitHub and make a new one. Before it expires, make a new token and paste it into the job.
+
