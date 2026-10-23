@@ -1,6 +1,7 @@
 """Stage 6, classification: the LLM labels items in batches; keyword rules label whatever the
 LLM could not. Results are cached by item id so an item is sent to the LLM only once."""
 
+import hashlib
 import json
 import logging
 
@@ -11,6 +12,10 @@ from ..llm.prompts import CLASSIFY_SYSTEM, classify_user, retry_user
 from ..llm.schemas import Batch, ItemLabel
 from ..models import Classification, Item
 from .prefilter import compile_terms, fold
+
+# Cached labels are reused only if they came from the same instructions: a prompt change
+# relabels items still in the window (their events are rebuilt in cluster.refresh).
+PROMPT_ID = hashlib.sha1(CLASSIFY_SYSTEM.encode()).hexdigest()[:12]
 
 log = logging.getLogger("pipeline.classify")
 
@@ -101,7 +106,7 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
     todo = []
     for item in items:
         hit = cache.get(item.id)
-        if hit:
+        if hit and hit.get("prompt") == PROMPT_ID:
             item.classification = Classification.model_validate(hit["classification"])
             places[item.id] = hit["places"]
         else:
@@ -125,7 +130,8 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
                 item.classification = _from_label(label)
                 places[item.id] = [p.model_dump() for p in label.places]
                 cache[item.id] = {"classification": item.classification.model_dump(mode="json"),
-                                  "places": places[item.id], "at": item.published_at.isoformat()}
+                                  "places": places[item.id], "at": item.published_at.isoformat(),
+                                  "prompt": PROMPT_ID}
                 stats["llm"] += 1
             else:
                 item.classification = rules_label(item)
