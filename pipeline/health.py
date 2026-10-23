@@ -20,7 +20,8 @@ def source_health(source: dict, result: FetchResult | None, previous: dict | Non
     """result is None for a disabled source. previous is last run's record for this source.
 
     Stale: no successful fetch for 48 h, or 6 successful runs in a row with no items from a
-    source that has delivered items before (sources that only produce counts never are)."""
+    source that has delivered items before (sources that only produce counts never are, nor
+    sources marked sparse: true, which publish only a few items a week)."""
     base = {"id": source["id"], "name": source["name"], "tier": source["tier"],
             "group": source["group"]}
     last_success, last_error = _dt(previous, "last_success"), _dt(previous, "last_error")
@@ -34,7 +35,8 @@ def source_health(source: dict, result: FetchResult | None, previous: dict | Non
         zero_runs = 0 if items else (previous or {}).get("zero_runs", 0) + 1
         if items:
             last_items_at = now
-        empty = zero_runs >= STALE_ZERO_RUNS and last_items_at is not None
+        empty = (zero_runs >= STALE_ZERO_RUNS and last_items_at is not None
+                 and not source.get("sparse"))
         return SourceHealth(**base, status="stale" if empty else "ok", last_success=now,
                             last_error=last_error, items=items, http_status=result.http_status,
                             error=f"no items for {zero_runs} runs" if empty else result.error,

@@ -120,6 +120,9 @@ def test_source_turns_stale_after_six_empty_runs_only_if_it_had_items():
     assert h.status == "ok" and h.zero_runs == 5
     h = source_health(SRC, FetchResult("x", ok=True, items=[]), prev, NOW + timedelta(days=4))
     assert h.status == "stale" and h.error == "no items for 6 runs"
+    sparse = source_health(SRC | {"sparse": True}, FetchResult("x", ok=True, items=[]), prev,
+                           NOW + timedelta(days=4))
+    assert sparse.status == "ok" and sparse.zero_runs == 6  # a few items a week is normal
     prev = None
     for _ in range(8):  # e.g. GDELT GKG: never items, so never stale for being empty
         h = source_health(SRC, FetchResult("x", ok=True, items=[]), prev, NOW)
@@ -767,6 +770,19 @@ def test_relabelled_reports_rebuild_or_drop_their_stored_event():
     assert [(e.id, e.severity) for e in events3] == [(events[0].id, 1)]
 
 
+def test_items_left_out_of_an_answer_are_asked_again_once():
+    from pipeline.process.classify import classify
+    items = [_item(i, f"Teroristický útok číslo {i} vo Viedni", "a.sk") for i in range(3)]
+    llm = FakeLlm([json.dumps({"items": [_label(0), _label(1)]}),   # item 2 left out
+                   json.dumps({"items": [_label(2)]})])
+    _, stats = classify(items, llm, LLM_CFG, {})
+    assert llm.calls == 2 and stats["llm"] == 3 and stats["rules"] == 0
+    again = [_item(i, f"Teroristický útok číslo {i} v Linzi", "a.sk") for i in range(10, 12)]
+    stubborn = FakeLlm([json.dumps({"items": [_label(10)]}), json.dumps({"items": []})])
+    _, stats2 = classify(again, stubborn, LLM_CFG, {})
+    assert stubborn.calls == 2 and stats2["rules"] == 1  # asked once more, then rules
+
+
 def test_a_changed_prompt_relabels_cached_items(monkeypatch):
     from pipeline.process import classify as cl
     items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
@@ -1005,16 +1021,49 @@ def test_gdelt_window_reaches_back_to_the_oldest_query_success():
     assert collect.gdelt_since(h(30), NOW) == NOW - timedelta(hours=24)    # at most a day
 
 
-def test_pipeline_takes_gdelt_health_from_the_collector():
+def test_pipeline_runs_stale_gdelt_queries_itself(monkeypatch):
+    from pipeline.adapters.base import FetchResult
+    asked = {}
+
+    def fake_fetch(src, qs, since, until):
+        asked.update(ids=[q["id"] for q in qs], since=since)
+        return FetchResult(source_id=src["id"], ok=True, parts=[q["id"] for q in qs],
+                           parts_ok=[q["id"] for q in qs])
+    monkeypatch.setattr(pipeline_main.gdelt_doc, "fetch", fake_fetch)
     src = [{"id": "gdelt_doc", "name": "GDELT", "tier": "C", "group": "backbone"}]
+    qs = [{"id": "fresh"}, {"id": "starved"}]
+    eight = (NOW - timedelta(hours=8)).isoformat()
+    health = {"gdelt_doc": {"last_success": eight, "error": "starved: HTTP 429",
+                            "parts": {"fresh": (NOW - timedelta(hours=1)).isoformat(),
+                                      "starved": eight}}}
+    results, merged = pipeline_main.topup_gdelt(src, qs, health, NOW)
+    assert asked["ids"] == ["starved"] and asked["since"] == NOW - timedelta(hours=8)
+    assert results["gdelt_doc"].ok and health["gdelt_doc"]["parts"]["starved"] == eight  # copy
+    ok = pipeline_main.collected_health(src, [], merged, NOW - timedelta(days=1), NOW)
+    assert ok["gdelt_doc"].ok
+    asked.clear()
+    pipeline_main.topup_gdelt(src, qs, merged, NOW)
+    assert asked == {}  # nothing stale: no GDELT call at all
+
+
+def test_pipeline_takes_gdelt_health_from_the_collector():
+    src = [{"id": "gdelt_doc", "name": "GDELT", "tier": "C", "group": "backbone",
+            "adapter": "gdelt_doc"}]
     item = _item(1, "Terror story", "x.com", source_id="gdelt_doc", tier="C")
     fresh = {"gdelt_doc": {"last_success": (NOW - timedelta(hours=2)).isoformat()}}
     res = pipeline_main.collected_health(src, [item], fresh, NOW - timedelta(days=1), NOW)
     assert res["gdelt_doc"].ok and res["gdelt_doc"].item_count == 1
-    old = {"gdelt_doc": {"last_success": (NOW - timedelta(hours=8)).isoformat(),
-                         "error": "terror_sk_sources: HTTP 429"}}
-    res = pipeline_main.collected_health(src, [], old, NOW - timedelta(days=1), NOW)
+    def at(hours):
+        return {"gdelt_doc": {"last_success": (NOW - timedelta(hours=hours)).isoformat(),
+                              "error": "terror_sk_sources: HTTP 429"}}
+    # GDELT queries catch up a day back, so 8 hours without success loses nothing; 25 does.
+    assert pipeline_main.collected_health(src, [], at(8), NOW - timedelta(days=1), NOW)[
+        "gdelt_doc"].ok
+    res = pipeline_main.collected_health(src, [], at(25), NOW - timedelta(days=1), NOW)
     assert not res["gdelt_doc"].ok and "429" in res["gdelt_doc"].error
+    rss = [{"id": "gdelt_doc", "name": "Feed", "tier": "B", "group": "press", "adapter": "rss"}]
+    assert not pipeline_main.collected_health(rss, [], at(8), NOW - timedelta(days=1), NOW)[
+        "gdelt_doc"].ok  # feeds scroll: 6 hours
 
 
 

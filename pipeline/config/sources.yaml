@@ -641,6 +641,7 @@ sources:
     regions: [SK, EU]
     enabled: true
     verified_on: null
+    sparse: true   # a few items a week: empty runs are normal, not a sign of breakage
     queries:
       - id: blocked_outlets
         query: "(domain:ecfr.eu OR domain:mzv.sk OR domain:globsec.org OR domain:understandingwar.org OR domain:euvsdisinfo.eu OR domain:euractiv.com OR domain:rapporteur.com)"

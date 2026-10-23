@@ -12,7 +12,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 | Phase 3, processing | Done |
 | Phase 4, scoring and calibration | Done; weights are reviewed after four weeks of live data |
 | Geopolitics | Done |
-| Phase 5, frontend | Done; the GTD history appears once Adam's GTD download is aggregated |
+| Phase 5, frontend | Done |
 | Phase 6, hardening | Done, except the 14 unattended days, which can only start after the merge to `main` |
 
 ## Hard rules
@@ -54,8 +54,8 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 - [x] **ACLED**: not used. ACLED answered on 2026-10-22 that dashboards built on its data may
       not be public; the adapter was removed and the dashboard stays public
 - [x] **ReliefWeb**: appname approved, switched on 2026-10-23
-- [ ] **GTD aggregates** (waiting on Adam, optional): `pipeline.tools.gtd_aggregates` and the
-      chart are built and tested; they need the GTD download from START
+- [x] **GTD aggregates**: yearly counts 1970 to 2020 for Slovakia (from 1993) and the EU-27,
+      from the GTD file downloaded 2026-10-23 (raw file kept outside the repository)
 - Blocked and left out: MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv (bot walls; GDELT does not
   index them), DW and PAP (explicit opt-outs). Telex, EEAS and ECFR are unreachable from
   GitHub's servers and replaced (Index.hu, Council feed, ECFR through GDELT). Request texts
@@ -118,7 +118,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 - [x] Every panel renders with the five fixture cases (tested)
 - [x] Load time on Lighthouse's mobile 4G profile (dev deploy, 2026-10-22): first paint
       1.7 s, largest paint 1.7 to 2.6 s, interactive 2.6 to 2.7 s
-- [ ] GTD history in base rates: built; shows once `static/gtd_aggregates.json` exists
+- [x] GTD history in base rates, with the citation the GTD licence requires
 
 ## Phase 6, hardening
 
@@ -131,12 +131,14 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
       file tree identical before and after
 - [x] `docs/RUNBOOK.md`, including the 60-day inactivity rule for scheduled workflows
 - [x] Source "stale" after 6 empty runs, if it has delivered items before
-- [x] Run-status rule (every source, GDELT DOC within 6 h, the LLM, 10 press sources)
+- [x] Run-status rule (every source, each GDELT query within 24 h, the LLM, 10 press sources)
 - [ ] 14 days (28 runs) without manual fixes (waiting on time; counting from 2026-10-23)
 
 ## Waiting on Adam
 
+- [ ] Outside hourly timer for the collector (SETUP.md step 8): GitHub skips most hourly runs
+- [ ] Send the ACLED Partner-tier request (research only, not the dashboard)
+
 Step-by-step instructions: [SETUP.md](SETUP.md).
 
-- [ ] GTD download from START (optional, step 5)
 - [ ] Permission requests to the blocked sources (optional, step 6)
