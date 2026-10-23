@@ -261,7 +261,7 @@ describe("Phase 5: every panel renders in each special case", () => {
   it("disagreement", async () => {
     mockFetch(withSK({ disagreement: true }));
     renderAt("2026-10-22T14:00:00Z");
-    expect(await screen.findByText(/disagree by more than one level/)).toBeInTheDocument();
+    expect(await screen.findByText(/The rules and the language model disagree/)).toBeInTheDocument();
   });
 
   it("a failed source", async () => {
