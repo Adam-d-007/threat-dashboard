@@ -804,6 +804,22 @@ def test_items_left_out_of_an_answer_are_asked_again_once():
     assert stubborn.calls == 2 and stats2["rules"] == 1  # asked once more, then rules
 
 
+def test_a_severe_incident_is_not_placed_in_the_sources_country_by_assumption():
+    from pipeline.process.classify import classify
+    jordan = _item(1, "STREĽBA V KOSTOLE: Hlásia najmenej 7 obetí, ďalší sú vážne zranení",
+                   "teraz.sk")
+    jordan.snippet = ("Očitý svedok povedal, že strelci na miesto dorazili vozidlom a v kostole "
+                      "nepretržite strieľali päť minút predtým než z miesta útoku utiekli.")
+    bratislava = _item(2, "Streľba v Bratislave: dvaja mŕtvi", "teraz.sk")
+    minor = _item(3, "Polícia zadržala muža, ktorý sa vyhrážal útokom na školu", "teraz.sk")
+    labels = [_label(1, event_type="attack", severity=4, countries=["SK"], places=[]),
+              _label(2, event_type="attack", severity=4, countries=["SK"], places=[]),
+              _label(3, event_type="arrest", severity=1, countries=["SK"], places=[])]
+    items = [jordan, bratislava, minor]
+    classify(items, FakeLlm([json.dumps({"items": labels})]), LLM_CFG, {})
+    assert [i.classification.countries for i in items] == [[], ["SK"], ["SK"]]
+
+
 def test_a_changed_prompt_relabels_cached_items(monkeypatch):
     from pipeline.process import classify as cl
     items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
