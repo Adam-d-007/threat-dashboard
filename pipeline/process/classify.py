@@ -71,6 +71,22 @@ def rules_label(item: Item) -> Classification:
         countries=["SK"] if hit["slovak"] else [], confidence=0.3)
 
 
+# Languages spoken in one country, and words that name it (folded: no diacritics, lowercase).
+HOME = {"sk": ("SK", ("sloven", "slovak", "bratislav")), "cs": ("CZ", ("cesk", "czech", "praha")),
+        "hu": ("HU", ("magyar", "hungar", "budapest")), "pl": ("PL", ("pols", "poland", "warsz"))}
+
+
+def assumed_home_country(item: Item, c: Classification, place_refs: list) -> bool:
+    """A severe incident placed in the source's own country although the item names no place
+    and never mentions that country: the model assumed it. On 2026-10-23 a TASR headline about
+    a church shooting in Jordan, with no place in it, became seven deaths in Slovakia."""
+    home = HOME.get(item.lang)
+    if not home or c.severity < 3 or c.countries != [home[0]] or place_refs:
+        return False
+    text = fold(f"{item.title} {item.snippet}")
+    return not any(word in text for word in home[1])
+
+
 def _from_label(label: ItemLabel) -> Classification:
     # Places are geocoded later; until then the names wait in place_refs.
     return Classification(
@@ -149,5 +165,10 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
         item.classification = rules_label(item)
         places[item.id] = []
         stats["rules"] += 1
+    for item in items:
+        c = item.classification
+        if c and c.status == "llm" and assumed_home_country(item, c, places.get(item.id, [])):
+            log.info("%s: no place and no mention of %s; country dropped", item.id, c.countries)
+            item.classification = c.model_copy(update={"countries": []})
     log.info("classified: %s", stats)
     return places, stats
