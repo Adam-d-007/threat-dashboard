@@ -31,7 +31,9 @@ Each entry has exactly these fields:
   someone linked to it) is not a new incident: event_type other, severity 0
 - sk_link: direct (happened in Slovakia, targets Slovakia or Slovaks, or Slovak authorities
   act on it) | indirect (neighbouring country or clear relevance to Slovakia) | none
-- countries: ISO 3166-1 alpha-2 codes of the countries where it happened (max 6)
+- countries: ISO 3166-1 alpha-2 codes of the countries where it happened (max 6). Only
+  countries the item names or clearly implies; never assume the source's own country. If the
+  item does not say where it happened, give []
 - places: up to 4 places where it happened, each {"name": English place name,
   "country": ISO alpha-2}; [] if none
 - event_key: a short "who-what-where-date" string that would be the same for other reports

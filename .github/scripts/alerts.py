@@ -43,7 +43,8 @@ def main() -> None:
     ensure_label(FAILURE, "d03b3b", "A pipeline run failed or two runs in a row were partial")
     ensure_label(SIS, "fab219", "The SIS threat level page changed")
 
-    failed = job != "success"
+    # A run cancelled by hand is not a failure (cancelling one opened issue #3 on 2026-10-23).
+    failed = job == "failure"
     two_partial = len(last) == 2 and all(r["status"] == "partial" for r in last)
     issue = open_issue(FAILURE)
     if failed or two_partial:
