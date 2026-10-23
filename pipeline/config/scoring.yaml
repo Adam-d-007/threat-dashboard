@@ -5,7 +5,7 @@ llm:
   # The first available model in prefer is used; otherwise the newest stable model of the
   # family, chosen from the provider's live model list each run (logged in run.llm.model).
   gemini:
-    prefer: [gemini-3.8-flash, gemini-2.5-flash]
+    prefer: [gemini-3.8-flash]   # gemini-2.5-flash: retired for new users (HTTP 404, 2026-10-22)
     family: flash
     requests_per_minute: 10
   groq:
