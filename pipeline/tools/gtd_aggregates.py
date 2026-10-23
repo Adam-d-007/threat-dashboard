@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 OUT = Path(__file__).parents[2] / "static" / "gtd_aggregates.json"
-SOURCE = "https://www.start.umd.edu/gtd/"
+SOURCE = "https://www.start.umd.edu/data-tools/GTD"
 
 # GTD country_txt -> ISO code; "EU" for a former state wholly inside today's EU.
 EU_NAMES = {

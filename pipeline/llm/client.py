@@ -30,6 +30,9 @@ GEMINI = "https://generativelanguage.googleapis.com/v1beta"
 GROQ = "https://api.groq.com/openai/v1"
 TIMEOUT_S = 45
 RETRY_WAITS_S = (5, 15)
+# A 429 with a Retry-After of at most this many seconds is waited out instead of the fixed
+# waits: Groq's free tier counts tokens per minute and says when the minute resets.
+MAX_RETRY_AFTER_S = 60
 MAX_OUTPUT_TOKENS = 8192
 TRANSIENT = {429, 500, 502, 503, 504, None}
 FATAL = {401, 403}
@@ -46,9 +49,11 @@ class LlmBadOutput(Exception):
 
 
 class _ProviderError(Exception):
-    def __init__(self, message: str, status: int | str | None = None):
+    def __init__(self, message: str, status: int | str | None = None,
+                 retry_after: float | None = None):
         super().__init__(message)
         self.status = status
+        self.retry_after = retry_after
 
 
 def _version(name: str) -> tuple[float, ...]:
@@ -183,6 +188,8 @@ class LlmClient:
             except _ProviderError as e:
                 if wait is None or e.status not in TRANSIENT or self.out_of_time:
                     raise
+                if e.retry_after is not None and e.retry_after <= MAX_RETRY_AFTER_S:
+                    wait = e.retry_after + 1
                 log.info("%s answered %s; retrying in %d s", p.name, e.status, wait)
                 time.sleep(wait)
         raise AssertionError("unreachable")
@@ -232,5 +239,10 @@ class LlmClient:
             raise _ProviderError(f"{type(e).__name__}") from e
         if r.status_code != 200:
             # The body can echo the request, so keep only a short, key-free excerpt.
-            raise _ProviderError(f"HTTP {r.status_code}: {r.text[:160]}", r.status_code)
+            try:
+                retry_after = float(r.headers.get("retry-after", ""))
+            except ValueError:
+                retry_after = None
+            raise _ProviderError(f"HTTP {r.status_code}: {r.text[:160]}", r.status_code,
+                                 retry_after)
         return r

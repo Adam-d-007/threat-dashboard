@@ -10,7 +10,7 @@ Where things stand (2026-10-22):
 | 1. Gemini key | Done |
 | 2. Groq key | Done |
 | 3. ACLED | Not used: ACLED's terms forbid public dashboards (their answer, 2026-10-22) |
-| 4. ReliefWeb | Waiting for the approved appname |
+| 4. ReliefWeb | Done: appname approved and switched on (2026-10-23) |
 | 5. GTD | Optional; the tool is ready, waiting for your download |
 | 6. Permission requests | Optional; not sent |
 | 7. Keyword review | Done (Adam checked the Slovak and Czech terms, 2026-10-22) |

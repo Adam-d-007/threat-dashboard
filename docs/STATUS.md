@@ -8,7 +8,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 | Area | State |
 |---|---|
 | Phase 1, heartbeat | Done; scheduled runs not yet seen firing from `main` (see below) |
-| Phase 2, sources | Done for everything open to us: 29 of 40 live. ReliefWeb waits on its appname; ACLED is not used (its terms forbid public dashboards); 7 need the publishers' permission; 3 are unreachable from GitHub and replaced |
+| Phase 2, sources | Done for everything open to us: 30 of 40 live. ACLED is not used (its terms forbid public dashboards); 7 need the publishers' permission; 3 are unreachable from GitHub and replaced |
 | Phase 3, processing | Done |
 | Phase 4, scoring and calibration | Done; weights are reviewed after four weeks of live data |
 | Geopolitics | Done |
@@ -53,8 +53,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 - [x] SIS annual report (2023, the latest published) summarised and shown on the Slovak page
 - [x] **ACLED**: not used. ACLED answered on 2026-10-22 that dashboards built on its data may
       not be public; the adapter was removed and the dashboard stays public
-- [ ] **ReliefWeb** (waiting on others): adapter written and tested; waiting for the approved
-      appname (requested 2026-10-22)
+- [x] **ReliefWeb**: appname approved, switched on 2026-10-23
 - [ ] **GTD aggregates** (waiting on Adam, optional): `pipeline.tools.gtd_aggregates` and the
       chart are built and tested; they need the GTD download from START
 - Blocked and left out: MZV, GLOBSEC, ISW, EUvsDisinfo, Euractiv (bot walls; GDELT does not
@@ -141,4 +140,3 @@ Step-by-step instructions: [SETUP.md](SETUP.md).
 
 - [ ] GTD download from START (optional, step 5)
 - [ ] Permission requests to the blocked sources (optional, step 6)
-- [ ] ReliefWeb: forward the approved appname when it arrives

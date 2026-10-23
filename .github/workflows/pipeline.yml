@@ -13,6 +13,10 @@ on:
         description: "First run the LLM acceptance check (about 2 LLM calls)"
         type: boolean
         default: false
+      slot_run:
+        description: "Run as the current 04/13 slot, like a scheduled run (used by the watchdog)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -53,7 +57,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           slot=""
-          if [ "${{ github.event_name }}" = "schedule" ]; then
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ inputs.slot_run }}" = "true" ]; then
             # A delayed or backup run still gets its slot's id, and skips a slot already done.
             if [ "$(date -u +%H)" -lt 13 ]; then slot="--slot 04"; else slot="--slot 13"; fi
             slot="$slot --skip-if-slot-done"

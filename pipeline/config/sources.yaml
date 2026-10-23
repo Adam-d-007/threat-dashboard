@@ -662,18 +662,17 @@ sources:
     urls: ["https://api.reliefweb.int/v2/reports"]
     lang: en
     regions: [EU]
-    enabled: false
-    verified_on: null
+    enabled: true
+    verified_on: 2026-10-23
     reliefweb:
       limit: 100
       # Ukraine, Russia; Israel, Palestine, Lebanon, Syria, Iran, Iraq, Jordan, Yemen;
       # Serbia, Bosnia and Herzegovina, Montenegro, North Macedonia, Albania, Kosovo
       countries: [UKR, RUS, ISR, PSE, LBN, SYR, IRN, IRQ, JOR, YEM, SRB, BIH, MNE, MKD, ALB, XKX]
     notes: >-
-      appname requested by Adam on 2026-10-22 (form linked from apidoc.reliefweb.int). To switch
-      on: add the approved name as the Actions variable RELIEFWEB_APPNAME, then set enabled: true.
-      The adapter follows ReliefWeb's documentation but has not been run against the API yet;
-      Kosovo's code (XKX) is unverified.
+      appname approved 2026-10-23, stored as the Actions variable RELIEFWEB_APPNAME (not a
+      secret). First live fetch on 2026-10-23 returned reports; the API rejected dates with
+      microseconds, fixed then. Kosovo's code (XKX) is unverified.
 
   - id: gdelt_gkg
     name: GDELT 2.0 GKG files

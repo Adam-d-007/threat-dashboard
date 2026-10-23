@@ -21,8 +21,20 @@ from .store import state
 
 KEEP = timedelta(hours=48)
 GDELT_WINDOW = timedelta(hours=3)
+# GitHub runs scheduled workflows late or skips them (4 of about 15 collector runs fired on the
+# night of 2026-10-22), so GDELT is asked from the oldest query's last success, up to a day.
+GDELT_MAX_WINDOW = timedelta(hours=24)
 
 log = logging.getLogger("pipeline.collect")
+
+
+def gdelt_since(health: dict, now: datetime) -> datetime:
+    """Start of the GDELT window: the oldest last success of any GDELT query, so hours the
+    collector missed are filled in; at least GDELT_WINDOW and at most GDELT_MAX_WINDOW back."""
+    times = [datetime.fromisoformat(t) for h in health.values() for t in
+             (h.get("parts") or {}).values()]
+    oldest = min(times, default=now - GDELT_WINDOW)
+    return max(now - GDELT_MAX_WINDOW, min(oldest, now - GDELT_WINDOW))
 
 
 def update_health(health: dict, results: dict, now: datetime) -> dict:
@@ -58,17 +70,18 @@ def main(argv: list[str] | None = None) -> int:
     wanted = {"rss"} if args.fixtures else {"rss", "gdelt_doc"}
     collected = [s for s in sources
                  if s["enabled"] and s["adapter"] in wanted and s.get("hourly", True)]
-    results = fetch_all(collected, queries, now - GDELT_WINDOW, now, args.fixtures)
-    # Read-only: dates undated items the way the pipeline already did.
-    seen = state.load(args.state_dir)["seen"]
-    fresh = normalize_all(collected, results, now, seen)
-
     try:
         buf, reset = state.load_buffer_full(args.state_dir), False
         old, health = buf.items, dict(buf.health)
     except ValidationError:
         log.exception("rss_buffer.json is invalid; starting a new buffer")
         old, health, reset = [], {}, True
+    since = gdelt_since(health, now)
+    log.info("GDELT window from %s", since.isoformat())
+    results = fetch_all(collected, queries, since, now, args.fixtures)
+    # Read-only: dates undated items the way the pipeline already did.
+    seen = state.load(args.state_dir)["seen"]
+    fresh = normalize_all(collected, results, now, seen)
     health = update_health(health, results, now)
     old_ids = {i.id for i in old}
     kept = [i for i in dedupe(old + fresh) if now - i.fetched_at <= KEEP]

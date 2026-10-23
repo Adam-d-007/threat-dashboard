@@ -635,8 +635,10 @@ def test_reliefweb_posts_query_and_parses(monkeypatch):
         return httpx.Response(200, json=body, request=httpx.Request("POST", url))
 
     monkeypatch.setattr(httpx, "post", fake_post)
-    res = reliefweb.fetch(RW_SRC, NOW - timedelta(hours=12))
+    res = reliefweb.fetch(RW_SRC, NOW - timedelta(hours=12, microseconds=-123456))
     assert res.ok and res.items[0].title == "Ukraine: Flash Update"
+    # ReliefWeb rejects microseconds and "Z" (HTTP 400), so the bound has neither.
+    assert seen["json"]["filter"]["conditions"][0]["value"]["from"] == "2026-10-21T23:00:00+00:00"
     assert res.items[0].snippet == "Ukraine · OCHA" and res.items[0].published_at.hour == 8
     assert seen["params"] == {"appname": "MCSlovakia-threatresearch-x"}
     assert seen["json"]["filter"]["conditions"][1]["value"] == ["UKR"]
@@ -795,9 +797,9 @@ def _llm_client(monkeypatch, script, gemini_models=("gemini-3.8-flash",)):
                                 for m in gemini_models]}
                     if "googleapis" in url else {"data": [{"id": "openai/gpt-oss-120b"}]})
             return httpx.Response(200, json=body, request=req)
-        frag, status, body = queue.pop(0)
+        frag, status, body, *headers = queue.pop(0)
         assert frag in url, (frag, url)
-        return httpx.Response(status, json=body, request=req)
+        return httpx.Response(status, json=body, request=req, headers=(headers or [{}])[0])
 
     monkeypatch.setattr(httpx, "request", fake_request)
     cfg = {"gemini": {"prefer": ["gemini-3.8-flash", "gemini-2.5-flash"], "family": "flash",
@@ -838,6 +840,16 @@ def test_gemini_down_on_every_model_is_dropped_and_groq_answers(monkeypatch):
     assert c.providers[0].dead
     c.complete_json("s", "u")  # straight to Groq, no more waiting on Gemini
     assert c.calls == 5 and c.usage()["provider"] == "groq"
+
+
+def test_rate_limit_waits_as_long_as_the_provider_asks(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [("googleapis", 403, {}),
+                                       ("groq", 429, {}, {"retry-after": "37"}),
+                                       ("groq", 200, GROQ_OK)])
+    waits = []
+    monkeypatch.setattr(llm.time, "sleep", waits.append)
+    assert c.complete_json("s", "u") == '{"items": []}'
+    assert 38 in waits  # Retry-After 37 s, plus one
 
 
 def test_llm_stops_when_the_time_budget_is_used(monkeypatch):
@@ -949,6 +961,16 @@ def test_gdelt_counts_as_ok_once_every_query_succeeded_across_runs():
     fresh = pipeline_main.collected_health(
         [{"id": "gdelt_doc"}], [], {"gdelt_doc": h2}, NOW - timedelta(days=1), NOW)
     assert fresh["gdelt_doc"].ok
+
+
+def test_gdelt_window_reaches_back_to_the_oldest_query_success():
+    def h(*hours):
+        return {"gdelt_doc": {"parts": {f"q{i}": (NOW - timedelta(hours=x)).isoformat()
+                                        for i, x in enumerate(hours)}}}
+    assert collect.gdelt_since({}, NOW) == NOW - timedelta(hours=3)        # nothing yet
+    assert collect.gdelt_since(h(1, 2), NOW) == NOW - timedelta(hours=3)   # at least 3 h
+    assert collect.gdelt_since(h(1, 7), NOW) == NOW - timedelta(hours=7)   # missed hours
+    assert collect.gdelt_since(h(30), NOW) == NOW - timedelta(hours=24)    # at most a day
 
 
 def test_pipeline_takes_gdelt_health_from_the_collector():

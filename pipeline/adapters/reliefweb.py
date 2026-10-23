@@ -40,7 +40,9 @@ def fetch(source: dict, since: datetime) -> FetchResult:
         "fields": {"include": ["title", "url", "date.created", "primary_country.name",
                                "primary_country.iso3", "source.name"]},
         "filter": {"operator": "AND", "conditions": [
-            {"field": "date.created", "value": {"from": since.isoformat()}},
+            # Only this form is accepted: no microseconds, no "Z" (checked 2026-10-23).
+            {"field": "date.created", "value": {"from": since.astimezone(UTC).replace(
+                microsecond=0).isoformat()}},
             {"field": "primary_country.iso3", "operator": "OR", "value": cfg["countries"]},
         ]},
         "sort": ["date.created:desc"],

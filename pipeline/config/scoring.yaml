@@ -9,7 +9,9 @@ llm:
     family: flash
     requests_per_minute: 10
   groq:
-    prefer: [openai/gpt-oss-120b, llama-3.3-70b-versatile]
+    # Each Groq model has its own free-tier limits; those not offered are skipped.
+    prefer: [openai/gpt-oss-120b, openai/gpt-oss-20b, llama-3.3-70b-versatile,
+             qwen/qwen3-32b, llama-3.1-8b-instant]
     requests_per_minute: 10
   batch_size: 25            # items per classification call
   max_seconds: 480          # all LLM work per run; then rules take over
