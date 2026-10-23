@@ -183,8 +183,11 @@ export type Source = string;
 export type DataEnds = number;
 export type Generated = string;
 export type Year = number;
-export type Incidents = number;
-export type Deaths = number;
+/**
+ * None for a year the GTD has no data for (1993)
+ */
+export type Incidents = number | null;
+export type Deaths = number | null;
 export type Sk = GtdYear[];
 export type Eu = GtdYear[];
 /**

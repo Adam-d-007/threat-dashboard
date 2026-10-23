@@ -939,12 +939,27 @@
           "type": "integer"
         },
         "incidents": {
-          "title": "Incidents",
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "None for a year the GTD has no data for (1993)",
+          "title": "Incidents"
         },
         "deaths": {
-          "title": "Deaths",
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deaths"
         }
       },
       "required": [
