@@ -96,6 +96,9 @@ class Event(Strict):
     country: str
     place: Place | None = None
     sk_link: SkLink
+    topic: Domain | None = Field(default=None, description="terrorism when any report calls it "
+                                 "that, else the first report's domain; None on events stored "
+                                 "before 2026-10-23")
     item_ids: list[str]
     event_keys: list[str] = Field(default_factory=list, description="LLM incident keys seen")
     domains: list[str]

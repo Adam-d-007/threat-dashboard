@@ -12,6 +12,8 @@ from ..models import AnchorReading, Component, Event, LlmAssessment
 
 EU27 = {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE",
         "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"}
+NATO_NON_EU = {"AL", "CA", "IS", "ME", "MK", "NO", "TR", "GB", "US"}
+EU_NATO = EU27 | NATO_NON_EU
 
 
 def curve(r: float, cfg: dict) -> float:
@@ -43,10 +45,14 @@ def corroboration(e: Event, cfg: dict) -> float:
 
 def event_contributions(events: list[Event], region: str, now: datetime,
                         cfg: dict) -> list[tuple[Event, float]]:
-    """(event, s * p * c * e^(-age/10)) for events in the 60-day window, largest first."""
+    """(event, s * p * c * e^(-age/10)) for events in the 60-day window, largest first.
+    Outside the EU and NATO only terrorism counts: drone and missile strikes in the
+    Russia-Ukraine war were labelled hybrid and raised both indices (2026-10-23)."""
     ec = cfg["events"]
     out = []
     for e in events:
+        if e.country not in EU_NATO and e.topic != "terrorism":
+            continue
         age = (now.date() - e.date).days
         if age < 0 or age > ec["window_days"]:
             continue

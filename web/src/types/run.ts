@@ -133,6 +133,10 @@ export type Severity1 = number;
 export type Date = string;
 export type Country1 = string;
 export type SkLink1 = "none" | "indirect" | "direct";
+/**
+ * terrorism when any report calls it that, else the first report's domain; None on events stored before 2026-10-23
+ */
+export type Topic = ("terrorism" | "hybrid" | "cyber" | "unrest" | "geopolitics" | "other") | null;
 export type ItemIds1 = string[];
 /**
  * LLM incident keys seen
@@ -473,6 +477,7 @@ export interface Event {
   country: Country1;
   place: Place | null;
   sk_link: SkLink1;
+  topic: Topic;
   item_ids: ItemIds1;
   event_keys: EventKeys;
   domains: Domains;

@@ -16,14 +16,17 @@ Each entry has exactly these fields:
 - relevant: true if the item reports a terrorism, hybrid, cyber, unrest or geopolitical
   security development; false otherwise (sport, celebrity, ordinary crime, business)
 - domain: terrorism | hybrid | cyber | unrest | geopolitics | other
-  (hybrid = sabotage, drones over infrastructure, airspace violations, state disinformation;
-   acts of war between states are geopolitics, not terrorism)
+  (hybrid = covert or deniable state actions against countries not at war with it: sabotage,
+   drones over infrastructure, airspace violations, state disinformation. Military strikes in
+   an ongoing war, such as Russian and Ukrainian drone, missile or artillery attacks on each
+   other's territory, are geopolitics even when they hit civilians or infrastructure)
 - event_type: attack | attempted_attack | plot_disrupted | arrest | conviction |
   threat_statement | sabotage | other
 - ideology (Europol TE-SAT categories): jihadist | right_wing | left_anarchist |
   ethno_separatist | state_linked | other | unknown. Use unknown unless the item says.
 - severity: 0 not an incident; 1 arrest or disrupted plot; 2 attempted or failed attack;
-  3 attack without deaths; 4 attack with 1 to 4 deaths; 5 attack with 5 or more deaths
+  3 attack without deaths; 4 attack with 1 to 4 deaths; 5 attack with 5 or more deaths.
+  Vandalism, graffiti and damage to monuments with no one hurt are at most 1
 - sk_link: direct (happened in Slovakia, targets Slovakia or Slovaks, or Slovak authorities
   act on it) | indirect (neighbouring country or clear relevance to Slovakia) | none
 - countries: ISO 3166-1 alpha-2 codes of the countries where it happened (max 6)

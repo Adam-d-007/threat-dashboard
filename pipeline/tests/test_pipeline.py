@@ -729,6 +729,7 @@ def test_one_incident_in_three_languages_becomes_one_event():
     e = events[0]
     assert sorted(e.domains) == ["bbc.co.uk", "ct24.ceskatelevize.cz", "teraz.sk"]
     assert e.corroborated and e.place.name == "Bratislava" and e.sk_link == "direct"
+    assert e.topic == "terrorism"
     assert all(i.event_id == e.id for i in kept)
 
 

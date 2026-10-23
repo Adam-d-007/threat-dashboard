@@ -714,6 +714,27 @@
           "title": "Sk Link",
           "type": "string"
         },
+        "topic": {
+          "anyOf": [
+            {
+              "enum": [
+                "terrorism",
+                "hybrid",
+                "cyber",
+                "unrest",
+                "geopolitics",
+                "other"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "terrorism when any report calls it that, else the first report's domain; None on events stored before 2026-10-23",
+          "title": "Topic"
+        },
         "item_ids": {
           "items": {
             "type": "string"
@@ -784,6 +805,7 @@
         "country",
         "place",
         "sk_link",
+        "topic",
         "item_ids",
         "event_keys",
         "domains",

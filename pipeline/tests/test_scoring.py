@@ -9,7 +9,7 @@ import yaml
 from pipeline.main import CONFIG
 from pipeline.models import AnchorReading, Event
 from pipeline.score import gates
-from pipeline.score.components import curve
+from pipeline.score.components import curve, event_contributions
 from pipeline.score.terrorism import disagree, score_region
 from pipeline.tools.gkg_replay import INCIDENTS
 from pipeline.tools.gkg_replay import OUT as REPLAYS
@@ -150,6 +150,22 @@ def test_forced_disagreement_keeps_the_gated_rules_level():
                         NOW, CFG, 5)
     assert a.llm.status == "ok" and a.llm.level == 4
     assert a.disagreement and a.rules_level == 2 and a.level == a.rules_level
+
+
+def test_outside_the_eu_and_nato_only_terrorism_counts():
+    def topic(e, t):
+        return e.model_copy(update={"topic": t})
+    war = topic(ev("UA", sev=5, sk="indirect", eid="war"), "hybrid")       # drone strikes
+    terror = topic(ev("UA", sev=3, sk="indirect", eid="ter"), "terrorism")  # a bombing
+    sabotage = topic(ev("PL", etype="sabotage", sev=2, eid="sab"), "hybrid")
+    old_ua = ev("UA", sev=3, sk="indirect", eid="old_ua")                   # no topic stored
+    old_pl = ev("PL", sev=3, eid="old_pl")
+    for region in ("SK", "EU"):
+        counted = {e.id for e, _ in event_contributions(
+            [war, terror, sabotage, old_ua, old_pl], region, NOW, CFG)}
+        assert "war" not in counted and "old_ua" not in counted, region
+        assert {"sab", "old_pl"} <= counted, region
+    assert "ter" in {e.id for e, _ in event_contributions([terror], "SK", NOW, CFG)}
 
 
 def test_curve_matches_spec():

@@ -16,10 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from ..models import Event, Gate
-from .components import EU27
+from .components import EU27, EU_NATO
 
-NATO_NON_EU = {"AL", "CA", "IS", "ME", "MK", "NO", "TR", "GB", "US"}
-EU_NATO = EU27 | NATO_NON_EU
 ATTACKS = {"attack", "attempted_attack"}
 
 
