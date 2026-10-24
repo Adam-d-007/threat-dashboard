@@ -33,10 +33,12 @@ RETRY_WAITS_S = (5, 15)
 # A 429 with a Retry-After of at most this many seconds is waited out instead of the fixed
 # waits: Groq's free tier counts tokens per minute and says when the minute resets.
 MAX_RETRY_AFTER_S = 60
-# Groq's free tier counts the reserved output against its per-request limit: with 8192 the
-# brief (about 5,100 input tokens) was refused with HTTP 413 on 2026-10-24, while a batch with
-# about 10,900 tokens in all went through. The longest answer, the brief, needs about 3,000.
-MAX_OUTPUT_TOKENS = 4096
+# Output tokens reserved per call, per provider. Groq's free tier counts the reservation against
+# its per-request limit: with 8192 the brief (about 5,100 input tokens) was refused with HTTP 413
+# on 2026-10-24, so Groq gets 4096 (the brief needs about 3,000). Gemini spends part of its
+# allowance thinking before it writes: with 4096 its batch answers were cut off mid-JSON, so it
+# keeps 8192.
+MAX_OUTPUT_TOKENS = {"gemini": 8192, "groq": 4096}
 TRANSIENT = {429, 500, 502, 503, 504, None}
 # A provider that has spent this long failing since its last answer is dropped for the run, so
 # the next one always gets its turn. On 2026-10-24 Gemini timed out on four models and used the
@@ -222,7 +224,7 @@ class LlmClient:
                 "systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"role": "user", "parts": [{"text": user}]}],
                 "generationConfig": {"temperature": 0, "responseMimeType": "application/json",
-                                     "maxOutputTokens": MAX_OUTPUT_TOKENS},
+                                     "maxOutputTokens": MAX_OUTPUT_TOKENS["gemini"]},
             })
             body = r.json()
             cands = body.get("candidates") or []
@@ -233,7 +235,7 @@ class LlmClient:
         try:
             r = self._http("POST", f"{GROQ}/chat/completions", p, json={
                 "model": p.model, "temperature": 0, "response_format": {"type": "json_object"},
-                "max_completion_tokens": MAX_OUTPUT_TOKENS,
+                "max_completion_tokens": MAX_OUTPUT_TOKENS["groq"],
                 "messages": [{"role": "system", "content": system},
                              {"role": "user", "content": user}],
             })
