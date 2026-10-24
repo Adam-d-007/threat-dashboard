@@ -60,9 +60,17 @@ export type Kind = "national" | "travel";
  */
 export type Issuer = string | null;
 export type Status1 = "ok" | "fallback" | "disabled";
+/**
+ * When this brief was written; earlier than the run when a failed run kept the last one
+ */
+export type WrittenAt = string | null;
 export type TextEn = string;
 export type TextSk = string | null;
 export type ItemIds = string[];
+/**
+ * Article URLs of its items, so the line keeps its links when the brief is carried forward
+ */
+export type Urls = string[];
 export type Lines = BriefLine[];
 export type WhatChangedEn = string | null;
 export type WhatChangedSk = string | null;
@@ -141,7 +149,7 @@ export type ItemIds1 = string[];
 /**
  * Article URLs of its reports, so the page can link every incident, also after its items leave the run
  */
-export type Urls = string[];
+export type Urls1 = string[];
 /**
  * LLM incident keys seen
  */
@@ -373,6 +381,7 @@ export interface AnchorReading {
  */
 export interface Brief {
   status: Status1;
+  written_at: WrittenAt;
   lines: Lines;
   what_changed_en: WhatChangedEn;
   what_changed_sk: WhatChangedSk;
@@ -385,6 +394,7 @@ export interface BriefLine {
   text_en: TextEn;
   text_sk: TextSk;
   item_ids: ItemIds;
+  urls: Urls;
 }
 /**
  * This interface was referenced by `ThreatDashboardData`'s JSON-Schema
@@ -483,7 +493,7 @@ export interface Event {
   sk_link: SkLink1;
   topic: Topic;
   item_ids: ItemIds1;
-  urls: Urls;
+  urls: Urls1;
   event_keys: EventKeys;
   domains: Domains;
   has_tier_a: HasTierA;

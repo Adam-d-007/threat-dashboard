@@ -243,10 +243,14 @@ class BriefLine(Strict):
     text_en: str
     text_sk: str | None = None
     item_ids: list[str]
+    urls: list[str] = Field(default_factory=list, description="Article URLs of its items, so "
+                            "the line keeps its links when the brief is carried forward")
 
 
 class Brief(Strict):
     status: Literal["ok", "fallback", "disabled"]
+    written_at: datetime | None = Field(default=None, description="When this brief was written; "
+                                        "earlier than the run when a failed run kept the last one")
     lines: list[BriefLine] = Field(default_factory=list)
     what_changed_en: str | None = None
     what_changed_sk: str | None = None

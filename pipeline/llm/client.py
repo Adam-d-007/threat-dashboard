@@ -33,7 +33,10 @@ RETRY_WAITS_S = (5, 15)
 # A 429 with a Retry-After of at most this many seconds is waited out instead of the fixed
 # waits: Groq's free tier counts tokens per minute and says when the minute resets.
 MAX_RETRY_AFTER_S = 60
-MAX_OUTPUT_TOKENS = 8192
+# Groq's free tier counts the reserved output against its per-request limit: with 8192 the
+# brief (about 5,100 input tokens) was refused with HTTP 413 on 2026-10-24, while a batch with
+# about 10,900 tokens in all went through. The longest answer, the brief, needs about 3,000.
+MAX_OUTPUT_TOKENS = 4096
 TRANSIENT = {429, 500, 502, 503, 504, None}
 # A provider that has spent this long failing since its last answer is dropped for the run, so
 # the next one always gets its turn. On 2026-10-24 Gemini timed out on four models and used the

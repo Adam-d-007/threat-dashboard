@@ -181,6 +181,7 @@ const en = {
   latestReports: "Latest reports",
   dateEstimated: "date estimated",
   brief: "Daily brief",
+  briefWritten: (when: string) => `Written ${when}: no language model could write a new one in the latest update.`,
   theatres: "Theatres",
   geoMap: {
     title: "Map of reports",
@@ -432,6 +433,7 @@ const sk: Strings = {
   latestReports: "Najnovšie správy",
   dateEstimated: "dátum je odhadnutý",
   brief: "Denný prehľad",
+  briefWritten: (when: string) => `Napísaný ${when}: pri poslednej aktualizácii nový prehľad nemohol vzniknúť.`,
   theatres: "Oblasti",
   geoMap: {
     title: "Mapa správ",

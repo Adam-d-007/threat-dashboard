@@ -163,10 +163,13 @@ def build(items: list[Item], prev_items: list[dict], prev_brief: list[str], base
             sk_angle_sk=got.sk_angle_sk if got else None))
     brief = None
     if out:
-        lines = [BriefLine(text_en=line.text_en, text_sk=line.text_sk,
-                           item_ids=[x for x in line.item_ids if x in known])
-                 for line in out.lines]
-        brief = Brief(status="ok", lines=[x for x in lines if x.item_ids],
+        url_of = {p["id"]: p["url"] for p in prev_items if p.get("url")}
+        url_of |= {i.id: i.url for i in pool if i.url}
+        lines = [BriefLine(text_en=line.text_en, text_sk=line.text_sk, item_ids=ids,
+                           urls=[url_of[x] for x in ids if x in url_of])
+                 for line in out.lines
+                 for ids in [[x for x in line.item_ids if x in known]]]
+        brief = Brief(status="ok", written_at=now, lines=[x for x in lines if x.item_ids],
                       what_changed_en=out.what_changed_en, what_changed_sk=out.what_changed_sk)
     elif client is not None and client.providers:
         brief = Brief(status="fallback")
