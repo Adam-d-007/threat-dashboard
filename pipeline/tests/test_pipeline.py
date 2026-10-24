@@ -996,6 +996,22 @@ def test_a_timeout_moves_on_at_once_and_a_failing_provider_yields_to_the_next(mo
     assert c.providers[0].dead and c.usage()["provider"] == "groq"
 
 
+def test_each_provider_gets_its_own_output_reservation(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [("googleapis", 200, GEMINI_OK)])
+    sent = []
+    real = llm.httpx.request
+
+    def spy(method, url, **kw):
+        if kw.get("json"):
+            sent.append(kw["json"])
+        return real(method, url, **kw)
+    monkeypatch.setattr(llm.httpx, "request", spy)
+    c.complete_json("s", "u")
+    # Gemini thinks before it writes (4096 cut its answers off); Groq's limit needs 4096.
+    assert sent[0]["generationConfig"]["maxOutputTokens"] == 8192
+    assert llm.MAX_OUTPUT_TOKENS["groq"] == 4096
+
+
 def test_llm_stops_when_the_time_budget_is_used(monkeypatch):
     llm, c = _llm_client(monkeypatch, [])
     c.started -= 10_000
