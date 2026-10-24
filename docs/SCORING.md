@@ -137,8 +137,16 @@ If no component has a value at all, the page shows no level, rather than an inve
 
 ## Gates from the NBAC definitions
 
-Gates bound which levels P may reach. Each gate that applies is listed on the page with the
-events behind it.
+Gates bound which levels P may reach. They are not shown on the terrorism pages (only in the
+index history's tooltips); in plain words:
+
+- **The level cannot fall below 2** while a confirmed attack happened in an EU or NATO state in
+  the last 30 days. This is why the level is usually 2 even on quiet days.
+- **Slovakia cannot rise above 2** unless a recent incident is linked to Slovakia.
+- **Slovakia cannot rise above 3** unless an official source confirms an imminent threat to it.
+- **The EU cannot rise above 3** without a mass-casualty attack or a series of attacks in 7 days.
+
+The exact rules:
 
 | Gate | Region | Rule |
 |---|---|---|

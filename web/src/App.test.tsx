@@ -145,7 +145,8 @@ describe("App with sample scores", () => {
     expect(screen.getByText("Dashboard indicator")).toBeInTheDocument();
     expect(screen.getByText("37")).toBeInTheDocument();
     expect(screen.getByText("What makes up the index")).toBeInTheDocument();
-    expect(screen.getByText(/It cannot fall below 2: a confirmed attack/)).toBeInTheDocument();
+    // The gates are explained on the method page, not in a note above the charts.
+    expect(screen.queryByText(/It cannot fall below 2: a confirmed attack/)).not.toBeInTheDocument();
   });
 
   it("folds each government's travel advice into one chip on the EU view", async () => {

@@ -52,7 +52,6 @@ const en = {
   banners: {
     disagreement:
       "The language model reads the situation differently from the rules (two levels apart, or one level at level 3 or above). In that case the rules decide the level and index shown. This is not an error.",
-    gates: "Why the level is where it is:",
     llmFallback: "The language model was unavailable. This run uses rules only.",
     sourcesFailing: (n: number) => `${n} source${n === 1 ? "" : "s"} failed in this run.`,
   },
@@ -300,7 +299,6 @@ const sk: Strings = {
   banners: {
     disagreement:
       "Jazykový model hodnotí situáciu inak než pravidlá (o dva stupne, alebo o jeden pri stupni 3 a vyššom). V takom prípade o zobrazenej úrovni aj indexe rozhodujú pravidlá. Nejde o chybu.",
-    gates: "Prečo je úroveň práve taká:",
     llmFallback: "Jazykový model nebol dostupný. Táto aktualizácia používa len pravidlá.",
     sourcesFailing: (n: number) =>
       n === 1
