@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { Sparkline } from "../charts/Sparkline";
 import { ArticleLink, Banner, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
-import { fmtDate } from "../lib/format";
+import { fmtDate, fmtDateTime } from "../lib/format";
 import type { Item, Run, Theatre } from "../types/run";
 import { LatestReports } from "./LatestReports";
 
@@ -32,6 +32,9 @@ export function GeopoliticsPage({ run }: { run: Run }) {
         <>
           {g.brief && (
             <Card title={t.brief}>
+              {g.brief.written_at && g.brief.written_at < run.run.started_at && (
+                <p className="mb-2 text-xs text-muted">{t.briefWritten(fmtDateTime(g.brief.written_at, locale))}</p>
+              )}
               {g.brief.what_changed_en && (
                 <p className="mb-3 text-ink-2">{pick(g.brief.what_changed_en, g.brief.what_changed_sk)}</p>
               )}
@@ -39,9 +42,13 @@ export function GeopoliticsPage({ run }: { run: Run }) {
                 {g.brief.lines.map((l, i) => (
                   <li key={i}>
                     {pick(l.text_en, l.text_sk)}{" "}
-                    {l.item_ids.map((id) => (
-                      <SourceLink key={id} item={itemById.get(id)} />
-                    ))}
+                    {l.urls?.length
+                      ? l.urls.map((u) => (
+                          <ArticleLink key={u} href={u} className="text-xs text-link">
+                            [{new URL(u).hostname.replace(/^www\./, "")}]
+                          </ArticleLink>
+                        ))
+                      : l.item_ids.map((id) => <SourceLink key={id} item={itemById.get(id)} />)}
                   </li>
                 ))}
               </ol>

@@ -254,6 +254,20 @@
           "title": "Status",
           "type": "string"
         },
+        "written_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When this brief was written; earlier than the run when a failed run kept the last one",
+          "title": "Written At"
+        },
         "lines": {
           "items": {
             "$ref": "#/$defs/BriefLine"
@@ -288,6 +302,7 @@
       },
       "required": [
         "status",
+        "written_at",
         "lines",
         "what_changed_en",
         "what_changed_sk"
@@ -320,12 +335,21 @@
           },
           "title": "Item Ids",
           "type": "array"
+        },
+        "urls": {
+          "description": "Article URLs of its items, so the line keeps its links when the brief is carried forward",
+          "items": {
+            "type": "string"
+          },
+          "title": "Urls",
+          "type": "array"
         }
       },
       "required": [
         "text_en",
         "text_sk",
-        "item_ids"
+        "item_ids",
+        "urls"
       ],
       "title": "BriefLine",
       "type": "object"

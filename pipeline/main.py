@@ -24,6 +24,7 @@ from .llm.client import LlmClient
 from .models import (
     SCHEMA_VERSION,
     AnchorReading,
+    Brief,
     Diff,
     Gtd,
     Item,
@@ -286,6 +287,22 @@ def topup_gdelt(sources: list[dict], queries: list[dict], health: dict[str, dict
     return results, health
 
 
+def carry_brief(prev_latest: dict) -> Brief | None:
+    """When no model could write a brief, keep the last good one (it says when it was written)
+    rather than show an empty box."""
+    old = (prev_latest.get("geopolitics") or {}).get("brief") or {}
+    if old.get("status") != "ok" or not old.get("lines"):
+        return None
+    brief = Brief.model_validate(old)
+    url_of = {i["id"]: i["url"] for i in prev_latest.get("items", []) if i.get("url")}
+    for line in brief.lines:
+        if not line.urls:
+            line.urls = [url_of[x] for x in line.item_ids if x in url_of]
+    if brief.written_at is None:
+        brief.written_at = datetime.fromisoformat(prev_latest["run"]["finished_at"])
+    return brief
+
+
 def prev_anchors_as_models(previous: list[dict]) -> list[AnchorReading]:
     """Fixture runs make no network calls, so they carry the previous anchors forward."""
     return [AnchorReading.model_validate(a) for a in previous]
@@ -399,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
                   ((prev_latest.get("geopolitics") or {}).get("brief") or {}).get("lines", [])]
     geo = geopolitics.build(relevant, prev_latest.get("items", []), prev_brief, baselines, client,
                             started, cfg_score, CONFIG, call_limit)
+    if geo.brief and geo.brief.status == "fallback":
+        geo.brief = carry_brief(prev_latest) or geo.brief
 
     health = [source_health(s, results.get(s["id"]) if s["enabled"] else None,
                             prev["health"].get(s["id"]), started) for s in sources]

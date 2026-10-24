@@ -140,6 +140,17 @@ def test_item_urls_are_found_in_stored_runs_but_not_the_index(tmp_path):
     assert state.item_urls_from_runs(tmp_path, {"a"}) == {"a": "https://dennikn.sk/minuta/1"}
 
 
+def test_a_failed_brief_keeps_the_last_good_one_with_its_links():
+    prev = {"run": {"finished_at": "2026-10-24T07:49:38+00:00"},
+            "items": [{"id": "a", "url": "https://www.nato.int/x"}],
+            "geopolitics": {"brief": {"status": "ok", "lines": [
+                {"text_en": "NATO officials visited Ukraine.", "item_ids": ["a"]}]}}}
+    kept = pipeline_main.carry_brief(prev)
+    assert kept.status == "ok" and kept.lines[0].urls == ["https://www.nato.int/x"]
+    assert kept.written_at.isoformat() == "2026-10-24T07:49:38+00:00"
+    assert pipeline_main.carry_brief({"geopolitics": {"brief": {"status": "fallback"}}}) is None
+
+
 def test_window_start():
     assert window_start(None, NOW) == NOW - timedelta(hours=36)
     prev = {"run": {"status": "ok", "started_at": "2026-10-22T04:05:00+00:00"}}
