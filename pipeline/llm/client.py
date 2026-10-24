@@ -35,6 +35,10 @@ RETRY_WAITS_S = (5, 15)
 MAX_RETRY_AFTER_S = 60
 MAX_OUTPUT_TOKENS = 8192
 TRANSIENT = {429, 500, 502, 503, 504, None}
+# A provider that has spent this long failing since its last answer is dropped for the run, so
+# the next one always gets its turn. On 2026-10-24 Gemini timed out on four models and used the
+# whole 480 s budget; Groq was never asked.
+PROVIDER_MAX_FAILING_S = 150
 FATAL = {401, 403}
 _SKIP = re.compile(r"lite|image|tts|live|audio|embedding|exp|thinking|vision|guard")
 MAX_MODELS = 4
@@ -95,6 +99,7 @@ class _Provider:
     model_index: int = 0
     last_call: float = 0.0
     dead: bool = False
+    failing_s: float = 0.0  # time spent in failed calls since the last answer
 
     @property
     def model(self) -> str | None:
@@ -150,13 +155,20 @@ class LlmClient:
             while p.model_index < len(p.models):
                 if self.out_of_time:
                     raise LlmUnavailable("LLM time budget for this run used up")
+                started = time.monotonic()
                 try:
                     text = self._call_with_retry(p, system, user)
+                    p.failing_s = 0.0
                     self.used.append(f"{p.name}:{p.model}")
                     return text
                 except _ProviderError as e:
+                    p.failing_s += time.monotonic() - started
                     if e.status in FATAL:
                         log.warning("%s dropped (bad key?): %s", p.name, e)
+                        p.model_index = len(p.models)
+                        break
+                    if p.failing_s > PROVIDER_MAX_FAILING_S:
+                        log.warning("%s has failed for %.0f s; next provider", p.name, p.failing_s)
                         p.model_index = len(p.models)
                         break
                     log.warning("%s %s failed, trying the next model: %s", p.name, p.model, e)
@@ -186,6 +198,8 @@ class LlmClient:
             try:
                 return self._call(p, system, user)
             except _ProviderError as e:
+                # A timeout (status "timeout", not in TRANSIENT) has already cost TIMEOUT_S, so
+                # it moves to the next model instead of trying the same one again.
                 if wait is None or e.status not in TRANSIENT or self.out_of_time:
                     raise
                 if e.retry_after is not None and e.retry_after <= MAX_RETRY_AFTER_S:
@@ -235,6 +249,8 @@ class LlmClient:
             headers["Authorization"] = f"Bearer {p.key}"
         try:
             r = httpx.request(method, url, headers=headers, timeout=TIMEOUT_S, verify=TLS, **kw)
+        except httpx.TimeoutException as e:
+            raise _ProviderError(f"{type(e).__name__}", "timeout") from e
         except httpx.HTTPError as e:
             raise _ProviderError(f"{type(e).__name__}") from e
         if r.status_code != 200:

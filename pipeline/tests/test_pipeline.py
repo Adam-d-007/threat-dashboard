@@ -916,6 +916,8 @@ def _llm_client(monkeypatch, script, gemini_models=("gemini-3.8-flash",)):
             return httpx.Response(200, json=body, request=req)
         frag, status, body, *headers = queue.pop(0)
         assert frag in url, (frag, url)
+        if status == "timeout":
+            raise httpx.ReadTimeout("timed out", request=req)
         return httpx.Response(status, json=body, request=req, headers=(headers or [{}])[0])
 
     monkeypatch.setattr(httpx, "request", fake_request)
@@ -967,6 +969,20 @@ def test_rate_limit_waits_as_long_as_the_provider_asks(monkeypatch):
     monkeypatch.setattr(llm.time, "sleep", waits.append)
     assert c.complete_json("s", "u") == '{"items": []}'
     assert 38 in waits  # Retry-After 37 s, plus one
+
+
+def test_a_timeout_moves_on_at_once_and_a_failing_provider_yields_to_the_next(monkeypatch):
+    # Two Gemini models time out: one attempt each, no retries on the same model.
+    llm, c = _llm_client(monkeypatch, [("3.8-flash", "timeout", {}), ("3.7-flash", "timeout", {}),
+                                       ("groq", 200, GROQ_OK)],
+                         gemini_models=("gemini-3.8-flash", "gemini-3.7-flash"))
+    assert c.complete_json("s", "u") == '{"items": []}' and c.calls == 3
+    # A provider failing past the cap is dropped even with models left: Groq gets its turn.
+    llm, c = _llm_client(monkeypatch, [("3.8-flash", 503, {})] * 3 + [("groq", 200, GROQ_OK)],
+                         gemini_models=("gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash"))
+    monkeypatch.setattr(llm, "PROVIDER_MAX_FAILING_S", -1)
+    assert c.complete_json("s", "u") == '{"items": []}'
+    assert c.providers[0].dead and c.usage()["provider"] == "groq"
 
 
 def test_llm_stops_when_the_time_budget_is_used(monkeypatch):

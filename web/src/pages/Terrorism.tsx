@@ -105,16 +105,6 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       <div className="space-y-2">
         {assess?.disagreement && <Banner tone="info">{t.banners.disagreement}</Banner>}
         {assess?.llm.status === "fallback" && <Banner tone="warn">{t.banners.llmFallback}</Banner>}
-        {assess && assess.gates.length > 0 && (
-          <Banner tone="info">
-            {t.banners.gates}
-            <ul className="mt-1 list-disc pl-5">
-              {assess.gates.map((g) => (
-                <li key={g.id}>{t.gateNames[g.id] ?? g.id}</li>
-              ))}
-            </ul>
-          </Banner>
-        )}
         {failing > 0 && (
           <Banner tone="warn">
             <a href="#sources">{t.banners.sourcesFailing(failing)}</a>
