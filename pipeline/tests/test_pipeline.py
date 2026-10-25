@@ -878,7 +878,7 @@ def test_one_severe_attack_reported_many_ways_is_one_incident():
     assert len(events2) == 2
 
 
-def test_invalid_answer_is_retried_once_then_rules():
+def test_invalid_answer_is_retried_then_asked_elsewhere_then_rules():
     items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
     ok = FakeLlm(["not json", json.dumps({"items": [_label(1)]})])
     pipeline_main.understand(items, {}, ok, {}, [], NOW)
@@ -887,7 +887,8 @@ def test_invalid_answer_is_retried_once_then_rules():
     items2 = [_item(2, "Teroristický útok vo Viedni", "a.sk")]
     bad = FakeLlm(["nope", json.dumps({"items": [{"id": "2", "severity": 9}]})])
     pipeline_main.understand(items2, {}, bad, {}, [], NOW)
-    assert bad.calls == 2 and items2[0].classification.status == "rules"
+    assert bad.calls == 3 and items2[0].classification.status == "rules"
+    assert bad.skipped == [None, None, "gemini"]  # the third answer from the other provider
 
 
 def test_classification_cache_and_call_budget():
@@ -1099,7 +1100,7 @@ def _gemini_cut_off(text):
 
 def test_a_gemini_answer_cut_off_by_thinking_says_so(monkeypatch):
     llm, c = _llm_client(monkeypatch, [("googleapis", 200, _gemini_cut_off('{"lines": [{"a": 1},'))])
-    with pytest.raises(llm.LlmBadOutput, match="cut off.*thinking 7900"):
+    with pytest.raises(llm.LlmBadOutput, match="MAX_TOKENS.*thinking 7900"):
         c.complete_json("s", "u")
 
 
@@ -1118,6 +1119,30 @@ def test_a_brief_gemini_breaks_twice_is_written_by_groq(monkeypatch):
     out = write_brief(items, [{"id": "eu_defence", "name_en": "EU defence"}], [], c, NOW, 99)
     assert out is not None and out.lines[0].text_en == "Summit"
     assert c.used == ["groq:openai/gpt-oss-120b"] and not c.providers[0].dead
+
+
+GEMINI_BROKEN = {"candidates": [{"content": {"parts": [{"text": '{"items": [{"id": "1", "rel'}]},
+                                 "finishReason": "STOP"}]}  # as on 2026-10-25, 08:52 UTC
+
+
+def test_a_batch_gemini_breaks_twice_is_labelled_by_groq(monkeypatch, caplog):
+    from pipeline.process.classify import classify
+    groq = ("groq", 200, {"choices": [{"message": {"content": json.dumps({"items": [_label(1)]})}}]})
+    _, c = _llm_client(monkeypatch, [("googleapis", 200, GEMINI_BROKEN)] * 2 + [groq])
+    c.cfg.update(batch_size=12, budget={"classify": 30})
+    _, stats = classify([_item(1, "Teroristický útok vo Viedni", "a.sk")], c, c.cfg, {})
+    assert stats["llm"] == 1 and stats["batches_failed"] == 0
+    assert "chars ends" in caplog.text  # the log shows how the broken answer ended
+
+
+def test_with_no_other_provider_a_broken_batch_gets_rules(monkeypatch):
+    from pipeline.process.classify import classify
+    _, c = _llm_client(monkeypatch, [("googleapis", 200, GEMINI_BROKEN)] * 2)
+    c.cfg.update(batch_size=12, budget={"classify": 30})
+    c.providers[1].dead = True
+    _, stats = classify([_item(1, "Teroristický útok vo Viedni", "a.sk")], c, c.cfg, {})
+    assert stats["rules"] == 1 and stats["batches_failed"] == 1
+    assert not c.providers[0].dead  # a broken answer is not a broken provider
 
 
 def test_a_brief_without_what_changed_is_kept():

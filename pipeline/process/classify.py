@@ -7,8 +7,8 @@ import logging
 
 from pydantic import ValidationError
 
-from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable
-from ..llm.prompts import CLASSIFY_SYSTEM, classify_user, retry_user
+from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable, ask
+from ..llm.prompts import CLASSIFY_SYSTEM, classify_user
 from ..llm.schemas import Batch, ItemLabel
 from ..models import Classification, Item
 from .prefilter import compile_terms, fold
@@ -101,21 +101,11 @@ def _from_label(label: ItemLabel) -> Classification:
 
 
 def _ask(client: LlmClient, batch: list[Item]) -> dict[str, ItemLabel]:
-    """One batch: call, validate, retry once with the error. Raises on a second failure."""
-    user = classify_user(batch)
-    prompt = user
-    for attempt in (1, 2):
-        try:
-            text = client.complete_json(CLASSIFY_SYSTEM, prompt)
-            parsed = Batch.model_validate(json.loads(text))
-            ids = {i.id for i in batch}
-            return {lab.id: lab for lab in parsed.items if lab.id in ids}
-        except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
-            if attempt == 2:
-                raise
-            log.warning("batch rejected, retrying once: %s", str(e)[:200])
-            prompt = retry_user(user, str(e))
-    raise AssertionError("unreachable")
+    """One batch, validated (see llm.client.ask for the retries). Raises when all fail."""
+    ids = {i.id for i in batch}
+    parsed = ask(client, CLASSIFY_SYSTEM, classify_user(batch),
+                 lambda t: Batch.model_validate(json.loads(t)))
+    return {lab.id: lab for lab in parsed.items if lab.id in ids}
 
 
 def classify(items: list[Item], client: LlmClient | None, cfg: dict,
@@ -151,7 +141,7 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
                     log.warning("no LLM available; rules for the remaining items")
                 except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
                     stats["batches_failed"] += 1
-                    log.warning("batch failed twice, rules instead: %s", str(e)[:200])
+                    log.warning("batch failed, rules instead: %s", str(e)[:200])
             for item in batch:
                 label = labels.get(item.id)
                 if label:

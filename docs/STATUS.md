@@ -71,7 +71,7 @@ Audited 2026-10-22 against the build spec (Oct 22, 2026). Legend: **done**, **pa
 - [x] Near-duplicate dedupe (same language, 48 h) and `also_reported_by`
 - [x] LLM client: Gemini with Groq fallback, model chosen from the live model list each run,
       retries and a time budget
-- [x] Classification in batches, items wrapped as data, pydantic validation, one retry,
+- [x] Classification in batches, items wrapped as data, pydantic validation, one retry, then the other provider,
       keyword-rules fallback, 7-day cache, call budget
 - [x] Language: every source declares one; GDELT reports each article's language
 - [x] Geocoding from a committed GeoNames gazetteer (GeoNames' robots.txt forbids automated
