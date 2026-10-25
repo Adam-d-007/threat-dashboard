@@ -731,10 +731,12 @@ class FakeLlm:
         self.answers, self.calls, self.prompts = list(answers), 0, []
         self.available = True
         self.started, self.deadline = time.monotonic(), None
+        self.last_provider, self.skipped = "gemini", []
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, skip=None):
         self.calls += 1
         self.prompts.append(user)
+        self.skipped.append(skip)
         return self.answers.pop(0) if self.answers else "{}"
 
 
@@ -1088,6 +1090,34 @@ def test_split_events_from_an_earlier_run_are_merged():
     assert [e.id for e in events] == ["evt_a", "evt_c"]
     assert events[0].domains == ["aktuality.sk", "rp.pl", "euronews.com"]
     assert events[0].item_ids == ["evt_a_i", "evt_b_i"]
+
+
+def _gemini_cut_off(text):
+    return {"candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": "MAX_TOKENS"}],
+            "usageMetadata": {"thoughtsTokenCount": 7900, "candidatesTokenCount": 290}}
+
+
+def test_a_gemini_answer_cut_off_by_thinking_says_so(monkeypatch):
+    llm, c = _llm_client(monkeypatch, [("googleapis", 200, _gemini_cut_off('{"lines": [{"a": 1},'))])
+    with pytest.raises(llm.LlmBadOutput, match="cut off.*thinking 7900"):
+        c.complete_json("s", "u")
+
+
+def test_a_brief_gemini_breaks_twice_is_written_by_groq(monkeypatch):
+    from pipeline.models import Classification
+    from pipeline.score.geopolitics import write_brief
+    items = [_item(1, "Samit NATO v Haagu", "a.sk")]
+    items[0].classification = Classification(status="llm", relevant=True, domain="geopolitics",
+                                             event_type="other", ideology="unknown", severity=0,
+                                             sk_link="indirect", countries=["NL"], confidence=0.9)
+    brief = {"lines": [{"text_en": "Summit", "text_sk": "Samit", "item_ids": ["1"]}],
+             "what_changed_en": "x", "what_changed_sk": "x", "theatres": [], "upcoming": []}
+    cut = ("googleapis", 200, _gemini_cut_off('{"lines": [{"text_en": "Summit",'))
+    groq = ("groq", 200, {"choices": [{"message": {"content": json.dumps(brief)}}]})
+    _, c = _llm_client(monkeypatch, [cut, cut, groq])
+    out = write_brief(items, [{"id": "eu_defence", "name_en": "EU defence"}], [], c, NOW, 99)
+    assert out is not None and out.lines[0].text_en == "Summit"
+    assert c.used == ["groq:openai/gpt-oss-120b"] and not c.providers[0].dead
 
 
 def test_brief_drops_lines_and_items_citing_unknown_ids(tmp_path):
