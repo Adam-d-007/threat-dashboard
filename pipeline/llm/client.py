@@ -105,6 +105,7 @@ class _Provider:
     last_call: float = 0.0
     dead: bool = False
     failing_s: float = 0.0  # time spent in failed calls since the last answer
+    waited_s: float = 0.0   # time spent waiting out rate limits, which is not failing
 
     @property
     def model(self) -> str | None:
@@ -118,10 +119,15 @@ class LlmClient:
     providers: list[_Provider] = field(default_factory=list)
     used: list[str] = field(default_factory=list)
     started: float = field(default_factory=time.monotonic)
+    # A phase may end earlier than the run's budget: classification stops here, so the
+    # assessments and the brief always get time (set and cleared by classify).
+    deadline: float | None = None
 
     @property
     def out_of_time(self) -> bool:
-        return time.monotonic() - self.started > self.cfg.get("max_seconds", 480)
+        now = time.monotonic()
+        return (now - self.started > self.cfg.get("max_seconds", 480)
+                or (self.deadline is not None and now > self.deadline))
 
     @classmethod
     def from_env(cls, cfg: dict) -> "LlmClient":
@@ -160,14 +166,14 @@ class LlmClient:
             while p.model_index < len(p.models):
                 if self.out_of_time:
                     raise LlmUnavailable("LLM time budget for this run used up")
-                started = time.monotonic()
+                started, waited = time.monotonic(), p.waited_s
                 try:
                     text = self._call_with_retry(p, system, user)
                     p.failing_s = 0.0
                     self.used.append(f"{p.name}:{p.model}")
                     return text
                 except _ProviderError as e:
-                    p.failing_s += time.monotonic() - started
+                    p.failing_s += time.monotonic() - started - (p.waited_s - waited)
                     if e.status in FATAL:
                         log.warning("%s dropped (bad key?): %s", p.name, e)
                         p.model_index = len(p.models)
@@ -199,19 +205,28 @@ class LlmClient:
         return models
 
     def _call_with_retry(self, p: _Provider, system: str, user: str) -> str:
-        for wait in (*RETRY_WAITS_S, None):
+        waits = list(RETRY_WAITS_S)
+        while True:
             try:
                 return self._call(p, system, user)
             except _ProviderError as e:
+                if (e.status == 429 and e.retry_after is not None
+                        and e.retry_after <= MAX_RETRY_AFTER_S and not self.out_of_time):
+                    # A rate limit that says when to come back is not a failure: wait as long
+                    # as asked, without using up a retry (Groq's free tier allows about one
+                    # batch a minute). The run's time budget still bounds it.
+                    wait = e.retry_after + 1
+                    log.info("%s is rate-limited; waiting %d s as asked", p.name, wait)
+                    time.sleep(wait)
+                    p.waited_s += wait
+                    continue
                 # A timeout (status "timeout", not in TRANSIENT) has already cost TIMEOUT_S, so
                 # it moves to the next model instead of trying the same one again.
-                if wait is None or e.status not in TRANSIENT or self.out_of_time:
+                if not waits or e.status not in TRANSIENT or self.out_of_time:
                     raise
-                if e.retry_after is not None and e.retry_after <= MAX_RETRY_AFTER_S:
-                    wait = e.retry_after + 1
+                wait = waits.pop(0)
                 log.info("%s answered %s; retrying in %d s", p.name, e.status, wait)
                 time.sleep(wait)
-        raise AssertionError("unreachable")
 
     def _call(self, p: _Provider, system: str, user: str) -> str:
         wait = p.last_call + 60 / p.rpm - time.monotonic()
