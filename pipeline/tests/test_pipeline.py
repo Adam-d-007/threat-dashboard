@@ -1120,6 +1120,21 @@ def test_a_brief_gemini_breaks_twice_is_written_by_groq(monkeypatch):
     assert c.used == ["groq:openai/gpt-oss-120b"] and not c.providers[0].dead
 
 
+def test_a_brief_without_what_changed_is_kept():
+    from pipeline.models import Classification
+    from pipeline.score.geopolitics import write_brief
+    items = [_item(1, "Samit NATO v Haagu", "a.sk")]
+    items[0].classification = Classification(status="llm", relevant=True, domain="geopolitics",
+                                             event_type="other", ideology="unknown", severity=0,
+                                             sk_link="indirect", countries=["NL"], confidence=0.9)
+    # What Groq answered on 2026-10-25: the lines, nothing else.
+    llm = FakeLlm([json.dumps({"lines": [{"text_en": "Summit", "text_sk": "Samit",
+                                          "item_ids": ["1"]}]})])
+    out = write_brief(items, [{"id": "eu_defence", "name_en": "EU defence"}], [], llm, NOW, 99)
+    assert out is not None and out.lines[0].text_sk == "Samit" and out.what_changed_sk is None
+    assert llm.calls == 1
+
+
 def test_brief_drops_lines_and_items_citing_unknown_ids(tmp_path):
     from pipeline.score import geopolitics
     items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]

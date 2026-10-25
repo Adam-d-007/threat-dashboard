@@ -88,7 +88,8 @@ class DateOut(BaseModel):
 class BriefOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
     lines: list[BriefLineOut] = Field(max_length=8)
-    what_changed_en: str = Field(max_length=600)
-    what_changed_sk: str = Field(max_length=600)
+    # Optional: Groq's model left both out twice on 2026-10-25; the page omits the paragraph.
+    what_changed_en: str | None = Field(default=None, max_length=600)
+    what_changed_sk: str | None = Field(default=None, max_length=600)
     theatres: list[TheatreOut] = Field(default_factory=list)
     upcoming: list[DateOut] = Field(default_factory=list, max_length=10)
