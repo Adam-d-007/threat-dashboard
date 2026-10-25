@@ -665,6 +665,9 @@ sources:
     regions: [EU]
     enabled: true
     verified_on: 2026-10-23
+    # Weekends are near silent: one report worldwide from Friday 19:16 to Sunday 08:00 UTC
+    # (2026-10-25), which made six empty runs and a partial run.
+    sparse: true
     reliefweb:
       limit: 100
       # Ukraine, Russia; Israel, Palestine, Lebanon, Syria, Iran, Iraq, Jordan, Yemen;
