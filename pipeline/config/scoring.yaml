@@ -15,7 +15,9 @@ llm:
     requests_per_minute: 10
   batch_size: 12            # items per classification call; 25 was too large for Groq's
                             # smaller model (HTTP 413, 2026-10-23)
-  max_seconds: 480          # all LLM work per run; then rules take over
+  max_seconds: 900          # all LLM work per run; then rules take over
+  classify_share: 0.66      # labelling may use this share; the rest is kept for the regional
+                            # assessments and the brief
   budget:
     classify: 30            # calls per run; the spec's total is 40 to 45
     assess: 10

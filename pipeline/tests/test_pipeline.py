@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import UTC, date, datetime, timedelta
 
 import httpx
@@ -729,6 +730,7 @@ class FakeLlm:
     def __init__(self, answers):
         self.answers, self.calls, self.prompts = list(answers), 0, []
         self.available = True
+        self.started, self.deadline = time.monotonic(), None
 
     def complete_json(self, system, user):
         self.calls += 1
@@ -1010,6 +1012,28 @@ def test_each_provider_gets_its_own_output_reservation(monkeypatch):
     # Gemini thinks before it writes (4096 cut its answers off); Groq's limit needs 4096.
     assert sent[0]["generationConfig"]["maxOutputTokens"] == 8192
     assert llm.MAX_OUTPUT_TOKENS["groq"] == 4096
+
+
+def test_a_rate_limit_is_waited_out_not_counted_as_failure(monkeypatch):
+    # Groq says "wait" five times in a row (more than the two retries for real errors).
+    limited = [("groq", 429, {}, {"retry-after": "20"})] * 5
+    llm, c = _llm_client(monkeypatch, [("googleapis", 403, {})] + limited + [("groq", 200, GROQ_OK)])
+    monkeypatch.setattr(llm, "PROVIDER_MAX_FAILING_S", 10)  # far below the 105 s of waiting
+    assert c.complete_json("s", "u") == '{"items": []}'
+    groq = c.providers[1]
+    assert not groq.dead and groq.failing_s == 0.0 and groq.waited_s == 105
+
+
+def test_labelling_leaves_ai_time_for_the_assessments(monkeypatch):
+    from pipeline.process.classify import classify
+    llm, c = _llm_client(monkeypatch, [])
+    cfg = c.cfg  # one llm: block configures both, as in main.py
+    cfg.update(batch_size=12, budget={"classify": 30}, max_seconds=900, classify_share=0.66)
+    c.started -= 600  # past labelling's share (594 s), inside the run's budget (900 s)
+    items = [_item(1, "Teroristický útok vo Viedni", "a.sk")]
+    _, stats = classify(items, c, cfg, {})
+    assert stats["rules"] == 1 and c.calls == 0      # labelling stopped at its share
+    assert c.deadline is None and c.available          # the assessments still have time
 
 
 def test_llm_stops_when_the_time_budget_is_used(monkeypatch):

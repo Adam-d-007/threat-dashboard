@@ -133,6 +133,11 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
             todo.append(item)
     stats = {"cached": len(items) - len(todo), "llm": 0, "rules": 0, "batches_failed": 0}
     size, budget = cfg["batch_size"], cfg["budget"]["classify"]
+    if client is not None:
+        # Labelling may use only its share of the AI time; the rest is kept for the regional
+        # assessments and the brief (on 2026-10-25 labelling 149 items used it all up).
+        client.deadline = client.started + cfg.get("max_seconds", 480) * cfg.get(
+            "classify_share", 1.0)
     pending, unlabelled = todo, []
     for attempt in (1, 2):
         skipped = []
@@ -165,6 +170,8 @@ def classify(items: list[Item], client: LlmClient | None, cfg: dict,
         log.info("%d items were left out of the model's answers; asking once more",
                  len(skipped))
         pending = skipped
+    if client is not None:
+        client.deadline = None
     for item in unlabelled:
         item.classification = rules_label(item)
         places[item.id] = []
