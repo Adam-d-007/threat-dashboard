@@ -122,6 +122,7 @@ class LlmClient:
     # A phase may end earlier than the run's budget: classification stops here, so the
     # assessments and the brief always get time (set and cleared by classify).
     deadline: float | None = None
+    last_provider: str | None = None  # the provider asked last, so a caller can skip it
 
     @property
     def out_of_time(self) -> bool:
@@ -151,10 +152,10 @@ class LlmClient:
                 "fallback_used": len({u.split(":")[0] for u in self.used}) > 1
                 or bool(self.used and self.used[0].split(":")[0] != "gemini")}
 
-    def complete_json(self, system: str, user: str) -> str:
-        """Raw JSON text from the first provider and model that answers."""
+    def complete_json(self, system: str, user: str, skip: str | None = None) -> str:
+        """Raw JSON text from the first provider and model that answers (except `skip`)."""
         for p in self.providers:
-            if p.dead:
+            if p.dead or p.name == skip:
                 continue
             try:
                 if p.models is None:
@@ -167,6 +168,7 @@ class LlmClient:
                 if self.out_of_time:
                     raise LlmUnavailable("LLM time budget for this run used up")
                 started, waited = time.monotonic(), p.waited_s
+                self.last_provider = p.name
                 try:
                     text = self._call_with_retry(p, system, user)
                     p.failing_s = 0.0
@@ -246,6 +248,12 @@ class LlmClient:
             if not cands or "content" not in cands[0]:
                 reason = cands[0].get("finishReason") if cands else body.get("promptFeedback")
                 raise LlmBadOutput(f"gemini returned no text: {str(reason)[:200]}")
+            if cands[0].get("finishReason") == "MAX_TOKENS":
+                # Thinking counts against the allowance; the answer stops mid-JSON.
+                u = body.get("usageMetadata") or {}
+                raise LlmBadOutput(f"gemini answer cut off at the output limit (thinking "
+                                   f"{u.get('thoughtsTokenCount')} tokens, answer "
+                                   f"{u.get('candidatesTokenCount')})")
             return "".join(part.get("text", "") for part in cands[0]["content"].get("parts", []))
         try:
             r = self._http("POST", f"{GROQ}/chat/completions", p, json={
