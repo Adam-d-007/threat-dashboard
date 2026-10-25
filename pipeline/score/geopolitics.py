@@ -10,8 +10,8 @@ from statistics import median
 import yaml
 from pydantic import ValidationError
 
-from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable
-from ..llm.prompts import BRIEF_SYSTEM, brief_user, retry_user
+from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable, ask
+from ..llm.prompts import BRIEF_SYSTEM, brief_user
 from ..llm.schemas import BriefOut
 from ..models import (
     Activity,
@@ -97,24 +97,11 @@ def write_brief(items: list[Item], theatres: list[dict], previous: list[str],
     rows = [_item_row(i) for i in items[:MAX_BRIEF_ITEMS]]
     user = brief_user(rows, [{"id": t["id"], "name": t["name_en"]} for t in theatres],
                       previous, now.date().isoformat())
-    prompt, skip = user, None
-    for attempt in (1, 2, 3):
-        try:
-            text = client.complete_json(BRIEF_SYSTEM, prompt, skip=skip)
-            return BriefOut.model_validate(json.loads(text))
-        except LlmUnavailable:
-            return None
-        except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
-            log.warning("brief attempt %d failed: %s", attempt, str(e)[:200])
-            if attempt == 3:
-                return None
-            if attempt == 1:
-                prompt = retry_user(user, str(e))
-            else:
-                # Two bad answers from one provider (Gemini's broke mid-JSON on 2026-10-25):
-                # the last try goes to the next one. Groq checks its JSON before answering.
-                prompt, skip = user, client.last_provider
-    return None
+    try:
+        return ask(client, BRIEF_SYSTEM, user, lambda t: BriefOut.model_validate(json.loads(t)))
+    except (LlmUnavailable, json.JSONDecodeError, ValidationError, LlmBadOutput):
+        log.warning("no brief this run")
+        return None
 
 
 def watchlist(path, out: BriefOut | None, known: set[str], now: datetime) -> list[WatchlistEntry]:

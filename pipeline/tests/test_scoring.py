@@ -99,9 +99,9 @@ def test_disagreement_rule():
 class LoudLlm:
     """An LLM that always answers level 4, to force a disagreement with the rules."""
 
-    providers, available, calls = ["fake"], True, 0
+    providers, available, calls, last_provider = ["fake"], True, 0, "fake"
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, skip=None):
         self.calls += 1
         return json.dumps({"level": 4, "position": "high", "confidence": "high", "drivers": [],
                            "what_changed_en": "x", "what_changed_sk": "x"})
@@ -114,9 +114,9 @@ class RecordingLlm(LoudLlm):
     def __init__(self):
         self.prompts = []
 
-    def complete_json(self, system, user):
+    def complete_json(self, system, user, skip=None):
         self.prompts.append(user)
-        return super().complete_json(system, user)
+        return super().complete_json(system, user, skip)
 
 
 def test_assessment_prompt_summarises_travel_advice():

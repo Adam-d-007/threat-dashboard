@@ -7,8 +7,8 @@ from datetime import date, datetime, timedelta
 
 from pydantic import ValidationError
 
-from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable
-from ..llm.prompts import assess_system, assess_user, retry_user
+from ..llm.client import LlmBadOutput, LlmClient, LlmUnavailable, ask
+from ..llm.prompts import assess_system, assess_user
 from ..llm.schemas import AssessmentOut
 from ..models import AnchorReading, Driver, Event, LlmAssessment, OfficialLevel, RegionAssessment
 from . import gates
@@ -59,19 +59,14 @@ def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event
     if by_gov:
         anchor_rows.append({"travel_advice_countries_per_value": by_gov})
     user = assess_user(region, events, anchor_rows, comps, recent)
-    prompt = user
-    for attempt in (1, 2):
-        try:
-            out = AssessmentOut.model_validate(
-                json.loads(client.complete_json(assess_system(region), prompt)))
-            break
-        except LlmUnavailable:
-            return LlmAssessment(status="fallback")
-        except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
-            if attempt == 2:
-                log.warning("%s assessment failed twice: %s", region, str(e)[:200])
-                return LlmAssessment(status="fallback")
-            prompt = retry_user(user, str(e))
+    try:
+        out = ask(client, assess_system(region), user,
+                  lambda t: AssessmentOut.model_validate(json.loads(t)))
+    except LlmUnavailable:
+        return LlmAssessment(status="fallback")
+    except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
+        log.warning("%s assessment failed: %s", region, str(e)[:200])
+        return LlmAssessment(status="fallback")
     drivers = []
     for d in out.drivers:
         ids = [i for i in d.event_ids if i in known]

@@ -8,12 +8,13 @@ gemini-3.8-flash answered 503 "overloaded" for minutes):
   failed a request is dropped for the rest of the run.
 - 401 and 403 (bad key) drop the provider at once; 404 skips to its next model.
 - All LLM work in a run stops after max_seconds, so a run stays inside its time budget.
-- An answer that is not valid JSON is the model's fault, not the provider's: LlmBadOutput
-  goes back to the caller, which retries once with the error and then uses the rules.
+- An answer that is not valid JSON is the model's fault, not the provider's: ask() retries
+  once with the error, then once on the next provider, then the caller uses the rules.
 When no provider is left, LlmUnavailable is raised and the caller falls back to rules. The
 model has no tools; prompts pass source text as data only.
 """
 
+import json
 import logging
 import os
 import re
@@ -21,8 +22,10 @@ import time
 from dataclasses import dataclass, field
 
 import httpx
+from pydantic import ValidationError
 
 from ..adapters.base import TLS, USER_AGENT
+from .prompts import retry_user
 
 log = logging.getLogger("pipeline.llm")
 
@@ -248,10 +251,12 @@ class LlmClient:
             if not cands or "content" not in cands[0]:
                 reason = cands[0].get("finishReason") if cands else body.get("promptFeedback")
                 raise LlmBadOutput(f"gemini returned no text: {str(reason)[:200]}")
-            if cands[0].get("finishReason") == "MAX_TOKENS":
-                # Thinking counts against the allowance; the answer stops mid-JSON.
+            reason = cands[0].get("finishReason")
+            if reason not in (None, "STOP"):
+                # e.g. MAX_TOKENS: thinking counts against the allowance and the answer stops
+                # mid-JSON.
                 u = body.get("usageMetadata") or {}
-                raise LlmBadOutput(f"gemini answer cut off at the output limit (thinking "
+                raise LlmBadOutput(f"gemini stopped early ({reason}; thinking "
                                    f"{u.get('thoughtsTokenCount')} tokens, answer "
                                    f"{u.get('candidatesTokenCount')})")
             return "".join(part.get("text", "") for part in cands[0]["content"].get("parts", []))
@@ -290,3 +295,32 @@ class LlmClient:
             raise _ProviderError(f"HTTP {r.status_code}: {r.text[:160]}", r.status_code,
                                  retry_after)
         return r
+
+
+def ask(client: LlmClient, system: str, user: str, parse):
+    """parse(text) turns an answer into a result, raising on a bad one. Up to three answers:
+    the prompt, the prompt with the error, then the prompt on the next provider (Gemini broke
+    its JSON twice in a row on 2026-10-25, in labelling and in the brief). Raises the last
+    error after that; LlmUnavailable passes through."""
+    prompt, skip, last = user, None, None
+    for attempt in (1, 2, 3):
+        text = None
+        try:
+            text = client.complete_json(system, prompt, skip=skip)
+            return parse(text)
+        except LlmUnavailable:
+            if last is None:
+                raise
+            raise last from None  # no other provider to ask
+        except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
+            ends = (f" (answer of {len(text)} chars ends {text[-80:]!r})"
+                    if isinstance(e, json.JSONDecodeError) and text else "")
+            log.warning("answer %d rejected: %s%s", attempt, str(e)[:200], ends)
+            if attempt == 3:
+                raise
+            last = e
+            if attempt == 1:
+                prompt = retry_user(user, str(e))
+            else:
+                prompt, skip = user, client.last_provider
+    raise AssertionError("unreachable")
