@@ -20,6 +20,7 @@ from pathlib import Path
 import yaml
 
 from ..adapters.gdelt_gkg import count_file
+from ..store.state import _write
 from .gkg_replay import CONFIG, first_file_in_hour
 
 
@@ -82,7 +83,7 @@ def merge(out: dict, baselines: dict) -> dict:
 def main() -> None:
     if sys.argv[1] == "--merge":
         out, path = json.loads(Path(sys.argv[2]).read_text()), Path(sys.argv[3])
-        path.write_text(json.dumps(merge(out, json.loads(path.read_text())), indent=1) + "\n")
+        _write(path, merge(out, json.loads(path.read_text())))  # the pipeline's own format
         print(f"merged {len(out['files_per_day'])} days into {path}", file=sys.stderr)
         return
     out = backfill(date.fromisoformat(sys.argv[1]), date.fromisoformat(sys.argv[2]))
