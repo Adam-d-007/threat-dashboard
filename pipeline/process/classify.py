@@ -100,12 +100,31 @@ def _from_label(label: ItemLabel) -> Classification:
         summary_sk=label.summary_sk, confidence=label.confidence)
 
 
+def _labels(text: str, ids: set[str]) -> dict[str, ItemLabel]:
+    """Valid labels by item id. A malformed label is dropped, so its item counts as left out
+    and is asked again; only an answer with no valid label at all is rejected."""
+    raw = Batch.model_validate(json.loads(text)).items
+    labels, errors = {}, []
+    for r in raw:
+        try:
+            lab = ItemLabel.model_validate(r)
+        except ValidationError as e:
+            errors.append(e)
+            continue
+        if lab.id in ids:
+            labels[lab.id] = lab
+    if errors and not labels:
+        raise errors[0]
+    if errors:
+        log.warning("%d labels malformed, their items are asked again: %s", len(errors),
+                    str(errors[0])[:200])
+    return labels
+
+
 def _ask(client: LlmClient, batch: list[Item]) -> dict[str, ItemLabel]:
     """One batch, validated (see llm.client.ask for the retries). Raises when all fail."""
     ids = {i.id for i in batch}
-    parsed = ask(client, CLASSIFY_SYSTEM, classify_user(batch),
-                 lambda t: Batch.model_validate(json.loads(t)))
-    return {lab.id: lab for lab in parsed.items if lab.id in ids}
+    return ask(client, CLASSIFY_SYSTEM, classify_user(batch), lambda t: _labels(t, ids))
 
 
 def classify(items: list[Item], client: LlmClient | None, cfg: dict,
