@@ -267,7 +267,7 @@ describe("Phase 5: every panel renders in each special case", () => {
 
   it("a failed source", async () => {
     // Failed with no success for 30 hours: flagged.
-    const sources = base.sources.map((s) =>
+    const sources = base.sources.map((s: (typeof base.sources)[number]) =>
       s.status === "failed" ? { ...s, last_success: "2026-10-21T06:00:00Z" } : s,
     );
     mockFetch({ ...base, sources });
