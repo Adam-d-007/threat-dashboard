@@ -60,6 +60,17 @@ Each incident from the last 60 days counts as:
 - **Only terrorism outside the EU and NATO.** There, sabotage, drone and missile strikes and
   unrest do not count, because in Ukraine and Russia they are acts of war, not terrorism.
   Inside the EU and NATO, state-linked sabotage still counts.
+- **Unrest never counts.** Riots, violent protests and arrests at demonstrations are not
+  terrorist offences, which is what the SIS level beside the index grades, and Europol's TE-SAT
+  leaves them out too. They come in waves of dozens of reports a day: on 26 October 2026
+  protests in France, Spain and Portugal lifted the EU to level 3 with no change in the
+  terrorist threat. They still appear among the news reports and on the geopolitics page.
+  Violent extremism, such as an anarchist arson attack, is labelled terrorism and counts.
+- **One incident counts once.** Reports join an incident when they share its type, country and
+  day and its town (within 50 km) or wording. Follow-up reports of a severe attack (arrests,
+  the motive, the victims) join it for up to 7 days, unless both name towns more than 50 km
+  apart: on 26 October 2026 the Jordan church shooting and the Trappes shooting had each come
+  back days later as a new attack.
 - **Labels can be corrected.** When the classification instructions change, the reports still
   in the window are labelled again, and an incident whose reports are all among them is rebuilt
   from the new labels (or dropped, if none of them is an incident any more).
@@ -119,9 +130,11 @@ L = (level − 1 + position) ÷ 4, with position 0.17, 0.5 or 0.83.
 A component without a value is left out, and the remaining weights are scaled up to sum to 1.
 This happens when:
 
-- **the language model fails** (the page says so), and
-- **M is warming up.** It compares today with its own history, which only starts with the
-  first live runs (22 October 2026). Until M has 14 complete days it is left out.
+- **the language model fails** (the page says so).
+
+M has its 90-day history from the start: the days before live counting began (23 July to 22
+October 2026) were counted from the same GDELT files, one per hour, scaled to a full day. On a
+day counted both ways the two agreed within 1% (EU: 812 against 815 articles).
 
 **The indicator is provisional for its first 14 days.** E normally compares today with the median
 of 180 days. Until it has 14 distinct days of history, it uses the median of the days there are,
@@ -183,7 +196,7 @@ language model can move the index, but it cannot move the level against the rule
 | Spec | Build | Why |
 |---|---|---|
 | Raw index shown only when a gate raises the level | Also whenever the level rises | Otherwise one run showed level 3 with index 48, outside level 3's band |
-| 180-day backfill sets the E and M baselines | E and M warm up from live data | A backfill from GDELT bulk files would measure something different from the live event signal |
+| 180-day backfill sets the E and M baselines | E warms up from live data; M is backfilled for 90 days | E is built from classified news items, which bulk files do not contain; M is counted from the same GDELT files live and in the backfill |
 | Replays from GDELT bulk data | Incidents rebuilt for E, real GDELT bulk counts for M (below) | E is built from classified news items, which bulk files do not contain; M is replayed from one GKG file per hour, not all four |
 | Media baselines from GDELT DOC TimelineVolRaw | GKG theme counts read from the bulk files every run | One source for live counts, baselines and replays; DOC calls are rate-limited from GitHub |
 | Austria in the Slovak anchors | Left out | DSN publishes no current level |

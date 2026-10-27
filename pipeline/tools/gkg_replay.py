@@ -42,25 +42,29 @@ def hours(day: date) -> list[str]:
     return [(start + timedelta(hours=h)).strftime("%Y%m%d%H%M%S") for h in range(n)]
 
 
+def first_file_in_hour(ts: str) -> bytes | None:
+    """The hour's first GKG file that exists: GDELT's archive has gaps (in 2020, many :00
+    files answer 404 while :15 exists)."""
+    for minute in ("00", "15", "30", "45"):
+        try:
+            return get(f"{BASE}{ts[:10]}{minute}00.gkg.csv.zip", retries=2, backoff_s=5).content
+        except FetchError as e:
+            if e.http_status == 404:
+                continue
+            print(f"  {ts}: {e}", file=sys.stderr)
+            return None
+    print(f"  {ts}: no file in this hour", file=sys.stderr)
+    return None
+
+
 def replay_counts(incident: str) -> dict:
     src = next(s for s in yaml.safe_load((CONFIG / "sources.yaml").read_text())["sources"]
                if s["adapter"] == "gdelt_gkg")
     fips, eu = src["gkg"]["countries"], set(src["gkg"]["eu"])
 
     def one(ts: str) -> tuple[str, dict | None]:
-        """The hour's first file that exists: GDELT's archive has gaps (in 2020, many :00
-        files answer 404 while :15 exists)."""
-        for minute in ("00", "15", "30", "45"):
-            try:
-                r = get(f"{BASE}{ts[:10]}{minute}00.gkg.csv.zip", retries=2, backoff_s=5)
-            except FetchError as e:
-                if e.http_status == 404:
-                    continue
-                print(f"  {ts}: {e}", file=sys.stderr)
-                return ts, None
-            return ts, count_file(r.content, {THEME}, fips, eu)[0]
-        print(f"  {ts}: no file in this hour", file=sys.stderr)
-        return ts, None
+        raw = first_file_in_hour(ts)
+        return ts, None if raw is None else count_file(raw, {THEME}, fips, eu)[0]
 
     files: dict[str, int] = {}
     counts: dict[str, dict[str, int]] = {}

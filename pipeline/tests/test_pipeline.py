@@ -18,7 +18,7 @@ from pipeline.adapters import (
     rss,
 )
 from pipeline.adapters.base import FetchError, FetchResult, RawItem
-from pipeline.health import run_status, source_health
+from pipeline.health import flagged, run_status, source_health
 from pipeline.main import FIXTURE_NOW, FIXTURES, window_start
 from pipeline.models import Run
 from pipeline.process.normalize import canonical_url, clean_text, item_id, normalize
@@ -94,8 +94,11 @@ def test_health_failed_then_stale():
     stale = source_health(SRC, FetchResult("x", ok=False, error="HTTP 404"), prev,
                           NOW + timedelta(hours=49))
     assert stale.status == "stale"
-    assert run_status([ok, failed], "ok") == "partial"
-    assert run_status([ok], "ok") == "partial"  # one press source is not ten
+    # A first failure 12 h after a success is shown but not flagged; a day later it is.
+    assert run_status([ok, failed], "ok", NOW) == "partial"  # one press source is not ten
+    assert not flagged(failed, NOW + timedelta(hours=12))
+    assert flagged(failed, NOW + timedelta(hours=25)) and flagged(stale, NOW)
+    assert run_status([ok], "ok", NOW) == "partial"  # one press source is not ten
 
 
 def test_run_status_needs_gdelt_and_ten_press_sources():
@@ -104,12 +107,19 @@ def test_run_status_needs_gdelt_and_ten_press_sources():
                              FetchResult(i, ok=status == "ok", items=[]), None, NOW)
     press = [h(f"p{i}") for i in range(12)]
     gdelt = h("gdelt_doc", group="backbone")
-    assert run_status([gdelt, *press], "ok") == "ok"
-    assert run_status([gdelt, *press], "fallback") == "partial"  # the LLM must succeed
-    assert run_status([h("gdelt_doc", "backbone", "failed"), *press], "ok") == "partial"
-    assert run_status([gdelt, *press[:9]], "ok") == "partial"  # only 9 press sources
+    assert run_status([gdelt, *press], "ok", NOW) == "ok"
+    assert run_status([gdelt, *press], "fallback", NOW) == "partial"  # the LLM must succeed
+    assert run_status([h("gdelt_doc", "backbone", "failed"), *press], "ok", NOW) == "partial"
+    assert run_status([gdelt, *press[:9]], "ok", NOW) == "partial"  # only 9 press sources
+    # The Council's feed, slow once (2026-10-27) after a success the run before: not flagged.
+    slow = source_health(SRC | {"id": "consilium", "group": "official"},
+                         FetchResult("consilium", ok=False, error="ReadTimeout"),
+                         h("consilium", "official").model_dump(mode="json"),
+                         NOW + timedelta(hours=15))
+    assert slow.status == "failed" and run_status(
+        [gdelt, *press, slow], "ok", NOW + timedelta(hours=15)) == "ok"
     assert run_status([gdelt, *press, h("y", group="analysis", status="failed")],
-                      "ok") == "partial"  # any failed source
+                      "ok", NOW) == "partial"  # any failed source
 
 
 def test_source_turns_stale_after_six_empty_runs_only_if_it_had_items():
@@ -817,6 +827,47 @@ def test_items_left_out_of_an_answer_are_asked_again_once():
     stubborn = FakeLlm([json.dumps({"items": [_label(10)]}), json.dumps({"items": []})])
     _, stats2 = classify(again, stubborn, LLM_CFG, {})
     assert stubborn.calls == 2 and stats2["rules"] == 1  # asked once more, then rules
+
+
+def test_follow_up_reports_days_later_join_the_attack():
+    # 2026-10-26: the Trappes shooting (10-23) came back as a "racist attack in Paris" on 10-25,
+    # and the Jordan church shooting as a new attack with no town three days on.
+    items = [_item(1, "Streľba v Trappes", "a.sk", hours=-72),
+             _item(2, "Rasistický útok v Paríži", "b.sk"),
+             _item(3, "Po streľbe v kostole zadržali podozrivých", "c.sk", hours=1),
+             _item(4, "Útok v Lyone", "d.sk")]
+    labels = [_label(1, key="shooting-trappes-2026-10-19", place=("Trappes", "FR"),
+                     event_type="attack", severity=4, countries=["FR"]),
+              _label(2, key="racist-attack-paris-2026-10-22", place=("Paris", "FR"),
+                     event_type="attack", severity=4, countries=["FR"]),
+              _label(3, key="church-attack-france-2026-10-22", event_type="attack", severity=4,
+                     countries=["FR"], places=[]),
+              _label(4, key="attack-lyon-2026-10-22", place=("Lyon", "FR"),
+                     event_type="attack", severity=4, countries=["FR"])]
+    _, events, _, _ = pipeline_main.understand(
+        items, {"s": "x"}, FakeLlm([json.dumps({"items": labels})]), {}, [], NOW)
+    by_size = sorted(len(e.item_ids) for e in events)
+    # Trappes, Paris (25 km) and the report with no town are one; Lyon (400 km) stays apart.
+    assert by_size == [1, 3]
+    trappes = next(e for e in events if len(e.item_ids) == 3)
+    assert trappes.date.isoformat() == "2026-10-19"
+
+
+def test_unrest_makes_no_incident_and_stored_unrest_is_dropped():
+    from pipeline.models import Event
+    from pipeline.process.cluster import cluster
+    items = [_item(1, "Vo Francúzsku zatkli 1 000 protestujúcich", "a.sk")]
+    labels = [_label(1, key="protest-arrests-france-2026-10-22", domain="unrest",
+                     event_type="arrest", severity=1, countries=["FR"], place=("Paris", "FR"))]
+    _, events, _, _ = pipeline_main.understand(
+        items, {"s": "x"}, FakeLlm([json.dumps({"items": labels})]), {}, [], NOW)
+    assert events == []
+    old = Event(id="evt_old", title_en="Riots in Barcelona", event_type="arrest",
+                ideology="unknown", severity=3, date=NOW.date(), country="ES", topic="unrest",
+                sk_link="none", item_ids=["gone"], domains=["x"], has_tier_a=False,
+                corroborated=False, first_seen=NOW, last_updated=NOW)
+    kept, _ = cluster([], [old], NOW)
+    assert kept == []
 
 
 def test_a_severe_incident_is_not_placed_in_the_sources_country_by_assumption():

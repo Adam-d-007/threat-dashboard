@@ -36,7 +36,15 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
   const assess = run.terrorism?.[region] ?? null;
   const sis = run.anchors.find((a) => a.id === "anchor_sk_sis") ?? null;
   const events = regionEvents(run.events, region);
-  const failing = run.sources.filter((s) => s.status === "failed" || s.status === "stale").length;
+  // As the pipeline's run status: a source that failed but succeeded within 24 hours is not
+  // flagged (the Council's feed was slow once on 2026-10-27); the sources page lists it.
+  const runAt = new Date(run.run.started_at).getTime();
+  const failing = run.sources.filter(
+    (s) =>
+      s.status === "stale" ||
+      (s.status === "failed" && (!s.last_success || runAt - new Date(s.last_success).getTime() > 24 * 3_600_000)),
+  ).length;
+  const newHere = (run.diff?.new_event_ids ?? []).filter((id) => events.some((e) => e.id === id)).length;
   const rows = timeseries?.rows.filter((r) => r.region === region) ?? [];
   // National levels: Poland's for Slovakia, every published one for the EU. Travel advice: each
   // government's reading for Slovakia, or for the EU one summary chip per government.
@@ -71,7 +79,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         </div>
 
         <div className="grid gap-4 md:grid-cols-[3fr_2fr]">
-          {assess ? <IndicatorCard a={assess} /> : <NotComputedCard />}
+          {assess ? <IndicatorCard a={assess} newEvents={newHere} /> : <NotComputedCard />}
           <OfficialCard region={region} sis={sis} />
         </div>
 
@@ -159,7 +167,7 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
   );
 }
 
-function IndicatorCard({ a }: { a: RegionAssessment }) {
+function IndicatorCard({ a, newEvents }: { a: RegionAssessment; newEvents: number }) {
   const { t, locale } = useLang();
   const delta = a.index_prev === null ? null : a.index - a.index_prev;
   return (
@@ -178,7 +186,10 @@ function IndicatorCard({ a }: { a: RegionAssessment }) {
             {a.index}
             <span className="text-xl font-normal text-muted">/100</span>
           </div>
-          <div className="text-sm text-ink-2">{delta === null || delta === 0 ? t.noChange : t.changeSinceLast(delta)}</div>
+          <div className="text-sm text-ink-2">
+            {delta === null || delta === 0 ? t.noChange : t.changeSinceLast(delta)}
+            {newEvents > 0 && ` · ${t.newSinceLast(newEvents)}`}
+          </div>
         </a>
       </div>
       <p className="mt-4 text-sm text-muted">

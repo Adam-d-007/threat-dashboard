@@ -92,8 +92,11 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     contribs = event_contributions(events, region, now, cfg)
     window = (now - timedelta(days=cfg["events"]["baseline_days"])).isoformat()
     region_rows = [r for r in rows if r["region"] == region]
-    history = [(r["at"], r["components"]["events_raw"]) for r in region_rows
-               if r["at"] >= window and r["components"].get("events_raw") is not None]
+    # One value per run slot: a rerun of a slot replaces it (ten manual runs on 2026-10-23
+    # outweighed the scheduled ones in the median).
+    slots = {r["run_id"]: r for r in region_rows
+             if r["at"] >= window and r["components"].get("events_raw") is not None}
+    history = [(r["at"], r["components"]["events_raw"]) for r in slots.values()]
     e_comp = events_component(contribs, history, region, cfg)
     m_comp = media_component(baselines, region, now, cfg)
     a_comp = anchors_component(anchors, region, scoring["anchor_history"], now, cfg)

@@ -423,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
                             prev["health"].get(s["id"]), started) for s in sources]
     finished = started if args.fixtures else datetime.now(UTC).replace(microsecond=0)
     usage = llm_usage(client, cstats)
-    status = run_status(health, usage.status) if buffer_ok else "partial"
+    status = run_status(health, usage.status, started) if buffer_ok else "partial"
     info = RunInfo(id=run_id(started, args.slot), status=status, started_at=started,
                    finished_at=finished, window_start=since, git_sha=args.git_sha,
                    counts=RunCounts(fetched=len(items), from_buffer=len(buffered),
