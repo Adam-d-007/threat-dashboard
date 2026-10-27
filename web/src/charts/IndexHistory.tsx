@@ -18,7 +18,10 @@ export function IndexHistory({ rows, officialLevel }: { rows: TimeseriesRow[]; o
   const c = useChartColors();
   const [range, setRange] = useState<Range>("90");
   const data = useMemo(() => {
-    const pts = rows.map((r) => ({
+    // One point per run slot: a rerun of a slot replaces it (manual reruns on 2026-10-23 drew
+    // ten points in a day).
+    const bySlot = new Map(rows.map((r) => [r.run_id, r]));
+    const pts = [...bySlot.values()].sort((a, b) => a.at.localeCompare(b.at)).map((r) => ({
       x: new Date(r.at).getTime(),
       index: r.index,
       level: r.level,
@@ -78,8 +81,9 @@ export function IndexHistory({ rows, officialLevel }: { rows: TimeseriesRow[]; o
                 t.index,
               ]}
             />
+            {/* Steps: the index holds until the next run; a curve drew values no run produced. */}
             <Line
-              type="monotone"
+              type="stepAfter"
               dataKey="index"
               stroke={c["series-1"]}
               strokeWidth={2}

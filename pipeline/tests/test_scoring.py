@@ -385,3 +385,25 @@ def test_a_cap_overrides_hysteresis():
     state = {"regions": {"SK": {"level": 3, "index": 60, "below_runs": 0}}, "anchor_history": {}}
     a, _ = score_region("SK", "y", quiet_events(NOW), ANCHORS, {}, rows, state, None, NOW, CFG, 0)
     assert a.level == 2 and "cap_sk_2" in {g.id for g in a.gates}
+
+
+def test_reruns_of_a_slot_count_once_in_the_events_baseline():
+    # Slot a was rerun five times (as on 2026-10-23); it must not outvote slots b and c.
+    rows = [{"run_id": run, "at": (NOW - timedelta(days=d, minutes=m)).isoformat(),
+             "region": "SK", "index": 30, "level": 2, "components": {"events_raw": raw}}
+            for run, d, raw, reruns in (("a", 3, 30.0, 5), ("b", 2, 2.0, 1), ("c", 1, 2.0, 1))
+            for m in range(reruns)]
+    a, _ = score_region("SK", "now", quiet_events(NOW), ANCHORS, {}, rows,
+                        {"regions": {}, "anchor_history": {}}, None, NOW, CFG, 0)
+    assert a.components[0].inputs["baseline_median"] == 2.0
+
+
+def test_history_is_rescored_with_only_the_events_seen_by_then():
+    from pipeline.tools.rescore_events_history import rescore
+    seen = ev("SK", sev=3, days_ago=0, sk="direct", now=NOW - timedelta(days=2))
+    later = ev("SK", sev=5, days_ago=0, sk="direct", now=NOW, eid="evt_later")
+    rows = [{"run_id": "r", "at": (NOW - timedelta(days=1)).isoformat(), "region": "SK",
+             "index": 50, "level": 3, "components": {"events_raw": 99.0}}]
+    assert rescore(rows, [seen, later], CFG) == 1
+    expected = sum(w for _, w in event_contributions([seen], "SK", NOW - timedelta(days=1), CFG))
+    assert rows[0]["components"]["events_raw"] == round(expected, 3) and expected > 0

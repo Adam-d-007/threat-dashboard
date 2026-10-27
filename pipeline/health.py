@@ -6,6 +6,10 @@ from .adapters.base import FetchResult
 from .models import RunStatus, SourceHealth
 
 STALE_AFTER = timedelta(hours=48)
+# A source that failed but succeeded within this long is not flagged (no banner, run not made
+# partial): on 2026-10-27 the Council's feed took 145 s to answer once and was fine the run
+# before. Failing two scheduled runs in a row flags it. The sources page shows every failure.
+FLAG_AFTER = timedelta(hours=24)
 STALE_ZERO_RUNS = 6
 PRESS = {"slovak_press", "regional_press", "eu_press"}
 MIN_PRESS_OK = 10
@@ -49,12 +53,18 @@ def source_health(source: dict, result: FetchResult | None, previous: dict | Non
                         last_items_at=last_items_at)
 
 
-def run_status(health: list[SourceHealth], llm_status: str) -> RunStatus:
+def flagged(h: SourceHealth, now: datetime) -> bool:
+    """Stale, or failed with no success in the last FLAG_AFTER."""
+    return h.status == "stale" or (h.status == "failed" and (
+        h.last_success is None or now - h.last_success > FLAG_AFTER))
+
+
+def run_status(health: list[SourceHealth], llm_status: str, now: datetime) -> RunStatus:
     """ok when every enabled source succeeded and, as the spec's status table requires, GDELT
     DOC, the LLM and at least 10 Tier B press sources did; otherwise partial. (The spec's phase 2
     check, one 404 source makes the run partial, needs the first condition.) An LLM switched off
     on purpose (--no-llm) does not make a run partial."""
-    if any(h.status in ("failed", "stale") for h in health):
+    if any(flagged(h, now) for h in health):
         return "partial"
     by_id = {h.id: h for h in health}
     gdelt_ok = by_id.get("gdelt_doc") is None or by_id["gdelt_doc"].status == "ok"

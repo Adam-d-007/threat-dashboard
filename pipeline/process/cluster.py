@@ -1,9 +1,12 @@
 """Stage 8, events: reports of the same incident become one event.
 
 An item joins an event when they share an LLM event_key, or have the same event type and
-country, dates within one day, and either places within 50 km or, when one side has no place,
-clearly similar English summaries (token_sort_ratio >= 66; measured 2026-10-22: two reports of
-one arrest scored 70, a different arrest in the same country 60). Events persist in
+country, dates within one day (seven for severe attacks), and either places within 50 km or,
+when one side has no place, clearly similar English summaries (token_sort_ratio >= 66; measured
+2026-10-22: two reports of one arrest scored 70, a different arrest in the same country 60).
+Only terrorism and hybrid reports make events: unrest (riots, protest arrests) is not a
+terrorism incident, and on 2026-10-26 it filled the incident table and raised the EU to level 3
+with protests in France, Spain and Portugal. Events persist in
 events.json for 90 days, so a story covered over several days stays one event. An event is
 corroborated with two or more independent domains, or one Tier A source. Unclassified items
 never enter."""
@@ -17,14 +20,19 @@ from rapidfuzz import fuzz
 from ..models import Event, Item, Place
 from .prefilter import fold
 
-DOMAINS = {"terrorism", "hybrid", "unrest"}
+DOMAINS = {"terrorism", "hybrid"}
 MAX_KM = 50
 MAX_DAYS = 1
 SUMMARY_MIN = 66
 # Severe attacks (severity 3+) are rare: two of the same type in one country within a day are
 # treated as one incident unless both have towns more than MAX_KM apart. On 2026-10-23 one
 # shooting near Paris, reported with differing wording and mostly no town, became six events.
+# Follow-up reports of a severe attack (arrests, the motive, the victims) come for days and are
+# dated when published: within SEVERE_DAYS they join it. On 2026-10-26 the Jordan church
+# shooting of 10-23 came back as a new attack, and the Trappes shooting of 10-23 as a
+# "racist attack in Paris" on 10-25.
 SEVERE = 3
+SEVERE_DAYS = 7
 KEEP_DAYS = 90
 SK_RANK = {"none": 0, "indirect": 1, "direct": 2}
 TIER_RANK = {"A": 0, "B": 1, "C": 2}
@@ -54,12 +62,13 @@ def _matches(item: Item, e: Event) -> bool:
         return True
     if c.event_type != e.event_type or c.countries[0] != e.country:
         return False
-    if abs((item.published_at.date() - e.date).days) > MAX_DAYS:
+    severe = c.severity >= SEVERE and e.severity >= SEVERE
+    if abs((item.published_at.date() - e.date).days) > (SEVERE_DAYS if severe else MAX_DAYS):
         return False
     place = c.places[0] if c.places else None
     if place and e.place and place.precision == "city" and e.place.precision == "city":
         return km(place, e.place) <= MAX_KM
-    if c.severity >= SEVERE and e.severity >= SEVERE:
+    if severe:
         return True
     return bool(c.summary_en) and fuzz.token_sort_ratio(
         fold(c.summary_en), fold(e.title_en)) >= SUMMARY_MIN
@@ -71,11 +80,12 @@ def _same_incident(a: Event, b: Event) -> bool:
         return True
     if a.event_type != b.event_type or a.country != b.country:
         return False
-    if abs((a.date - b.date).days) > MAX_DAYS:
+    severe = a.severity >= SEVERE and b.severity >= SEVERE
+    if abs((a.date - b.date).days) > (SEVERE_DAYS if severe else MAX_DAYS):
         return False
     if a.place and b.place and a.place.precision == "city" and b.place.precision == "city":
         return km(a.place, b.place) <= MAX_KM
-    if a.severity >= SEVERE and b.severity >= SEVERE:
+    if severe:
         return True
     return fuzz.token_sort_ratio(fold(a.title_en), fold(b.title_en)) >= SUMMARY_MIN
 
@@ -184,7 +194,8 @@ def refresh(events: list[Event], items: list[Item], now: datetime) -> list[Event
 def cluster(items: list[Item], events: list[Event], now: datetime) -> tuple[list[Event], list[str]]:
     """Assign items to events (setting item.event_id). Returns (all kept events, new ids)."""
     cutoff = (now - timedelta(days=KEEP_DAYS)).date()
-    events = refresh([e for e in events if e.date >= cutoff], items, now)
+    # Stored unrest events (made before unrest was left out) are dropped.
+    events = refresh([e for e in events if e.date >= cutoff and e.topic != "unrest"], items, now)
     new_ids = []
     for item in sorted(filter(eligible, items), key=lambda i: i.published_at):
         event = next((e for e in events if item.id in e.item_ids), None) or \

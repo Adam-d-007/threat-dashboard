@@ -266,9 +266,29 @@ describe("Phase 5: every panel renders in each special case", () => {
   });
 
   it("a failed source", async () => {
-    mockFetch(base);
+    // Failed with no success for 30 hours: flagged.
+    const sources = base.sources.map((s: (typeof base.sources)[number]) =>
+      s.status === "failed" ? { ...s, last_success: "2026-10-21T06:00:00Z" } : s,
+    );
+    mockFetch({ ...base, sources });
     renderAt("2026-10-22T14:00:00Z");
     expect(await screen.findByText(/1 source failed in this run/)).toBeInTheDocument();
+  });
+
+  it("a source that failed once after a success 11 hours earlier is not flagged", async () => {
+    mockFetch(base);
+    renderAt("2026-10-22T14:00:00Z");
+    await screen.findByText(/\/100/);
+    expect(screen.queryByText(/source failed in this run/)).not.toBeInTheDocument();
+  });
+
+  it("says the index did not move but names the new incidents", async () => {
+    // 2026-10-27: the index stayed at 42 while five incidents arrived; the page said only
+    // "no change".
+    const terrorism = { ...base.terrorism, SK: { ...base.terrorism.SK, index_prev: base.terrorism.SK.index } };
+    mockFetch({ ...base, terrorism });
+    renderAt("2026-10-22T14:00:00Z");
+    expect(await screen.findByText(/index unchanged since last run · 1 new incident$/)).toBeInTheDocument();
   });
 
   it("an official level change", async () => {
