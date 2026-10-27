@@ -39,9 +39,10 @@ MAX_RETRY_AFTER_S = 60
 # Output tokens reserved per call, per provider. Groq's free tier counts the reservation against
 # its per-request limit: with 8192 the brief (about 5,100 input tokens) was refused with HTTP 413
 # on 2026-10-24, so Groq gets 4096 (the brief needs about 3,000). Gemini spends part of its
-# allowance thinking before it writes: with 4096 its batch answers were cut off mid-JSON, so it
-# keeps 8192.
-MAX_OUTPUT_TOKENS = {"gemini": 8192, "groq": 4096}
+# allowance thinking before it writes: with 4096 its batch answers were cut off mid-JSON, and
+# with 8192 the brief stopped at MAX_TOKENS after 7,861 thinking tokens (2026-10-27), so it gets
+# 16384. Gemini's free tier counts tokens used, not the reservation.
+MAX_OUTPUT_TOKENS = {"gemini": 16384, "groq": 4096}
 TRANSIENT = {429, 500, 502, 503, 504, None}
 # A provider that has spent this long failing since its last answer is dropped for the run, so
 # the next one always gets its turn. On 2026-10-24 Gemini timed out on four models and used the
