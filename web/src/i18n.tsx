@@ -45,7 +45,7 @@ const en = {
   notComputedTitle: "The indicator is not computed yet",
   provisional: "Provisional",
   provisionalNote: (d: string) =>
-    `Provisional until ${d}: events are compared with the few days of history collected so far, and news coverage is not counted yet. Read it as a first estimate; from ${d} it is measured against two weeks of history.`,
+    `Provisional until ${d}: events are compared with the few days of history collected so far (news coverage already has its 90 days). Read it as a first estimate; from ${d} it is measured against two weeks of history.`,
   notComputedBody:
     "Scoring is still being built. Until it runs, this page shows the official level and the latest reports only, never an estimate.",
   sampleBanner:
@@ -295,7 +295,7 @@ const sk: Strings = {
   notComputedTitle: "Ukazovateľ sa zatiaľ nepočíta",
   provisional: "Predbežný",
   provisionalNote: (d: string) =>
-    `Predbežný do ${d}: udalosti porovnávame s niekoľkými dňami histórie, ktoré máme zatiaľ k dispozícii, a mediálne pokrytie sa ešte nezapočítava. Berte ho ako prvý odhad; od ${d} sa meria voči dvom týždňom histórie.`,
+    `Predbežný do ${d}: udalosti porovnávame s niekoľkými dňami histórie, ktoré máme zatiaľ k dispozícii (mediálne pokrytie už má svojich 90 dní). Berte ho ako prvý odhad; od ${d} sa meria voči dvom týždňom histórie.`,
   notComputedBody:
     "Hodnotenie je ešte vo vývoji. Kým nebude spustené, táto stránka zobrazuje len oficiálnu úroveň a najnovšie správy, nikdy odhad.",
   sampleBanner:
