@@ -369,21 +369,23 @@ function ChangesCard({ run, events }: { run: Run; events: Event[] }) {
   const { t, pick } = useLang();
   const d = run.diff;
   const byId = new Map(events.map((e) => [e.id, e]));
-  const empty =
-    !d || (!d.new_event_ids.length && !d.level_changes.length && !d.anchor_changes.length && !d.source_changes.length);
+  // Only this region's new incidents: an EU-only incident has no place on the Slovak page (it
+  // showed as a bare id on 2026-10-27).
+  const fresh = (d?.new_event_ids ?? []).filter((id) => byId.has(id));
+  const empty = !d || (!fresh.length && !d.level_changes.length && !d.anchor_changes.length && !d.source_changes.length);
   return (
     <Card title={t.changes}>
       {empty ? (
         <Muted>{t.nothingChanged}</Muted>
       ) : (
         <div className="space-y-3 text-sm">
-          {d!.new_event_ids.length > 0 && (
+          {fresh.length > 0 && (
             <div>
               <h3 className="font-semibold">{t.newEvents}</h3>
               <ul className="list-disc pl-5">
-                {d!.new_event_ids.map((id) => (
+                {fresh.map((id) => (
                   <li key={id}>
-                    <a href={`#evt-${id}`}>{byId.get(id) ? pick(byId.get(id)!.title_en, byId.get(id)!.title_sk) : id}</a>
+                    <a href={`#evt-${id}`}>{pick(byId.get(id)!.title_en, byId.get(id)!.title_sk)}</a>
                   </li>
                 ))}
               </ul>
