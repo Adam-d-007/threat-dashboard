@@ -1079,7 +1079,7 @@ def test_each_provider_gets_its_own_output_reservation(monkeypatch):
     monkeypatch.setattr(llm.httpx, "request", spy)
     c.complete_json("s", "u")
     # Gemini thinks before it writes (4096 cut its answers off); Groq's limit needs 4096.
-    assert sent[0]["generationConfig"]["maxOutputTokens"] == 8192
+    assert sent[0]["generationConfig"]["maxOutputTokens"] == 16384
     assert llm.MAX_OUTPUT_TOKENS["groq"] == 4096
 
 
