@@ -291,6 +291,13 @@ describe("Phase 5: every panel renders in each special case", () => {
     expect(await screen.findByText(/index unchanged since last run · 1 new incident$/)).toBeInTheDocument();
   });
 
+  it("lists only this region's new incidents, never a bare id", async () => {
+    mockFetch({ ...base, diff: { ...base.diff, new_event_ids: [...base.diff.new_event_ids, "evt_elsewhere"] } });
+    renderAt("2026-10-22T14:00:00Z");
+    await screen.findByText(/\/100/);
+    expect(screen.queryByText("evt_elsewhere")).not.toBeInTheDocument();
+  });
+
   it("an official level change", async () => {
     mockFetch(base);
     renderAt("2026-10-22T14:00:00Z");
