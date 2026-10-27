@@ -1,5 +1,6 @@
-"""What the LLM must return for a classification batch. Validated with pydantic; anything
-that does not fit is rejected, retried once with the error, then replaced by the rules."""
+"""What the LLM must return: classification batches, assessments and the brief. Validated with
+pydantic; an answer that does not fit is rejected and asked again (llm.client.ask), then the
+rules take over. A batch's labels are checked one by one (process.classify)."""
 
 from typing import Literal
 
@@ -32,8 +33,10 @@ class ItemLabel(BaseModel):
 
 
 class Batch(BaseModel):
+    """Items are validated one by one (classify._labels): one malformed label must not throw
+    away the other eleven (Groq left out summary_en for single items on 2026-10-27)."""
     model_config = ConfigDict(extra="ignore")
-    items: list[ItemLabel]
+    items: list[dict]
 
 
 class DriverOut(BaseModel):

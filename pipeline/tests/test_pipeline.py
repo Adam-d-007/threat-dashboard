@@ -942,6 +942,21 @@ def test_invalid_answer_is_retried_then_asked_elsewhere_then_rules():
     assert bad.skipped == [None, None, "gemini"]  # the third answer from the other provider
 
 
+def test_one_malformed_label_does_not_sink_the_batch():
+    # 2026-10-27: Groq left summary_en out of single items; the whole batch went to rules.
+    from pipeline.process.classify import classify
+    items = [_item(1, "Teroristický útok vo Viedni", "a.sk"),
+             _item(2, "Útok nožom v Ríme", "b.sk")]
+    broken = _label(2, key="knife-rome-2026-10-22", countries=["IT"], place=("Rome", "IT"))
+    del broken["summary_en"]
+    llm = FakeLlm([json.dumps({"items": [_label(1), broken]}),
+                   json.dumps({"items": [_label(2, key="knife-rome-2026-10-22",
+                                                countries=["IT"], place=("Rome", "IT"))]})])
+    _, stats = classify(items, llm, LLM_CFG, {})
+    assert stats["llm"] == 2 and stats["rules"] == 0 and llm.calls == 2
+    assert "Teroristický" not in llm.prompts[1]  # only the malformed item is asked again
+
+
 def test_classification_cache_and_call_budget():
     from pipeline.process.classify import classify
     items = [_item(i, f"Teroristický útok číslo {i} vo Viedni", "a.sk") for i in range(100)]
