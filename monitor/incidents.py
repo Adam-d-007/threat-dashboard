@@ -201,7 +201,9 @@ def seed(events: list[Event], removed: list[str], now: datetime, keep_days: int,
         inc = Incident(
             id=iid, type=e.event_type, severity=e.severity, date=e.date, country=e.country,
             place=e.place, ideology=e.ideology, sk_link=e.sk_link,
-            topic="hybrid" if e.topic == "hybrid" else "terrorism", title_en=e.title_en,
+            # Events from before 2026-10-23 have no topic. Outside the EU and NATO only
+            # terrorism counts, and those never counted there: "hybrid" keeps that.
+            topic="terrorism" if e.topic == "terrorism" else "hybrid", title_en=e.title_en,
             title_sk=e.title_sk, reports=reports, domains=[], has_tier_a=False, best_tier=None,
             corroborated=False, first_seen=e.first_seen, last_updated=e.last_updated,
             seeded_from=e.id)
