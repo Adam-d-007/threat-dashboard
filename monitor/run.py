@@ -213,7 +213,9 @@ def main(argv: list[str] | None = None) -> int:
     runs = store.load_json(d, "log.json", [])
     runs.append({"at": finished.isoformat(), "overall": st.overall, "reasons": st.reasons,
                  "new": new_articles, "labelled": lstats.get("labelled", 0),
-                 "waiting": st.queue.waiting_label, "scored": slot})
+                 "waiting": st.queue.waiting_label, "scored": slot,
+                 "brief_written_at": st.brief_written_at.isoformat() if st.brief_written_at
+                 else None})
     oldest = (finished - timedelta(days=LOG_DAYS)).isoformat()
     store.save_json(d, "log.json", [r for r in runs if r["at"] >= oldest])
 

@@ -33,7 +33,8 @@ Overall = Literal["ok", "degraded", "failed"]
 
 
 class Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # Fields with defaults are always written, so the schema marks them required.
+    model_config = ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
 
 
 class Article(Strict):
