@@ -34,16 +34,11 @@ def _event_brief(e: Event, weight: float) -> dict:
             "summary": e.title_en}
 
 
-def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event, float]],
-               anchors: list[AnchorReading], comps: dict, recent: list[dict],
-               call_limit: int) -> LlmAssessment:
-    """The LLM's reading of the region on the NBAC scale. Drivers citing unknown events are
-    dropped. Any failure returns status 'fallback', and the score runs on rules alone."""
-    if client is None or not client.providers:
-        return LlmAssessment(status="disabled")
-    if not client.available or client.calls >= call_limit:
-        return LlmAssessment(status="fallback")
-    events = [_event_brief(e, w) for e, w in contribs[:MAX_PROMPT_EVENTS]]
+def assess_prompt(region: str, contribs: list[tuple[Event, float]],
+                  anchors: list[AnchorReading], comps: dict, recent: list[dict],
+                  max_events: int = MAX_PROMPT_EVENTS) -> tuple[str, set[str]]:
+    """(the user message for a region's assessment, the event ids it shows)."""
+    events = [_event_brief(e, w) for e, w in contribs[:max_events]]
     known = {e["id"] for e in events}
     # National levels one by one; travel advice summarised, because 138 readings made the
     # prompt too large for Groq's free tier (HTTP 413 on 2026-10-22).
@@ -58,15 +53,11 @@ def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event
         counts[a.raw] = counts.get(a.raw, 0) + 1
     if by_gov:
         anchor_rows.append({"travel_advice_countries_per_value": by_gov})
-    user = assess_user(region, events, anchor_rows, comps, recent)
-    try:
-        out = ask(client, assess_system(region), user,
-                  lambda t: AssessmentOut.model_validate(json.loads(t)))
-    except LlmUnavailable:
-        return LlmAssessment(status="fallback")
-    except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
-        log.warning("%s assessment failed: %s", region, str(e)[:200])
-        return LlmAssessment(status="fallback")
+    return assess_user(region, events, anchor_rows, comps, recent), known
+
+
+def assessment_of(out: AssessmentOut, known: set[str], model: str | None) -> LlmAssessment:
+    """A model's answer as an assessment. Drivers citing unknown events are dropped."""
     drivers = []
     for d in out.drivers:
         ids = [i for i in d.event_ids if i in known]
@@ -75,7 +66,28 @@ def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event
     return LlmAssessment(status="ok", level=out.level, position=out.position,
                          confidence=out.confidence, drivers=drivers,
                          what_changed_en=out.what_changed_en,
-                         what_changed_sk=out.what_changed_sk, model=client.usage()["model"])
+                         what_changed_sk=out.what_changed_sk, model=model)
+
+
+def assess_llm(region: str, client: LlmClient | None, contribs: list[tuple[Event, float]],
+               anchors: list[AnchorReading], comps: dict, recent: list[dict],
+               call_limit: int) -> LlmAssessment:
+    """The LLM's reading of the region on the NBAC scale. Any failure returns status
+    'fallback', and the score runs on rules alone."""
+    if client is None or not client.providers:
+        return LlmAssessment(status="disabled")
+    if not client.available or client.calls >= call_limit:
+        return LlmAssessment(status="fallback")
+    user, known = assess_prompt(region, contribs, anchors, comps, recent)
+    try:
+        out = ask(client, assess_system(region), user,
+                  lambda t: AssessmentOut.model_validate(json.loads(t)))
+    except LlmUnavailable:
+        return LlmAssessment(status="fallback")
+    except (json.JSONDecodeError, ValidationError, LlmBadOutput) as e:
+        log.warning("%s assessment failed: %s", region, str(e)[:200])
+        return LlmAssessment(status="fallback")
+    return assessment_of(out, known, client.usage()["model"])
 
 
 def disagree(llm_level: int, rules_level: int) -> bool:
@@ -85,10 +97,11 @@ def disagree(llm_level: int, rules_level: int) -> bool:
 
 def score_region(region: str, run_id: str, events: list[Event], anchors: list[AnchorReading],
                  baselines: dict, rows: list[dict], scoring: dict, client: LlmClient | None,
-                 now: datetime, cfg: dict, call_limit: int,
+                 now: datetime, cfg: dict, call_limit: int, assess=None,
                  ) -> tuple[RegionAssessment | None, dict | None]:
     """Score one region. Returns (None, None) when no component has a value: the page then
-    says the indicator is not computed, rather than showing an invented level."""
+    says the indicator is not computed, rather than showing an invented level. assess replaces
+    assess_llm (same arguments); the rebuilt pipeline passes its own."""
     contribs = event_contributions(events, region, now, cfg)
     window = (now - timedelta(days=cfg["events"]["baseline_days"])).isoformat()
     region_rows = [r for r in rows if r["region"] == region]
@@ -111,7 +124,7 @@ def score_region(region: str, run_id: str, events: list[Event], anchors: list[An
     recent = [{"run": r["run_id"], "index": r["index"], "level": r["level"]}
               for r in region_rows[-3:]]
     comps = {"events": e_comp.value, "media": m_comp.value, "anchors": a_comp.value}
-    llm = assess_llm(region, client, contribs, anchors, comps, recent, call_limit)
+    llm = (assess or assess_llm)(region, client, contribs, anchors, comps, recent, call_limit)
     l_comp = llm_component(llm, cfg)
     p = composite([e_comp, m_comp, a_comp, l_comp]) or 0.0
     raw_level = level_of(p, cfg)

@@ -45,3 +45,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/pipeline_watchdog.py
+
+      # The rebuilt pipeline reads the buffer this job has just written. A failure to start it
+      # must not fail the collector.
+      - name: Start the rebuilt pipeline's hourly run
+        if: always() && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run monitor.yml --ref main
