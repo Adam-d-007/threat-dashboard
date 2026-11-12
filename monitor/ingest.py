@@ -19,10 +19,13 @@ KEEP_UNUSED = timedelta(hours=48)
 
 
 def ingest(articles: dict[str, Article], items: list[Item], groups: dict[str, str],
-           prefilter_cfg: dict, now: datetime, max_age_hours: float) -> int:
-    """Add the prefiltered items not seen before; returns how many. An article already known
-    takes over the outlets that have reported the same story since."""
-    oldest = now - timedelta(hours=max_age_hours)
+           prefilter_cfg: dict, now: datetime, oldest: datetime) -> int:
+    """Add the prefiltered items published since `oldest` and not seen before; returns how
+    many. An article already known takes over the outlets that have reported the same story
+    since. Unlabelled articles from before `oldest` are dropped: they are from before this
+    pipeline started and were never its to label."""
+    for a in [a for a in articles.values() if a.label is None and a.published_at < oldest]:
+        del articles[a.id]
     new = 0
     for item in prefilter([i for i in items if i.published_at >= oldest], groups, prefilter_cfg):
         known = articles.get(item.id)

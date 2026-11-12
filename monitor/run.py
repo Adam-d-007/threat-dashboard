@@ -36,7 +36,7 @@ from .scoring import due_slot, score
 
 log = logging.getLogger("monitor")
 MIN_GAP = timedelta(minutes=40)
-FIRST_RUN_HOURS = 6     # the first run takes only the newest articles, not two days of them
+FIRST_RUN_HOURS = 6     # how far before its first run the pipeline takes articles from
 LOG_DAYS = 7
 
 
@@ -117,9 +117,16 @@ def main(argv: list[str] | None = None) -> int:
     if ai is not None and not ai.keys:
         ai = None
 
+    runs = store.load_json(d, "log.json", [])
+
     def do_ingest():
-        hours = FIRST_RUN_HOURS if first_run and not articles else cfg["label"]["max_age_hours"]
-        new = ingest(articles, old_state.load_buffer(d), groups, prefilter_cfg, now, hours)
+        # Nothing older than the labelling window, and nothing from more than a few hours
+        # before this pipeline's first run: on 2026-11-12 the second run took in the buffer's
+        # whole 36 hours, 443 articles, and labelling fell ten hours behind.
+        began = datetime.fromisoformat(runs[0]["at"]) if runs else now
+        oldest = max(now - timedelta(hours=cfg["label"]["max_age_hours"]),
+                     began - timedelta(hours=FIRST_RUN_HOURS))
+        new = ingest(articles, old_state.load_buffer(d), groups, prefilter_cfg, now, oldest)
         prune(articles, now)
         stages["ingest"] = Stage(status="ok", detail=f"{new} new articles, {len(articles)} kept")
         return new
@@ -210,7 +217,6 @@ def main(argv: list[str] | None = None) -> int:
         summary.terrorism if summary else None, summary.scored_at if summary else None,
         summary.run_id if summary else None, bstats["stale"], min(written, default=None), ai, cfg)
     store.write_public(d, "status.json", st)
-    runs = store.load_json(d, "log.json", [])
     runs.append({"at": finished.isoformat(), "overall": st.overall, "reasons": st.reasons,
                  "new": new_articles, "labelled": lstats.get("labelled", 0),
                  "waiting": st.queue.waiting_label, "scored": slot,
