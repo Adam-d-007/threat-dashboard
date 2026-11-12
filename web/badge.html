@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="sk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin />
+    <title>Monitor hrozieb</title>
+    <!-- The badge is shown inside other sites' pages, so it carries its own few styles and
+         none of the app's. Text is near-black on white whatever the host page looks like. -->
+    <style>
+      body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #101318; background: #fff; }
+      .badge { box-sizing: border-box; max-width: 340px; padding: 12px 14px; border: 1px solid #c9ced6; border-radius: 12px; }
+      .badge.stale { opacity: 0.5; filter: grayscale(1); }
+      .head { margin: 0 0 8px; font-weight: 700; }
+      .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+      .num { flex: none; width: 30px; height: 30px; border-radius: 7px; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center; color: #000; background: #e3e6eb; }
+      .l1 { background: #0ca30c; } .l2 { background: #fab219; } .l3 { background: #ec835a; } .l4 { background: #d03b3b; color: #fff; }
+      .what { font-size: 12px; color: #434a56; }
+      .name { font-weight: 600; }
+      .foot { margin: 8px 0 0; font-size: 11px; color: #434a56; }
+      .foot a { color: #1d5fbf; }
+    </style>
+  </head>
+  <body>
+    <div id="badge"></div>
+    <script type="module" src="/src/badge.ts"></script>
+  </body>
+</html>

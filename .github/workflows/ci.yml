@@ -43,7 +43,7 @@ jobs:
       - name: TypeScript types match the schema
         run: |
           npm run gen:types
-          git diff --exit-code src/types/run.ts
+          git diff --exit-code src/types/run.ts src/types/v2.ts
       - run: npm run lint
       - run: npm test
       - run: npm run build

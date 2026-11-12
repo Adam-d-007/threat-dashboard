@@ -1,7 +1,8 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { ArticleLink, Card, Muted, Segmented } from "../components/ui";
 import { useLang } from "../i18n";
-import { fmtDate } from "../lib/format";
+import { fmtDate, fmtDateTime } from "../lib/format";
+import type { IncidentEvent } from "../lib/v2";
 import type { Event, Item, Tesat } from "../types/run";
 
 const IncidentMap = lazy(() => import("../map/IncidentMap"));
@@ -108,6 +109,11 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
   // Runs before 2026-10-23 stored no URLs on events: fall back to this run's items.
   const linksOf = (e: Event) =>
     e.urls?.length ? e.urls : e.item_ids.map((id) => urlOf.get(id)).filter((u): u is string => !!u);
+  // An incident's reports in order, when the data carries them and there is more than one.
+  const timelineOf = (e: Event) => {
+    const reports = (e as IncidentEvent).reports;
+    return reports && reports.length > 1 ? reports : null;
+  };
   const rows = [...events].sort((a, b) => {
     const v =
       sort.key === "date"
@@ -155,16 +161,36 @@ function IncidentTable({ events, items }: { events: Event[]; items: Item[] }) {
                 </ArticleLink>
                 <div className="text-xs text-muted">
                   {e.place?.name ?? e.country} · {e.country}
-                  {linksOf(e).length > 0 && " · "}
-                  {linksOf(e).map((u, i) => (
-                    <span key={u}>
-                      {i > 0 && ", "}
-                      <ArticleLink href={u} className="text-link">
-                        {hostOf(u)}
-                      </ArticleLink>
-                    </span>
-                  ))}
+                  {!timelineOf(e) && linksOf(e).length > 0 && " · "}
+                  {!timelineOf(e) &&
+                    linksOf(e).map((u, i) => (
+                      <span key={u}>
+                        {i > 0 && ", "}
+                        <ArticleLink href={u} className="text-link">
+                          {hostOf(u)}
+                        </ArticleLink>
+                      </span>
+                    ))}
                 </div>
+                {timelineOf(e) && (
+                  <details className="mt-1 text-xs">
+                    <summary className="cursor-pointer text-link">{t.v2.timeline(timelineOf(e)!.length)}</summary>
+                    <ol className="mt-1.5 space-y-1.5 border-l border-line pl-3">
+                      {timelineOf(e)!.map((r) => (
+                        <li key={r.article_id}>
+                          <span className="tabular text-muted">{fmtDateTime(r.published_at, locale)}</span>
+                          {" · "}
+                          <span className="text-muted">{r.kind === "update" ? t.v2.update : t.v2.first}</span>
+                          {" · "}
+                          <ArticleLink href={r.url} className="text-link">
+                            {r.source || hostOf(r.url)}
+                          </ArticleLink>
+                          {r.summary_en && <span className="block text-ink-2">{pick(r.summary_en, r.summary_sk)}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                )}
               </td>
               <td className="px-2 py-2 text-ink-2">{t.eventTypes[e.event_type]}</td>
               <td className="px-2 py-2 text-ink-2">{t.ideologies[e.ideology]}</td>

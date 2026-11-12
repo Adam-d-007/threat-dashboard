@@ -1,10 +1,11 @@
 import { Card, Muted, StatusPill } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate, fmtDateTime } from "../lib/format";
-import type { Run } from "../types/run";
+import type { RunV2 } from "../lib/v2";
 
-export function SourcesPage({ run }: { run: Run }) {
+export function SourcesPage({ run }: { run: RunV2 }) {
   const { t, locale } = useLang();
+  const st = run.status;
   const order = { failed: 0, stale: 1, ok: 2, disabled: 3 } as Record<string, number>;
   const sources = [...run.sources].sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name));
   const th = "px-2 py-2 text-left font-medium text-muted";
@@ -16,6 +17,48 @@ export function SourcesPage({ run }: { run: Run }) {
         <p className="mt-2 text-ink-2">{t.sources.intro}</p>
         <p className="mt-1 text-sm text-muted">{t.sources.tierHelp}</p>
       </div>
+
+      {st && (
+        <Card title={t.v2.statusTitle}>
+          <p className="font-medium">{t.v2.overall[run.run.status]}</p>
+          <ul className="mt-2 space-y-1 text-sm text-ink-2">
+            <li>{t.v2.waiting(st.queue.waiting_label)}</li>
+            <li>
+              {t.v2.labelled(st.queue.labelled_24h)}
+              {Object.keys(st.labelled_by_24h).length > 0 && (
+                <span className="text-muted">
+                  {" "}
+                  ({t.v2.byModel}:{" "}
+                  {Object.entries(st.labelled_by_24h)
+                    .map(([model, n]) => `${model} ${n}`)
+                    .join(", ")}
+                  )
+                </span>
+              )}
+            </li>
+            {st.queue.given_up_24h > 0 && <li>{t.v2.givenUp(st.queue.given_up_24h)}</li>}
+            {st.last_scored && <li>{t.v2.scored(st.last_scored)}</li>}
+            {st.brief_written_at && <li>{t.v2.briefAt(fmtDateTime(st.brief_written_at, locale))}</li>}
+          </ul>
+          <details className="mt-3 text-xs text-muted">
+            <summary className="cursor-pointer">{t.v2.details}</summary>
+            <ul className="mt-2 space-y-1" lang="en">
+              {st.reasons.map((r) => (
+                <li key={r} className="text-ink-2">
+                  {r}
+                </li>
+              ))}
+              {Object.entries(st.stages).map(([name, stage]) => (
+                <li key={name}>
+                  {name}: {stage!.status}, {stage!.detail}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </Card>
+      )}
+
+      {st && <EmbedCard />}
 
       <Card>
         <div className="-mx-4 overflow-x-auto sm:mx-0">
@@ -77,5 +120,20 @@ export function SourcesPage({ run }: { run: Run }) {
         )}
       </Card>
     </div>
+  );
+}
+
+/** The line of HTML that puts the badge on another site. */
+function EmbedCard() {
+  const { t, lang } = useLang();
+  const src = `${window.location.origin}/badge.html?lang=${lang}`;
+  const code = `<iframe src="${src}" title="${t.siteName}" width="340" height="170" style="border:0" loading="lazy"></iframe>`;
+  return (
+    <Card title={t.v2.embedTitle}>
+      <p className="text-sm text-ink-2">{t.v2.embedHelp}</p>
+      <pre className="mt-3 overflow-x-auto rounded-lg bg-surface-2 p-3 text-xs">
+        <code>{code}</code>
+      </pre>
+    </Card>
   );
 }
