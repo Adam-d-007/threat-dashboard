@@ -213,10 +213,47 @@ Acceptance, measured over the seven days:
 - The security review and the website review from the audit did not finish. The security
   review happens before switch-over, single-threaded.
 
+## 13a. Step 0 results (probe run 43260605889, 2026-11-12 16:37 to 16:49 UTC)
+
+The same 48 real articles, in 4 batches of 12, went to each model with strict JSON.
+
+| Model | Valid answers | Labels | Time per batch | Matching test |
+|---|---|---|---|---|
+| Groq `openai/gpt-oss-120b` | 4 of 4 | 48 of 48 | 7 s | 4 of 4 |
+| Gemini `gemini-3.6-flash` (minimal thinking) | 4 of 4 | 48 of 48 | 9 to 75 s | 4 of 4 |
+| Groq `openai/gpt-oss-20b` | 3 of 4 | 31 of 48 | 4 s | 4 of 4 |
+| Gemini `gemini-3.5-flash-lite` | 0 of 4 | 0 | refused (503) or timed out | 4 of 4 |
+| Gemini `gemini-3.8-flash` | 0 of 4 | 0 | refused (503) every time | timed out |
+
+Decisions:
+
+- **Labelling order:** Groq 120b first, Gemini 3.6-flash second. The 20b model is not used for
+  labelling (one answer cut off at the output limit, one refused, three self-contradicting
+  labels); it stays as a fallback for the small matching call only.
+- **Gemini request confirmed:** the current endpoint accepts `responseJsonSchema` together with
+  `thinkingConfig.thinkingLevel`. Its timeout becomes 120 s: two of its four answers took over
+  70 s, which the old 45 s timeout would have thrown away.
+- **Batch size goes down from 12:** Groq 120b used up to 3,697 of its 4,096 output tokens on 12
+  articles. Step 1 settles on 8 or 10.
+- **Groq's real limits** (from its response headers): 1,000 requests a day and 8,000 tokens a
+  minute per model. A daily token limit is not stated there.
+- **Not shown:** whether strict mode fixes Gemini 3.8-flash, because Google refused every call
+  to it during the run, including the old-style control. The same 3.6-flash model that broke
+  7 answers without a schema in the morning run gave 5 valid answers of 5 with one.
+- **Quality:** the two working models agreed on the kind of report for 34 of 48 articles and
+  on the incident date for 46. Gemini recognises follow-ups better; Groq is stricter about
+  what is an incident at all. Both read Slovak, Czech, Polish, Hungarian and German.
+- **Open for step 3:** both models labelled shootings with no stated motive (police shot at
+  in Kraków, a shooting near the White House) as "unrest" or "other". The prompt must say
+  where an attack of unknown motive belongs; that is a method decision for Adam.
+
 ## 14. Feature ideas
 
 Chosen by Adam on 2026-11-12: incident timelines (built in step 7), then ideas 1, 2 and 6 once the
-rebuild has switched over. Idea 13 (the badge) is undecided. The rest are a backlog.
+rebuild has switched over. Idea 13 (the badge): Adam chose to build it, against my advice,
+so it is built with the website (step 7) on the new data files, with these safeguards: the
+official SIS level comes first and ours beside it marked "neoficiálny odhad", it carries the
+date, and it greys out when the data is more than 24 hours old. The rest are a backlog.
 
 | # | Idea | For whom | Needs | Cost and risk |
 |---|---|---|---|---|
