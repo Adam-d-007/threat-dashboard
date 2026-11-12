@@ -39,4 +39,4 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: uv run python -m monitor.tools.replay --state-dir state
+        run: uv run python -m monitor.tools.replay --state-dir state --only soldier --only school

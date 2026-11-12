@@ -11,6 +11,7 @@ are asked again with that incident on the list, since they may be about it.
 
 import hashlib
 import logging
+from collections import Counter
 from datetime import date, datetime, timedelta
 
 from pipeline.models import Event
@@ -57,14 +58,18 @@ def report_of(a: Article) -> Report:
 
 def recompute(inc: Incident) -> None:
     """Everything an incident derives from its timeline. Severity is the highest any report
-    states (a death toll that rises is picked up) and the type comes with it. The date and the
-    title come from the first report of the incident itself, or the first update if it is only
-    known through updates."""
+    states (a death toll that rises is picked up) and the type comes with it. The title comes
+    from the first report of the incident itself, or the first update if it is only known
+    through updates."""
     inc.reports.sort(key=lambda r: r.published_at)
     first = next((r for r in inc.reports if r.kind == "new_incident"), inc.reports[0])
     worst = max(inc.reports, key=lambda r: (r.severity, r.kind == "new_incident"))
     inc.severity, inc.type = worst.severity, worst.type
-    inc.date = first.event_date
+    # The day most reports give; the first report's when they are evenly split. On 2026-11-12
+    # the first report of the Kraków shooting was dated a day early and 18 others were right.
+    days = Counter(r.event_date for r in inc.reports)
+    inc.date = first.event_date if days[first.event_date] == max(days.values()) else min(
+        d for d, n in days.items() if n == max(days.values()))
     if first.summary_en:
         inc.title_en, inc.title_sk = first.summary_en, first.summary_sk
     inc.domains = list(dict.fromkeys(d for r in inc.reports

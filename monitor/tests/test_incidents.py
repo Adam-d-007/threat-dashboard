@@ -214,3 +214,16 @@ def test_incidents_older_than_the_scoring_needs_are_dropped():
     run([a], incidents, answer(r1="new"))
     run([b], incidents, answer(r1="new"))
     assert [i.date for i in prune(incidents, NOW + timedelta(days=1), 90)] == [date(2026, 11, 12)]
+
+
+def test_the_incident_is_dated_the_day_most_of_its_reports_give():
+    first = labelled("Strelec v Krakove", attack(incident_date="2026-11-06"), hours_ago=120)
+    others = [labelled(f"Krakov {n}", update(incident_date="2026-11-07"), hours_ago=100 - n)
+              for n in (1, 2)]
+    incidents = []
+    run([first], incidents, answer(r1="new"))
+    assert incidents[0].date == date(2026, 11, 6)
+    run(others[:1], incidents, answer(r1=incidents[0].id))
+    assert incidents[0].date == date(2026, 11, 6)  # one against one: the first report's day
+    run(others[1:], incidents, answer(r1=incidents[0].id))
+    assert incidents[0].date == date(2026, 11, 7)

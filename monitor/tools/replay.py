@@ -55,7 +55,11 @@ def stories(state_dir: Path) -> dict[str, list[Item]]:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="python -m monitor.tools.replay")
     p.add_argument("--state-dir", type=Path, default=Path("state"))
+    p.add_argument("--only", action="append", help="part of a story's name; may repeat")
     args = p.parse_args(argv)
+    for name in list(STORIES):
+        if args.only and not any(o in name for o in args.only):
+            del STORIES[name]
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     cfg = settings.load()
