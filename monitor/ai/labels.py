@@ -151,7 +151,8 @@ Return one entry per input item, with the same ids. Fields:
     4 deaths; 5 attack with 5 or more deaths. Vandalism, graffiti and damage to monuments with
     no one hurt are at most 1
   - incident_date: the day the incident happened, YYYY-MM-DD, worked out from the item's
-    published date when it says "yesterday" or "on Saturday"; null if the item does not say
+    published date when it says "yesterday" or "on Saturday"; null if the item does not say.
+    Do not guess a day
   - incident_country: ISO alpha-2 code of the country where it happened; null if the item
     does not say. Never assume the source's own country
   - incident_place: English name of the town where it happened; null if none is named
@@ -161,7 +162,9 @@ Return one entry per input item, with the same ids. Fields:
 - summary_sk: the same sentence in formal Slovak with full diacritics; "" when kind is none
 - confidence: 0 to 1, how sure you are of the labels
 
-Judge only from the text given. Do not add facts. """ + SLOVAK
+Judge only from the text given. Do not add facts. Label each item from its own text: several
+items may report the same event, but each summary and each date must come from that item, not
+be copied from another. """ + SLOVAK
 
 
 def label_user(rows: list[dict]) -> str:

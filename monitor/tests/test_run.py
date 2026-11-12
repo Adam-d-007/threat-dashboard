@@ -86,8 +86,13 @@ class RuleAi:
         return parse(text), "groq_120b"
 
 
-@pytest.fixture
-def state(tmp_path, monkeypatch):
+SIS = {"id": "anchor_sk_sis", "country": "SK", "name": "SIS NBAC",
+       "url": "https://www.sis.gov.sk/o-nas/nbac-sto.html", "scale": ["1", "2", "3", "4"],
+       "raw": "2", "level": 2, "normalized": 0.333, "since": "2017-08-23",
+       "as_of": "2026-11-12T13:05:00Z", "status": "ok"}
+
+
+def build_state(tmp_path):
     """What the old pipeline leaves on the data branch."""
     items = [item("Strelec v Krakove zabil päť ľudí", hours_ago=3, also=("sme.sk",)),
              item("Údajný strelec z Krakova zomrel v nemocnici", hours_ago=2, domain="sme.sk"),
@@ -99,7 +104,7 @@ def state(tmp_path, monkeypatch):
                           last_success=AT, items=5) for n in range(10)]
     (tmp_path / "source_health.json").write_text(json.dumps(
         {"schema_version": 1, "sources": [s.model_dump(mode="json") for s in press]}))
-    (tmp_path / "latest.json").write_text(json.dumps({"anchors": [], "run": {"id": "x"}}))
+    (tmp_path / "latest.json").write_text(json.dumps({"anchors": [SIS], "run": {"id": "x"}}))
     events = [v1_event("evt_old", 3, country="FR", date=AT.date() - timedelta(days=5)),
               v1_event("evt_zero", 0, event_type="other")]
     (tmp_path / "events.json").write_text(json.dumps(
@@ -109,9 +114,14 @@ def state(tmp_path, monkeypatch):
     (tmp_path / "scoring_state.json").write_text(json.dumps(
         {"regions": {"SK": {"level": 2, "index": 30, "below_runs": 0},
                      "EU": {"level": 2, "index": 30, "below_runs": 0}}, "anchor_history": {}}))
+    return tmp_path
+
+
+@pytest.fixture
+def state(tmp_path, monkeypatch):
     monkeypatch.setattr(run, "Ai", RuleAi)
     monkeypatch.setattr(RuleAi, "down", set())
-    return tmp_path
+    return build_state(tmp_path)
 
 
 def go(state, *flags, at=AT):
