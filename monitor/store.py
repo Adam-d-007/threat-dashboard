@@ -15,7 +15,8 @@ from .models import Article, Incident
 ROOT = "v2"
 
 
-def _read(path: Path):
+def read(path: Path):
+    """The JSON in a file, or None when there is no such file."""
     return json.loads(path.read_text()) if path.exists() else None
 
 
@@ -33,7 +34,7 @@ def private(state_dir: Path, name: str) -> Path:
 
 
 def load_articles(state_dir: Path) -> dict[str, Article]:
-    data = _read(private(state_dir, "articles.json")) or {"articles": []}
+    data = read(private(state_dir, "articles.json")) or {"articles": []}
     return {a["id"]: Article.model_validate(a) for a in data["articles"]}
 
 
@@ -46,7 +47,7 @@ def save_articles(state_dir: Path, articles: dict[str, Article], now: datetime) 
 
 def load_incidents(state_dir: Path) -> list[Incident] | None:
     """None when the file does not exist yet (the first run then carries the old events over)."""
-    data = _read(private(state_dir, "incidents.json"))
+    data = read(private(state_dir, "incidents.json"))
     return None if data is None else [Incident.model_validate(i) for i in data["incidents"]]
 
 
@@ -59,11 +60,11 @@ def save_incidents(state_dir: Path, incidents: list[Incident], removed: list[str
 
 def load_removed(state_dir: Path) -> list[str]:
     """Ids of incidents removed by hand, so they are not carried over or rebuilt."""
-    return (_read(private(state_dir, "incidents.json")) or {}).get("removed", [])
+    return (read(private(state_dir, "incidents.json")) or {}).get("removed", [])
 
 
 def load_json(state_dir: Path, name: str, default):
-    data = _read(private(state_dir, name))
+    data = read(private(state_dir, name))
     return default if data is None else data
 
 
@@ -72,7 +73,7 @@ def save_json(state_dir: Path, name: str, data) -> None:
 
 
 def load_public(state_dir: Path, name: str):
-    return _read(public(state_dir, name))
+    return read(public(state_dir, name))
 
 
 def write_public(state_dir: Path, name: str, model: BaseModel) -> None:

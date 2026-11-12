@@ -4,6 +4,7 @@ that answers from a script."""
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 from monitor.ai.labels import ArticleLabel
 from monitor.models import Article
@@ -56,11 +57,19 @@ def batch(*labels: dict) -> str:
     return json.dumps({"items": list(labels)})
 
 
+class _Models(dict):
+    """Any model name maps to a model whose provider name is "model of <name>"."""
+
+    def __missing__(self, name):
+        return SimpleNamespace(model=f"model of {name}")
+
+
 class FakeAi:
     """Gives the scripted answers in order: a text, a (text, model) pair, or an exception."""
 
     def __init__(self, *answers):
         self.answers, self.asked, self.t = list(answers), [], 0.0
+        self.models = _Models()
 
     def clock(self) -> float:
         return self.t

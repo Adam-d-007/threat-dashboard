@@ -1,0 +1,56 @@
+name: monitor
+
+# The rebuilt pipeline (docs/plans/2026-11-12-rebuild-design.md), running beside the old one
+# until it has proved itself. The hourly collector starts it when it finishes; the schedule is
+# a backup, and a run that comes within 40 minutes of the last one does nothing. It reads what
+# the old pipeline collects and writes only under v2/ of the data branch.
+on:
+  schedule:
+    - cron: "50 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      force_score:
+        description: "Score the latest slot again and rewrite the brief"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the data branch into ./state
+        uses: actions/checkout@v7
+        with:
+          ref: data
+          path: state
+
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
+
+      - run: uv sync --frozen --no-dev
+
+      - name: Run
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FORCE: ${{ inputs.force_score && '--force --force-score' || '' }}
+        run: |
+          uv run python -m monitor --state-dir state --git-sha "${{ github.sha }}" \
+            --commit-msg-file "$RUNNER_TEMP/commit_msg.txt" $FORCE
+
+      # Also after a failed run: what was labelled before the failure is kept.
+      - name: Commit to the data branch
+        if: always()
+        working-directory: state
+        run: |
+          [ -f "$RUNNER_TEMP/commit_msg.txt" ] || { echo "The run wrote nothing"; exit 0; }
+          $GITHUB_WORKSPACE/.github/scripts/commit_data.sh "$RUNNER_TEMP/commit_msg.txt"

@@ -24,6 +24,11 @@ ai:
   strikes: 2          # failures in a row after which a model is left alone for the run
   max_wait_s: 90      # a rate limit that asks for at most this long is waited out
 
+# Hours (UTC) in which no model is asked for labels or matches: the old pipeline does all its
+# AI work then (04:05 and 13:05 runs), on the same free allowance, and it feeds the live site.
+# Articles wait one hour longer. Empty this list at switch-over.
+quiet_hours: [4, 13]
+
 label:
   # 12 articles used up to 3,697 of the 4,096 output tokens in the probe; 8 leaves room.
   batch_size: 8

@@ -1,6 +1,7 @@
 import copy
 import json
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 
 import yaml
 
@@ -76,7 +77,9 @@ def assessment(**over) -> str:
 
 
 class Models(FakeAi):
-    models = {"gemini_36": type("M", (), {"model": "gemini-3.6-flash"})()}
+    def __init__(self, *answers):
+        super().__init__(*answers)
+        self.models["gemini_36"] = SimpleNamespace(model="gemini-3.6-flash")
 
 
 def test_the_models_assessment_counts_and_records_which_model_gave_it():
