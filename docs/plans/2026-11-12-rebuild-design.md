@@ -247,6 +247,39 @@ Decisions:
   in Kraków, a shooting near the White House) as "unrest" or "other". The prompt must say
   where an attack of unknown motive belongs; that is a method decision for Adam.
 
+## 13b. What changed while building (2026-11-12, steps 1 to 6)
+
+- **Strict mode is not a hard promise.** Groq refused about one answer in twenty with "the
+  generated JSON does not match the schema" (HTTP 400). So section 3's "a malformed answer
+  cannot come back" really means: the provider refuses it instead of handing it to us. The
+  code asks the same model once more, then the next model; a batch that still fails waits for
+  the next hour and the rest of the hour's batches are still tried.
+- **Severity keeps the old scale.** A threat with no act (a bomb hoax) is listed as an
+  incident with severity 0 and weighs nothing in the index, exactly as before. Without this
+  the new labels would have counted every threat as 1 and raised the index.
+- **The incident's day is the one most of its reports give.** The first report of the Kraków
+  shooting was dated a day early by the model; the 18 that followed were right.
+- **While the old pipeline runs, the new one reads what the old one collects** (the hourly
+  buffer, the official levels, the media counts, the source health) and fetches nothing
+  itself, so no news site or government page is visited twice. It writes only under `v2/` of
+  the data branch.
+- **Quiet hours.** In the old pipeline's two AI hours (04 and 13 UTC) the new one asks no model
+  for labels, so it does not take free allowance from the pipeline that feeds the live site.
+  Its own scoring runs an hour later (05 and 14 UTC) under the same slot names.
+- **The index continues.** The first run takes over the old pipeline's history, scoring state
+  and incidents (severity 1 or more). Checked on the stored data of 2026-11-12: the carried
+  incidents give exactly the old index, level and components.
+- **Alerts stay with the old pipeline** until switch-over; the new alert code is written and
+  tested but not called, so there is no second stream of emails.
+
+Left for switch-over day, on purpose:
+
+1. Fetching for itself: the new run takes over the collector's fetch, the official-level
+   readers and the media counts (the same carried-over code), and `quiet_hours` is emptied.
+2. The security review of the new code.
+3. The website switch (step 7 is built on branch `rebuild` and not deployed).
+4. Deleting the old pipeline, its workflows and its files on the data branch.
+
 ## 14. Feature ideas
 
 Chosen by Adam on 2026-11-12: incident timelines (built in step 7), then ideas 1, 2 and 6 once the
