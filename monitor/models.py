@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipeline.models import (
     AnchorReading,
     BriefLine,
+    Diff,
     Gtd,
     Ideology,
     Place,
@@ -132,6 +133,8 @@ class Summary(Strict):
     run_id: str | None = Field(description="The scoring run the levels come from")
     scored_at: datetime | None
     terrorism: Terrorism | None
+    diff: Diff | None = Field(default=None, description="What changed between the last two "
+                              "scoring runs")
     anchors: list[AnchorReading]
     tesat: Tesat | None = None
     sis_annual: SisAnnual | None = None

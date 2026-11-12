@@ -189,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     def do_publish():
         facts = {"tesat": old_main.load_tesat(), "sis_annual": old_main.load_sis_annual(),
                  "gtd": old_main.load_gtd()}
-        summary = publish.summary_file(d, scored, anchors, facts, now)
+        summary = publish.summary_file(d, scored, anchors, health, incidents, facts, now)
         publish.incidents_files(d, incidents, corrections, now, cfg["incidents"]["current_days"])
         publish.reports_file(d, articles, now)
         stages["publish"] = Stage(status="ok", detail="files written")

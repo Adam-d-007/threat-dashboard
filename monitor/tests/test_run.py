@@ -54,6 +54,9 @@ class RuleAi:
             for row in data:
                 if "zomrel" in row["title"]:
                     out.append(attack(row["id"], kind="update", summary_en="The shooter died."))
+                elif "Lubline" in row["title"]:
+                    out.append(attack(row["id"], incident_place="Lublin",
+                                      incident_date="2026-11-13"))
                 elif "Strelec" in row["title"]:
                     out.append(attack(row["id"]))
                 else:
@@ -61,10 +64,12 @@ class RuleAi:
                                           summary_en="Talks on Ukraine continued."))
             text = json.dumps({"items": out})
         elif task == "match":
-            known = [i["id"] for i in data["incidents"] if i["country"] == "PL"
-                     and i["date"] == "2026-11-07"]
-            text = json.dumps({"matches": [{"id": r["id"], "incident": known[0] if known
-                                            else "new"} for r in data["reports"]]})
+            def known(r):
+                same = [i["id"] for i in data["incidents"]
+                        if (i["country"], i["date"]) == (r["country"], r["date"])]
+                return same[0] if same else "new"
+            text = json.dumps({"matches": [{"id": r["id"], "incident": known(r)}
+                                           for r in data["reports"]]})
         elif task == "assess":
             text = assessment(drivers=[])
         else:
@@ -232,3 +237,24 @@ def test_in_the_old_pipelines_hours_no_model_is_asked_and_articles_wait(state):
     assert st.queue.waiting_label == 3
     assert go(state, at=AT) == 0
     assert public(state, "status.json", Status).queue.waiting_label == 0
+
+
+def test_the_summary_says_what_changed_since_the_previous_scoring(state):
+    go(state)
+    first = public(state, "summary.json", Summary)
+    assert first.diff.new_event_ids == [] and first.diff.level_changes == []
+    # A day later: a source has failed, and an incident has been seen since.
+    health = json.loads((state / "source_health.json").read_text())
+    health["sources"][0]["status"] = "failed"
+    (state / "source_health.json").write_text(json.dumps(health))
+    extra = item("Strelec v Lubline zabil dvoch ľudí", hours_ago=-20)
+    buffer = RssBuffer.model_validate_json((state / "rss_buffer.json").read_text())
+    buffer.items.append(extra)
+    (state / "rss_buffer.json").write_text(buffer.model_dump_json())
+    go(state, at=AT + timedelta(hours=24))
+    diff = public(state, "summary.json", Summary).diff
+    assert [(c.id, c.value_from, c.value_to) for c in diff.source_changes] == [("s0", "ok", "failed")]
+    assert len(diff.new_event_ids) == 1
+    # The next hour does not score, and the changes stay as they were.
+    go(state, at=AT + timedelta(hours=25))
+    assert public(state, "summary.json", Summary).diff == diff
