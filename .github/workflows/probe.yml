@@ -1,0 +1,43 @@
+name: probe
+
+# Temporary (rebuild step 0, docs/plans/2026-11-12-rebuild-design.md): measures strict JSON
+# output on the free AI providers with real articles from the data branch. It only reads; it
+# commits nothing. It runs when the probe itself changes on the rebuild branch, because a
+# workflow that is not on the default branch cannot be started by hand. Delete after step 0.
+on:
+  push:
+    branches: [rebuild]
+    paths:
+      - .github/workflows/probe.yml
+      - monitor/tools/probe.py
+      - monitor/ai/labels.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the data branch into ./state
+        uses: actions/checkout@v7
+        with:
+          ref: data
+          path: state
+
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
+
+      - run: uv sync --frozen --no-dev
+
+      - name: Probe the AI providers
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: uv run python -m monitor.tools.probe --state-dir state
