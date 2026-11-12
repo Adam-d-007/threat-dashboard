@@ -1,0 +1,71 @@
+# Settings of the rebuilt pipeline (docs/plans/2026-11-12-rebuild-design.md). The scoring method
+# itself (weights, gates, thresholds) stays in pipeline/config/scoring.yaml.
+
+ai:
+  # Fixed models, in the order they are asked. From the step 0 probe (2026-11-12): Groq's 120b
+  # model labelled 48 of 48 articles in 7 s a batch; Gemini 3.6-flash did the same in 9 to 75 s;
+  # Groq's 20b model cut answers off and contradicted itself, so it only does the small
+  # matching call; Gemini 3.8-flash answered 503 throughout.
+  models:
+    # interval_s: least time between two calls. Groq allows these models 8,000 tokens a minute
+    # (response headers, 2026-11-12) and one call can reserve most of that.
+    groq_120b: {provider: groq, model: openai/gpt-oss-120b, interval_s: 62, timeout_s: 60}
+    groq_20b: {provider: groq, model: openai/gpt-oss-20b, interval_s: 62, timeout_s: 60}
+    # Two of its four probe answers took over 70 s; the old 45 s timeout threw those away.
+    gemini_36: {provider: gemini, model: gemini-3.6-flash, thinking: MINIMAL, interval_s: 8,
+                timeout_s: 120}
+  # max_output: output tokens reserved per call. On Groq the input plus this must stay under
+  # the 8,000 a minute, and the model's reasoning counts as output.
+  tasks:
+    label: {models: [groq_120b, gemini_36], max_output: 4096}
+    match: {models: [groq_120b, groq_20b, gemini_36], max_output: 2048}
+    assess: {models: [groq_120b, gemini_36], max_output: 3000}
+    brief: {models: [groq_120b, gemini_36], max_output: 3000}
+  strikes: 2          # failures in a row after which a model is left alone for the run
+  max_wait_s: 90      # a rate limit that asks for at most this long is waited out
+
+label:
+  # 12 articles used up to 3,697 of the 4,096 output tokens in the probe; 8 leaves room.
+  batch_size: 8
+  max_seconds: 420    # labelling time per hourly run; what is left waits for the next hour
+  max_age_hours: 36   # an article nobody labelled in this long is given up (and counted)
+  max_attempts: 3     # failed labelling attempts after which an article is given up
+
+match:
+  domains: [terrorism, hybrid]   # reports in these domains can make incidents
+  batch_size: 8
+  max_seconds: 300
+  candidate_days: 30  # incidents this recent are offered to the matcher
+  max_candidates: 60
+  max_attempts: 3
+
+incidents:
+  keep_days: 90       # the scoring window is 60 days
+  current_days: 60    # incidents/current.json
+
+score:
+  # Hours (UTC) from which a scoring slot may run. While the old pipeline runs beside this one
+  # they are an hour after its 04:05 and 13:05 runs, so the two do not compete for the same
+  # free AI allowance. Run ids keep the old slot names (T04, T13).
+  slots: {"04": 5, "13": 14}
+  max_events: 25      # strongest incidents shown to the assessing model
+
+brief:
+  max_reports: 20     # per theatre
+  window_hours: 24
+  keep_hours: 72      # a theatre's text older than this is dropped rather than shown
+  # Which reports belong to a theatre besides naming one of its countries.
+  theatres:
+    russia_ukraine: [geopolitics, hybrid]
+    hybrid_eu: [hybrid, cyber, terrorism]
+    sk_policy: [geopolitics]
+    eu_defence: [geopolitics]
+    middle_east: [geopolitics, terrorism]
+    western_balkans: [geopolitics, unrest, terrorism, hybrid]
+
+status:
+  min_press_ok: 10
+  max_wait_hours: 6   # an article waiting longer for a label makes the run degraded
+  max_brief_hours: 24
+  max_score_hours: 14
+  alert_after_hours: 24

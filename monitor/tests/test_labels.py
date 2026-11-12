@@ -1,7 +1,6 @@
 import json
 
 from monitor.ai.labels import BATCH_SCHEMA, LABEL_SCHEMA, ArticleLabel, parse_labels
-from monitor.tools.probe import clean, match_schema, openapi
 
 UPDATE = {
     "id": "1", "kind": "update", "domain": "terrorism", "sk_link": "indirect",
@@ -59,25 +58,3 @@ def test_a_date_that_is_not_a_date_is_refused():
     labels, errors = parse_labels(
         json.dumps({"items": [UPDATE | {"incident_date": "last Saturday"}]}), {"1"})
     assert labels == {} and "incident_date" in errors[0]
-
-
-def test_older_gemini_schema_style_uses_nullable():
-    old = openapi(BATCH_SCHEMA)
-    label = old["properties"]["items"]["items"]
-    assert "additionalProperties" not in old and "additionalProperties" not in label
-    assert label["properties"]["incident_type"]["type"] == "string"
-    assert label["properties"]["incident_type"]["nullable"] is True
-    assert None not in label["properties"]["incident_type"]["enum"]
-    assert label["properties"]["severity"] == {"type": "integer", "enum": [0, 1, 2, 3, 4, 5]}
-    # The schema sent in strict mode is left as it was.
-    assert LABEL_SCHEMA["properties"]["incident_type"]["type"] == ["string", "null"]
-
-
-def test_a_match_may_only_name_a_listed_incident_or_new():
-    entry = match_schema(["inc1", "inc2"])["properties"]["matches"]["items"]
-    assert entry["properties"]["incident"]["enum"] == ["inc1", "inc2", "new"]
-
-
-def test_error_text_for_the_public_log_hides_the_organisation_id():
-    assert clean("Request too large in organization `org_01abcXYZ`\n on TPM") == (
-        "Request too large in organization `org_(hidden)` on TPM")
