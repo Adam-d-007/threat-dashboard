@@ -70,8 +70,13 @@ class Report(Strict):
     tier: Tier
     published_at: datetime
     kind: Literal["new_incident", "update"]
-    summary_en: str
+    summary_en: str | None = Field(description="None on reports carried over from the old "
+                                   "pipeline, which kept no summary per article")
     summary_sk: str | None = None
+    type: IncidentType = Field(description="What this report says the incident was")
+    severity: int = Field(ge=1, le=5, description="How severe this report says it was")
+    event_date: dt.date = Field(description="The day this report says it happened")
+    also_reported_by: list[str] = Field(default_factory=list)
 
 
 class Incident(Strict):

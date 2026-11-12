@@ -133,7 +133,9 @@ Return one entry per input item, with the same ids. Fields:
   (hybrid = covert or deniable state actions against countries not at war with it: sabotage,
    espionage, drones over infrastructure, airspace violations, state disinformation. Military
    strikes in an ongoing war, such as Russian and Ukrainian drone, missile or artillery attacks
-   on each other's territory, are geopolitics even when they hit civilians or infrastructure)
+   on each other's territory, are geopolitics even when they hit civilians or infrastructure.
+   unrest = riots, violent protests and clashes at demonstrations; a shooting, stabbing or
+   bombing by one person or a small group is never unrest)
 - sk_link: direct (happened in Slovakia, targets Slovakia or Slovaks, or Slovak authorities
   act on it) | indirect (neighbouring country or clear relevance to Slovakia) | none
 - countries: ISO 3166-1 alpha-2 codes of the countries the item is about (at most 6). Only

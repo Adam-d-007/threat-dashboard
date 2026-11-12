@@ -1,0 +1,13 @@
+# Corrections by hand, applied on every run and listed on the site. Ids are the incident ids
+# shown in incidents/current.json; a note says why, in a few words.
+#
+#   merge:
+#     - {into: inc_1a2b3c4d5e6f, from: inc_0f9e8d7c6b5a, note: "same attack, reported twice"}
+#   remove:
+#     - {id: inc_1a2b3c4d5e6f, note: "not an incident: a film review"}
+#   detach:   # a report that belongs to a different incident becomes its own
+#     - {url: "https://example.org/article", note: "a second attack, not a follow-up"}
+
+merge: []
+remove: []
+detach: []
