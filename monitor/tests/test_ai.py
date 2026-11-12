@@ -149,8 +149,21 @@ def test_an_answer_that_was_cut_off_goes_to_the_next_model():
     assert ask(ai(fake)) == ({"ok": True}, "gemini_36")
 
 
-def test_an_answer_the_caller_cannot_use_goes_to_the_next_model():
-    fake = Fake(groq_ok("not json"), gemini_ok())
+MISFIT = Reply(400, text='{"error":{"message":"Generated JSON does not match the expected '
+               'schema.","code":"json_validate_failed"}}')
+
+
+def test_an_answer_that_does_not_fit_is_asked_for_once_more_from_the_same_model():
+    fake = Fake(MISFIT, groq_ok())
+    client = ai(fake)
+    assert ask(client) == ({"ok": True}, "groq_120b")
+    assert client.models["groq_120b"].strikes == 0 and fake.slept == [62.0]
+    fake = Fake(groq_ok("not json"), groq_ok())
+    assert ask(ai(fake)) == ({"ok": True}, "groq_120b")
+
+
+def test_two_misfits_in_a_row_are_one_failure_and_the_next_model_is_asked():
+    fake = Fake(MISFIT, groq_ok("not json"), gemini_ok())
     client = ai(fake)
     assert ask(client)[1] == "gemini_36"
     assert client.models["groq_120b"].strikes == 1 and client.models["groq_120b"].answered == 0

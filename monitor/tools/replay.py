@@ -81,6 +81,12 @@ def main(argv: list[str] | None = None) -> int:
 
     kinds = Counter((story_of[a.id], a.label.kind if a.label else "unlabelled")
                     for a in articles.values())
+    for a in sorted(articles.values(), key=lambda a: a.published_at):
+        lab = a.label
+        print(f"  {a.published_at:%m-%d %H:%M} {a.domain:22} " + (
+            f"{lab.kind:12} {lab.domain:10} {lab.incident_type} sev {lab.severity} "
+            f"{lab.incident_date} {lab.incident_country} {lab.incident_place}"
+            if lab else "unlabelled") + f" | {a.title[:60]}")
     print("\nRESULT")
     for name in STORIES:
         mine = [i for i in incidents

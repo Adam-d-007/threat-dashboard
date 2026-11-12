@@ -49,7 +49,7 @@ class ArticleLabel(BaseModel):
         about_incident = self.kind in INCIDENT_KINDS
         if about_incident and self.incident_type is None:
             out.append(f"{self.kind} without incident_type")
-        if about_incident and self.severity == 0:
+        if about_incident and self.severity == 0 and self.incident_type != "threat_statement":
             out.append(f"{self.kind} with severity 0")
         if not about_incident and (self.incident_type is not None or self.severity != 0):
             out.append(f"{self.kind} with incident facts")
@@ -135,7 +135,8 @@ Return one entry per input item, with the same ids. Fields:
    strikes in an ongoing war, such as Russian and Ukrainian drone, missile or artillery attacks
    on each other's territory, are geopolitics even when they hit civilians or infrastructure.
    unrest = riots, violent protests and clashes at demonstrations; a shooting, stabbing or
-   bombing by one person or a small group is never unrest)
+   bombing by one person or a small group is never unrest. A bomb threat or hoax against the
+   public is terrorism, type threat_statement)
 - sk_link: direct (happened in Slovakia, targets Slovakia or Slovaks, or Slovak authorities
   act on it) | indirect (neighbouring country or clear relevance to Slovakia) | none
 - countries: ISO 3166-1 alpha-2 codes of the countries the item is about (at most 6). Only
@@ -145,9 +146,10 @@ Return one entry per input item, with the same ids. Fields:
   severity 0, incident_date null, incident_country null, incident_place null.
   - incident_type: attack | attempted_attack | plot_disrupted | arrest | conviction |
     threat_statement | sabotage | other
-  - severity: 1 arrest, charge, disrupted plot or threat; 2 attempted or failed attack;
-    3 attack without deaths; 4 attack with 1 to 4 deaths; 5 attack with 5 or more deaths.
-    Vandalism, graffiti and damage to monuments with no one hurt are at most 1
+  - severity: 0 a threat or hoax with no act (threat_statement only); 1 arrest, charge or
+    disrupted plot; 2 attempted or failed attack; 3 attack without deaths; 4 attack with 1 to
+    4 deaths; 5 attack with 5 or more deaths. Vandalism, graffiti and damage to monuments with
+    no one hurt are at most 1
   - incident_date: the day the incident happened, YYYY-MM-DD, worked out from the item's
     published date when it says "yesterday" or "on Saturday"; null if the item does not say
   - incident_country: ISO alpha-2 code of the country where it happened; null if the item

@@ -127,3 +127,14 @@ def test_a_broken_state_file_stops_the_run(tmp_path):
     path.write_text('{"articles": [{"id": "x"}]}')
     with pytest.raises(ValueError):
         store.load_articles(tmp_path)
+
+
+def test_one_failed_batch_does_not_end_the_hour_while_a_model_is_still_in_use():
+    a, b, c = (article(f"Útok {n}", hours_ago=n) for n in (1, 2, 3))
+    articles = {x.id: x for x in (a, b, c)}
+    ai = FakeAi(AiUnavailable("groq_120b: HTTP 400; gemini_36: HTTP 503"), batch(attack("1")))
+    ai.in_use = ["groq_120b"]
+    stats = label(articles, ai, CFG, NOW)
+    assert a.label is None and b.label is None and c.label is not None
+    assert stats["labelled"] == 1 and stats["waiting"] == 2
+    assert a.label_attempts == 0  # nobody answered: not the article's fault

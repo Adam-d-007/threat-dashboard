@@ -11,8 +11,10 @@ step 0 probe (2026-11-12):
 - 5xx, timeouts and network errors are a strike; `strikes` in a row leave the model alone for
   the run. 401 and 403 (bad key) do so at once. 413 (too large for this model) only skips it
   for this request.
-- An answer that was cut off or does not pass `parse` is a strike too, and the next model is
-  asked. Strict mode makes this rare; it is never papered over.
+- An answer that does not fit (the provider's own schema check refuses it, or `parse` does)
+  is asked for once more from the same model; a second misfit, or an answer that was cut off,
+  is a strike and the next model is asked. Strict mode makes this rare; it is never papered
+  over.
 When no model is left, AiUnavailable is raised and the caller leaves the work waiting.
 """
 
@@ -149,32 +151,44 @@ class Ai:
         for m in self.usable(task):
             url, headers, body = request(m, self.keys[m.provider], system, user, schema, name,
                                          max_output)
-            reply = self._call(m, url, headers, body, deadline)
-            after = self._retry_after(reply)
-            if reply.status == 429 and after is not None and after <= self.cfg["max_wait_s"]:
-                log.info("%s is rate-limited; waiting %.0f s as asked", m.name, after)
-                self.sleep(after + 1)
-                reply = self._call(m, url, headers, body, deadline, paced=False)
-            if reply.status != 200:
-                last = f"{m.name}: HTTP {reply.status} {clean(reply.text)}".strip()
-                self._failed(m, reply)
-                continue
-            text, finish, tokens_in, tokens_out = answer(m.provider, reply.body)
-            m.tokens_in += tokens_in
-            m.tokens_out += tokens_out
-            if finish != DONE[m.provider]:
-                last = f"{m.name}: answer cut off ({finish}, {tokens_out} output tokens)"
-                self._strike(m, last)
-                continue
-            try:
-                result = parse(text)
-            except ValueError as e:
-                last = f"{m.name}: unusable answer: {clean(str(e))}"
-                self._strike(m, last)
-                continue
-            m.strikes = 0
-            m.answered += 1
-            return result, m.name
+            for attempt in (1, 2):
+                reply = self._call(m, url, headers, body, deadline)
+                after = self._retry_after(reply)
+                if reply.status == 429 and after is not None and after <= self.cfg["max_wait_s"]:
+                    log.info("%s is rate-limited; waiting %.0f s as asked", m.name, after)
+                    self.sleep(after + 1)
+                    reply = self._call(m, url, headers, body, deadline, paced=False)
+                # Strict mode is not a hard promise: Groq sometimes answers 400
+                # json_validate_failed when its model missed the schema (seen 2026-11-12, once
+                # in about twenty calls). The same request usually works the second time.
+                misfit = reply.status == 400 and "json_validate_failed" in reply.text
+                if reply.status == 200:
+                    text, finish, tokens_in, tokens_out = answer(m.provider, reply.body)
+                    m.tokens_in += tokens_in
+                    m.tokens_out += tokens_out
+                    if finish != DONE[m.provider]:
+                        last = f"{m.name}: answer cut off ({finish}, {tokens_out} output tokens)"
+                        self._strike(m, last)
+                        break
+                    try:
+                        result = parse(text)
+                    except ValueError as e:
+                        last = f"{m.name}: unusable answer: {clean(str(e))}"
+                        misfit = True
+                    else:
+                        m.strikes = 0
+                        m.answered += 1
+                        return result, m.name
+                else:
+                    last = f"{m.name}: HTTP {reply.status} {clean(reply.text)}".strip()
+                if misfit and attempt == 1:
+                    log.info("%s: the answer did not fit; asking once more", m.name)
+                    continue
+                if misfit:
+                    self._strike(m, last)
+                else:
+                    self._failed(m, reply)
+                break
         raise AiUnavailable(last)
 
     def _call(self, m: Model, url: str, headers: dict, body: dict, deadline: float | None,

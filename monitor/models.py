@@ -75,7 +75,7 @@ class Report(Strict):
                                    "pipeline, which kept no summary per article")
     summary_sk: str | None = None
     type: IncidentType = Field(description="What this report says the incident was")
-    severity: int = Field(ge=1, le=5, description="How severe this report says it was")
+    severity: int = Field(ge=0, le=5, description="How severe this report says it was")
     event_date: dt.date = Field(description="The day this report says it happened")
     also_reported_by: list[str] = Field(default_factory=list)
 
@@ -83,7 +83,8 @@ class Report(Strict):
 class Incident(Strict):
     id: str
     type: IncidentType
-    severity: int = Field(ge=1, le=5)
+    severity: int = Field(ge=0, le=5, description="0 only for a threat with no act: listed, "
+                          "but it weighs nothing in the index, as in the old method")
     date: dt.date = Field(description="The day it happened, not the day it was reported")
     country: str
     place: Place | None = None

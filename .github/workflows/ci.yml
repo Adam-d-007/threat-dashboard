@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
       - run: uv sync --frozen
-      - run: uv run ruff check pipeline
+      - run: uv run ruff check pipeline monitor
       - run: uv run pytest -q
       - name: Fixture run completes
         run: uv run python -m pipeline.main --fixtures --no-llm --state-dir "$RUNNER_TEMP/state"

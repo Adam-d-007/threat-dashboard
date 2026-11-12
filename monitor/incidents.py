@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 
 from pipeline.models import Event
 
-from .ai.client import AiUnavailable
+from .ai.client import AiUnavailable, OutOfTime
 from .ai.labels import INCIDENT_KINDS
 from .ai.tasks import MATCH_SYSTEM, NEW, match_schema, match_user, parse_matches
 from .models import Article, Correction, Incident, Report
@@ -151,8 +151,11 @@ def match(articles: dict[str, Article], incidents: list[Incident], ai, cfg: dict
                 lambda t, r=set(by_short), i=set(by_id): parse_matches(t, r, i), deadline)
         except AiUnavailable as e:
             stats["stopped"] = str(e)
-            log.warning("matching stopped: %s", e)
-            break
+            if isinstance(e, OutOfTime) or not ai.usable("match"):
+                log.warning("matching stopped: %s", e)
+                break
+            log.warning("a batch could not be matched: %s", e)
+            continue
         created, again = False, []
         for short, a in by_short.items():
             answer = answers.get(short)

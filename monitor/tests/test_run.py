@@ -41,6 +41,9 @@ class RuleAi:
     def clock(self):
         return 0.0
 
+    def usable(self, task):
+        return [] if task in self.down else ["groq_120b"]
+
     def report(self):
         return {"groq_120b": {"calls": len(self.asked)}}
 

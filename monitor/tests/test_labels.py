@@ -51,6 +51,9 @@ def test_a_label_for_an_article_that_was_not_sent_is_refused():
 def test_a_label_that_contradicts_itself_says_how():
     assert ArticleLabel(**CONTEXT | {"severity": 3}).problems() == ["context with incident facts"]
     assert ArticleLabel(**UPDATE | {"severity": 0}).problems() == ["update with severity 0"]
+    # A threat with no act is an incident that weighs nothing, as in the old method.
+    assert ArticleLabel(**UPDATE | {"severity": 0, "incident_type": "threat_statement"}
+                        ).problems() == []
     assert ArticleLabel(**UPDATE | {"summary_sk": ""}).problems() == ["update without a summary"]
 
 

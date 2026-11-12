@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pipeline.process.geocode import geocode
 from pipeline.process.prefilter import fold
 
-from .ai.client import AiUnavailable
+from .ai.client import AiUnavailable, OutOfTime
 from .ai.labels import (
     BATCH_SCHEMA,
     INCIDENT_KINDS,
@@ -101,9 +101,14 @@ def label(articles: dict[str, Article], ai, cfg: dict, now: datetime) -> dict:
                                    BATCH_SCHEMA, "labels",
                                    lambda t, ids=set(by_short): _parse(t, ids), deadline)
         except AiUnavailable as e:
+            # One batch failing on every model is not the end: the next batch is tried while
+            # a model is still in use and there is time. These articles wait for the next hour.
             stats["stopped"] = str(e)
-            log.warning("labelling stopped: %s", e)
-            break
+            if isinstance(e, OutOfTime) or not ai.usable("label"):
+                log.warning("labelling stopped: %s", e)
+                break
+            log.warning("a batch could not be labelled: %s", e)
+            continue
         for short, a in by_short.items():
             if short in labels:
                 apply(a, labels[short], model, now)

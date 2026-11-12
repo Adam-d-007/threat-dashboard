@@ -70,9 +70,13 @@ class FakeAi:
     def __init__(self, *answers):
         self.answers, self.asked, self.t = list(answers), [], 0.0
         self.models = _Models()
+        self.in_use = []        # models still usable when an answer is an AiUnavailable
 
     def clock(self) -> float:
         return self.t
+
+    def usable(self, task) -> list:
+        return self.in_use
 
     def ask(self, task, system, user, schema, name, parse, deadline=None):
         self.asked.append({"task": task, "user": user, "schema": schema})
