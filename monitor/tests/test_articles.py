@@ -20,7 +20,7 @@ def test_only_items_worth_a_models_time_become_articles():
     items = [item("Útok v Krakove"), item("Počasie na víkend"),
              item("Minister otvoril cestu", source_id="minv"),
              item("Starý útok", hours_ago=40)]
-    assert ingest(articles, items, GROUPS, PRE, NOW, 36) == 2
+    assert ingest(articles, items, GROUPS, PRE, NOW, NOW - timedelta(hours=36)) == 2
     assert sorted(a.title for a in articles.values()) == ["Minister otvoril cestu",
                                                            "Útok v Krakove"]
     assert all(a.label is None and a.first_seen == NOW for a in articles.values())
@@ -28,9 +28,9 @@ def test_only_items_worth_a_models_time_become_articles():
 
 def test_a_known_article_is_not_added_twice_but_learns_who_else_reported_it():
     articles = {}
-    ingest(articles, [item("Útok v Krakove")], GROUPS, PRE, NOW, 36)
+    ingest(articles, [item("Útok v Krakove")], GROUPS, PRE, NOW, NOW - timedelta(hours=36))
     again = item("Útok v Krakove", also=("sme.sk", "bbc.co.uk"))
-    assert ingest(articles, [again], GROUPS, PRE, NOW + timedelta(hours=1), 36) == 0
+    assert ingest(articles, [again], GROUPS, PRE, NOW + timedelta(hours=1), NOW - timedelta(hours=36)) == 0
     (a,) = articles.values()
     assert a.also_reported_by == ["bbc.co.uk", "sme.sk"] and a.first_seen == NOW
 
@@ -138,3 +138,12 @@ def test_one_failed_batch_does_not_end_the_hour_while_a_model_is_still_in_use():
     assert a.label is None and b.label is None and c.label is not None
     assert stats["labelled"] == 1 and stats["waiting"] == 2
     assert a.label_attempts == 0  # nobody answered: not the article's fault
+
+
+def test_unlabelled_articles_from_before_the_window_are_dropped_and_not_taken_in_again():
+    old, fresh = article("Starý útok", hours_ago=30), article("Nový útok", hours_ago=2)
+    done = labelled("Útok v Krakove", attack(), hours_ago=30)
+    articles = {a.id: a for a in (old, fresh, done)}
+    again = item("Starý útok", hours_ago=30)
+    assert ingest(articles, [again], GROUPS, PRE, NOW, NOW - timedelta(hours=6)) == 0
+    assert sorted(a.title for a in articles.values()) == ["Nový útok", "Útok v Krakove"]

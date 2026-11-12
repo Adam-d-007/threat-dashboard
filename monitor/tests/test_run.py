@@ -271,3 +271,14 @@ def test_the_summary_says_what_changed_since_the_previous_scoring(state):
     # The next hour does not score, and the changes stay as they were.
     go(state, at=AT + timedelta(hours=25))
     assert public(state, "summary.json", Summary).diff == diff
+
+
+def test_the_second_run_does_not_reach_back_before_the_pipeline_started(state):
+    buffer = RssBuffer.model_validate_json((state / "rss_buffer.json").read_text())
+    buffer.items.append(item("Strelec v Lubline zabil dvoch ľudí", hours_ago=20))
+    (state / "rss_buffer.json").write_text(buffer.model_dump_json())
+    go(state)
+    go(state, at=AT + timedelta(hours=1))
+    st = public(state, "status.json", Status)
+    # The article from 20 hours before the first run is never taken in.
+    assert st.queue.labelled_24h == 3 and st.queue.waiting_label == 0
