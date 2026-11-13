@@ -230,3 +230,10 @@ def test_a_theatre_brief_and_an_assessment_are_validated():
     assert out.level == 2 and out.drivers[0].event_ids == ["e"]
     with pytest.raises(ValueError):
         parse_assessment('{"level": 7}')
+
+
+def test_the_shipped_settings_ask_gemini_for_labels_first_and_groq_for_the_rest():
+    from monitor import settings
+    tasks = settings.load()["ai"]["tasks"]
+    assert tasks["label"]["models"] == ["gemini_36", "groq_120b"]
+    assert all(tasks[t]["models"][0] == "groq_120b" for t in ("match", "assess", "brief"))

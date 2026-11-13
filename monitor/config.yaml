@@ -16,8 +16,13 @@ ai:
                 timeout_s: 120}
   # max_output: output tokens reserved per call. On Groq the input plus this must stay under
   # the 8,000 a minute, and the model's reasoning counts as output.
+  # Labelling is about two thirds of all tokens, and Groq allows its 120b model about 200,000
+  # a day: on 2026-11-13, after a day of labelling (and of tests), it refused the brief at
+  # 05:52 UTC and Gemini was busy, so four theatres got no text. Gemini therefore labels first
+  # (slower, which an hourly queue does not mind) and Groq when Gemini is busy; Groq's
+  # allowance is kept for matching, the assessments and the brief.
   tasks:
-    label: {models: [groq_120b, gemini_36], max_output: 4096}
+    label: {models: [gemini_36, groq_120b], max_output: 4096}
     match: {models: [groq_120b, groq_20b, gemini_36], max_output: 2048}
     assess: {models: [groq_120b, gemini_36], max_output: 3000}
     brief: {models: [groq_120b, gemini_36], max_output: 3000}
