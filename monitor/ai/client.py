@@ -215,7 +215,12 @@ class Ai:
             log.warning("%s: request too large for this model", m.name)
         elif reply.status == 429:
             m.out = "rate limit reached"
-            log.warning("%s left alone for this run: rate limit reached", m.name)
+            # Which limit, and when it resets: the headers are the only place a free plan's
+            # real limits are stated.
+            limits = {k: v for k, v in reply.headers.items()
+                      if k.lower().startswith("x-ratelimit-") or k.lower() == "retry-after"}
+            log.warning("%s left alone for this run: rate limit reached %s %s", m.name, limits,
+                        clean(reply.text))
         elif reply.status in (401, 403):
             m.out = f"HTTP {reply.status} (key refused)"
             log.warning("%s left alone for this run: %s", m.name, m.out)
