@@ -93,3 +93,25 @@ def test_outside_the_scoring_hours_no_model_is_asked_and_the_text_is_carried():
     geo2, stats = run([a], ai, geo, write=False, now=NOW + timedelta(hours=1))
     assert ai.asked == [] and theatre(geo2).lines == theatre(geo).lines
     assert stats["stale"] == []
+
+
+def test_a_development_two_theatres_share_is_told_once():
+    # A report about Slovakia and Ukraine belongs to "Russia and Ukraine" and to "Slovak policy".
+    shared = labelled("Slovakia opts out of the Ukraine loan", label_dict(
+        countries=["SK", "UA"], summary_en="Slovakia opts out of the Ukraine loan"))
+    only_sk = labelled("Slovakia opens an embassy", label_dict(
+        countries=["SK"], summary_en="Slovakia opens an embassy"), hours_ago=2)
+    two_lines = json.dumps({
+        "lines": [{"text_en": "Loan.", "text_sk": "Pôžička.", "item_ids": ["1"]},
+                  {"text_en": "Embassy.", "text_sk": "Veľvyslanectvo.", "item_ids": ["2"]}],
+        "top_items": [], "sk_angle_en": None, "sk_angle_sk": None, "upcoming": []})
+    # Both are also EU defence news, the third theatre asked.
+    geo, stats = run([shared, only_sk], FakeAi(answer("1"), two_lines, two_lines))
+    assert stats["written"] == ["russia_ukraine", "sk_policy", "eu_defence"]
+    assert [line.text_en for line in theatre(geo).lines] == ["Talks continued."]
+    assert [line.text_en for line in theatre(geo, "sk_policy").lines] == ["Embassy."]
+    assert theatre(geo, "eu_defence").lines == []
+    # Carried into the next hour, nothing more is lost.
+    geo2, _ = run([shared, only_sk], FakeAi(), geo, write=False, now=NOW + timedelta(hours=1))
+    assert [line.text_en for line in theatre(geo2, "sk_policy").lines] == ["Embassy."]
+    assert len(theatre(geo2).lines) == 1
