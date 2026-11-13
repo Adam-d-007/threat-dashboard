@@ -120,6 +120,14 @@ def brief(articles: dict[str, Article], previous: GeopoliticsFile | None, baseli
         if write and reports and t.written_at != now:
             stats["stale"].append(t.id)
         theatres.append(t)
+    # A report can belong to several theatres (a loan to Ukraine is Russia and Ukraine, Slovak
+    # policy and EU defence at once), and each wrote its own line about it: on 2026-11-12 the
+    # brief said the same thing three times. A development is told once, by the first theatre.
+    told: set[str] = set()
+    for t in theatres:
+        fresh = [line for line in t.lines if not set(line.item_ids) <= told]
+        told |= {i for line in t.lines for i in line.item_ids}
+        t.lines = fresh
     log.info("brief: %s", stats)
     return GeopoliticsFile(
         schema_version=2, updated_at=now, theatres=theatres,
