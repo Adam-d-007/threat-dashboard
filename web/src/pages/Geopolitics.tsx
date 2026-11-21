@@ -3,7 +3,8 @@ import { Sparkline } from "../charts/Sparkline";
 import { ArticleLink, Banner, Card, Muted } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate, fmtDateTime } from "../lib/format";
-import type { Item, Run, Theatre } from "../types/run";
+import type { RunV2 } from "../lib/v2";
+import type { Item, Theatre } from "../types/run";
 import { LatestReports } from "./LatestReports";
 
 const ReportMap = lazy(() => import("../map/ReportMap"));
@@ -11,7 +12,15 @@ const ReportMap = lazy(() => import("../map/ReportMap"));
 // f(1) = 0.375 is a normal day on the shared curve; f(0.5) ≈ 0.21 and f(2) ≈ 0.61.
 const NORMAL = 0.375;
 
-export function GeopoliticsPage({ run }: { run: Run }) {
+/** Whether to say when the brief was written. The old pipeline wrote it in every run, so one
+ * older than the run was carried over. The rebuilt one writes it twice a day and updates the
+ * rest hourly, so there the note appears once the oldest text is more than 14 hours old. */
+function briefIsOld(writtenAt: string, run: RunV2): boolean {
+  if (!run.status) return writtenAt < run.run.started_at;
+  return new Date(run.run.finished_at).getTime() - new Date(writtenAt).getTime() > 14 * 3_600_000;
+}
+
+export function GeopoliticsPage({ run }: { run: RunV2 }) {
   const { t, pick, locale } = useLang();
   const g = run.geopolitics;
   const itemById = new Map(run.items.map((i) => [i.id, i]));
@@ -32,7 +41,7 @@ export function GeopoliticsPage({ run }: { run: Run }) {
         <>
           {g.brief && (
             <Card title={t.brief}>
-              {g.brief.written_at && g.brief.written_at < run.run.started_at && (
+              {g.brief.written_at && briefIsOld(g.brief.written_at, run) && (
                 <p className="mb-2 text-xs text-muted">{t.briefWritten(fmtDateTime(g.brief.written_at, locale))}</p>
               )}
               {g.brief.what_changed_en && (

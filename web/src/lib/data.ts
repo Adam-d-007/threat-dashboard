@@ -1,6 +1,12 @@
 import type { Run, Timeseries } from "../types/run";
+import { loadHistoryV2, loadV2, type RunV2 } from "./v2";
 
 export const SUPPORTED_SCHEMA_VERSIONS = [1];
+
+/** Which files the site reads: "v2" is the rebuilt pipeline's (v2/ on the data branch, several
+ * small files, updated hourly); anything else the old pipeline's single latest.json. Set by
+ * VITE_DATA_LAYOUT at build time; the switch-over is that one setting. */
+export const V2 = import.meta.env.VITE_DATA_LAYOUT === "v2";
 
 /** True on builds made with VITE_SAMPLE_DATA=true (the dev branch deploy and local design work).
  * The site then renders the bundled, made-up sample files and says so on every page. */
@@ -38,7 +44,7 @@ export function slotKey(now: Date): string {
 }
 
 export type LoadResult =
-  | { kind: "ok"; run: Run }
+  | { kind: "ok"; run: RunV2 }
   | { kind: "unsupported"; version: unknown }
   | { kind: "error"; message: string };
 
@@ -46,6 +52,8 @@ export async function loadLatest(now: Date = new Date()): Promise<LoadResult> {
   let data: { schema_version?: unknown };
   if (SAMPLE_MODE) {
     data = (await import("../sample/latest.json")).default;
+  } else if (V2) {
+    return loadV2(dataBaseUrl(), now);
   } else {
     let res: Response;
     try {
@@ -64,7 +72,9 @@ export async function loadLatest(now: Date = new Date()): Promise<LoadResult> {
 
 /** Ids of the stored runs, newest first (runs/index.json), or [] when there is no index. */
 export async function loadRunIndex(now: Date = new Date()): Promise<string[]> {
-  if (SAMPLE_MODE) return [];
+  // The rebuilt pipeline keeps no full copies of earlier runs: the history chart and the
+  // monthly incident files take their place.
+  if (SAMPLE_MODE || V2) return [];
   const res = await fetch(`${dataBaseUrl()}/runs/index.json?v=${slotKey(now)}`);
   if (!res.ok) return [];
   const runs = (await res.json())?.runs;
@@ -100,6 +110,7 @@ function withAnchorKinds(run: Run): Run {
 /** The index history, or null when none exists yet (before scoring runs). */
 export async function loadTimeseries(now: Date = new Date()): Promise<Timeseries | null> {
   if (SAMPLE_MODE) return (await import("../sample/timeseries.json")).default as unknown as Timeseries;
+  if (V2) return loadHistoryV2(dataBaseUrl(), now);
   const res = await fetch(`${dataBaseUrl()}/timeseries.json?v=${slotKey(now)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`timeseries.json: HTTP ${res.status}`);

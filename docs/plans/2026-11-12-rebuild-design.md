@@ -272,6 +272,18 @@ Decisions:
 - **Alerts stay with the old pipeline** until switch-over; the new alert code is written and
   tested but not called, so there is no second stream of emails.
 
+- **Groq's daily allowance is real, and labelling would use most of it.** At 05:52 UTC on
+  2026-11-13, after a day of labelling and of tests, Groq refused the brief with a rate limit
+  and Gemini was busy: four of six theatres kept the previous day's text, and the status said
+  so. Gemini now labels first and Groq keeps its allowance for matching, the assessments and
+  the brief.
+- **The brief tells a development once.** One report can belong to three theatres, and each
+  wrote its own line about it; the first theatre's line is kept.
+- **The first side-by-side numbers** (9 hours, 10 runs): every run finished; 122 of 122
+  articles labelled within 3 hours; the index at the 04:00 slot was 32 for Slovakia (old
+  pipeline 32) and 42 for the EU (old 43); the old pipeline's own run that morning had no
+  model assessment and labelled 24 articles by keywords.
+
 Left for switch-over day, on purpose:
 
 1. Fetching for itself: the new run takes over the collector's fetch, the official-level

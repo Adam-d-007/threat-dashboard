@@ -227,6 +227,25 @@ const en = {
       "The level shown is a dashboard indicator. It is not an official or professional threat assessment, and it is always shown next to the official SIS level.",
     ],
   },
+  v2: {
+    timeline: (n: number) => `${n} reports, oldest first`,
+    first: "first report",
+    update: "update",
+    statusTitle: "How the latest update went",
+    overall: { ok: "Everything ran.", partial: "Partly: see below.", failed: "A step failed." } as Record<string, string>,
+    waiting: (n: number) => `${n} article${n === 1 ? "" : "s"} waiting for classification`,
+    labelled: (n: number) => `${n} articles classified in the last 24 hours`,
+    byModel: "By model",
+    givenUp: (n: number) => `${n} given up unclassified in the last 24 hours`,
+    scored: (id: string) => `Threat level last computed in update ${id}`,
+    briefAt: (when: string) => `Oldest brief text shown: ${when}`,
+    details: "Technical details",
+    late: (n: number, h: number) =>
+      `Classification is running late: ${n} article${n === 1 ? " has" : "s have"} waited up to ${h} hours.`,
+    embedTitle: "Put the level on your own page",
+    embedHelp:
+      "Paste this into a web page. The box shows the official SIS level first and this site's unofficial estimate beside it, with the date of the data.",
+  },
   lastRun: "Updated",
   runPicker: "Run",
   latest: "latest",
@@ -480,6 +499,30 @@ const sk: Strings = {
       "Objem medializácie sa vždy porovnáva s kĺzavým základom, nikdy sa nezobrazuje ako absolútny počet. Každé číslo odkazuje na svoje vstupy a správy, z ktorých vzniklo.",
       "Zobrazená úroveň je ukazovateľ dashboardu. Nejde o oficiálne ani odborné hodnotenie hrozby a vždy sa zobrazuje vedľa oficiálnej úrovne SIS.",
     ],
+  },
+  v2: {
+    timeline: (n: number) => (n >= 5 ? `${n} správ, od najstaršej` : `${n} správy, od najstaršej`),
+    first: "prvá správa",
+    update: "doplnenie",
+    statusTitle: "Priebeh poslednej aktualizácie",
+    overall: { ok: "Všetko prebehlo.", partial: "Čiastočne: podrobnosti nižšie.", failed: "Jeden krok zlyhal." },
+    waiting: (n: number) =>
+      n === 1
+        ? "Na klasifikáciu čaká 1 článok"
+        : n >= 2 && n <= 4
+          ? `Na klasifikáciu čakajú ${n} články`
+          : `Na klasifikáciu čaká ${n} článkov`,
+    labelled: (n: number) => `Počet článkov klasifikovaných za posledných 24 hodín: ${n}`,
+    byModel: "Podľa modelu",
+    givenUp: (n: number) => `Počet článkov, ktoré sa za posledných 24 hodín nepodarilo klasifikovať: ${n}`,
+    scored: (id: string) => `Úroveň ohrozenia naposledy vypočítaná v aktualizácii ${id}`,
+    briefAt: (when: string) => `Najstarší zobrazený text prehľadu: ${when}`,
+    details: "Technické podrobnosti (v angličtine)",
+    late: (n: number, h: number) =>
+      `Klasifikácia správ mešká: počet čakajúcich článkov je ${n}, najdlhšie čakajú ${h} h.`,
+    embedTitle: "Vložte si úroveň na vlastnú stránku",
+    embedHelp:
+      "Tento kód vložte do svojej webovej stránky. Okienko zobrazuje najprv oficiálny stupeň SIS a vedľa neho neoficiálny odhad tejto stránky spolu s dátumom údajov.",
   },
   lastRun: "Aktualizované",
   runPicker: "Aktualizácia",
