@@ -401,6 +401,7 @@ export interface Status {
   queue: Queue;
   ai: Ai;
   labelled_by_24h: LabelledBy24H;
+  ai_month_usd: AiMonthUsd;
   last_scored: LastScored;
   brief_written_at: BriefWrittenAt;
   sources: Sources;
@@ -436,6 +437,12 @@ export interface Ai {
  * Articles labelled per model, 24 hours
  */
 export interface LabelledBy24H {
+  [k: string]: number;
+}
+/**
+ * Estimated spend on paid models this calendar month, per provider
+ */
+export interface AiMonthUsd {
   [k: string]: number;
 }
 /**
