@@ -131,10 +131,19 @@ def brief(articles: dict[str, Article], previous: GeopoliticsFile | None, baseli
     # A report can belong to several theatres (a loan to Ukraine is Russia and Ukraine, Slovak
     # policy and EU defence at once), and each wrote its own line about it: on 2026-11-12 the
     # brief said the same thing three times. A development is told once, by the first theatre.
+    # The same goes for one incident told from different articles: on 2026-11-21 the Russian
+    # plot foiled in Denmark was a line under Russia and Ukraine (from the EU's reaction) and
+    # under hybrid threats (from the Danish police), each citing other articles.
+    def incidents_of(line) -> set[str]:
+        ids = {(articles.get(i) and articles[i].incident_id) or "" for i in line.item_ids}
+        return ids if all(i.startswith("inc_") for i in ids) else set()
+
     told: set[str] = set()
     for t in theatres:
-        fresh = [line for line in t.lines if not set(line.item_ids) <= told]
-        told |= {i for line in t.lines for i in line.item_ids}
+        fresh = [line for line in t.lines
+                 if not set(line.item_ids) <= told
+                 and not (incidents_of(line) and incidents_of(line) <= told)]
+        told |= {i for line in t.lines for i in [*line.item_ids, *incidents_of(line)]}
         t.lines = fresh
     log.info("brief: %s", stats)
     return GeopoliticsFile(

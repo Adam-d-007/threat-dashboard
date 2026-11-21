@@ -25,7 +25,7 @@ def main() -> None:
     run.Ai = RuleAi
     with tempfile.TemporaryDirectory() as tmp:
         state = build_state(Path(tmp))
-        code = run.main(["--state-dir", str(state), "--git-sha", "fixture", "--now",
+        code = run.main(["--state-dir", str(state), "--git-sha", "fixture", "--no-fetch", "--now",
                          AT.isoformat()])
         assert code == 0
         for name, flat in FILES.items():

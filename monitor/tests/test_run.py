@@ -132,6 +132,7 @@ def state(tmp_path, monkeypatch):
 
 def go(state, *flags, at=AT):
     return run.main(["--state-dir", str(state), "--git-sha", "abc", "--now", at.isoformat(),
+                     "--no-fetch",
                      "--commit-msg-file", str(state / "msg.txt"), *flags])
 
 
@@ -144,7 +145,7 @@ def test_one_hourly_run_from_news_to_published_files(state):
     st = public(state, "status.json", Status)
     assert st.overall == "ok" and st.reasons == []
     assert {k: v.status for k, v in st.stages.items()} == {
-        "ingest": "ok", "label": "ok", "match": "ok", "score": "ok", "brief": "ok",
+        "collect": "skipped", "ingest": "ok", "label": "ok", "match": "ok", "score": "ok", "brief": "ok",
         "publish": "ok"}
     assert st.queue.waiting_label == 0 and st.queue.labelled_24h == 3
     assert st.labelled_by_24h == {"groq_120b": 3} and st.last_scored == "2026-11-12T13"
@@ -249,14 +250,6 @@ def test_the_alert_opens_only_after_a_day_without_one_good_run():
     assert status.alert_due([entry(30, "ok"), entry(20, "degraded"), entry(1, "failed")], NOW, 24)
 
 
-def test_in_the_old_pipelines_hours_no_model_is_asked_and_articles_wait(state):
-    assert go(state, at=AT.replace(hour=13)) == 0
-    st = public(state, "status.json", Status)
-    assert st.stages["label"].status == "skipped" and "old pipeline" in st.stages["label"].detail
-    assert st.queue.waiting_label == 3
-    assert go(state, at=AT) == 0
-    assert public(state, "status.json", Status).queue.waiting_label == 0
-
 
 def test_the_summary_says_what_changed_since_the_previous_scoring(state):
     go(state)
@@ -303,16 +296,3 @@ def test_the_months_claude_spend_is_tallied_and_capped(state, monkeypatch):
     assert made[1].capped == [("anthropic", 1.25)]
     go(state, at=AT.replace(month=12, day=1))
     assert made[2].capped == []  # a new month starts from nothing
-
-
-def test_in_a_quiet_hour_claude_still_works(state, monkeypatch):
-    def with_claude(cls, cfg):
-        ai = cls()
-        ai.models["haiku_55"] = SimpleNamespace(model="claude-haiku-5-5", provider="anthropic",
-                                                out=None)
-        ai.keys = {"groq": "k", "anthropic": "k"}
-        return ai
-    monkeypatch.setattr(RuleAi, "from_env", classmethod(with_claude))
-    go(state, at=AT.replace(hour=13))
-    st = public(state, "status.json", Status)
-    assert st.stages["label"].status == "ok" and st.queue.waiting_label == 0

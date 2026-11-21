@@ -2,9 +2,9 @@
 # Commit the current directory (a checkout of the data branch) and push it.
 # Usage: commit_data.sh MESSAGE_FILE
 #
-# The pipeline and the hourly collector both push to the data branch. If the other one
-# pushed first, rebase onto it and retry. They write different files (the collector only
-# rss_buffer.json, the pipeline everything else), so the rebase cannot conflict.
+# The hourly job is the only writer apart from the monthly squash, which shares its
+# concurrency group. A push can still be refused when a run overlaps a manual one, so it
+# rebases onto the data branch and retries.
 set -euo pipefail
 
 git config user.name "github-actions[bot]"
