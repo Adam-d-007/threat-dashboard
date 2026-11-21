@@ -1,10 +1,14 @@
 name: compare-claude
 
-# One-off (2026-11-21): Claude Haiku 5.5 against Claude Opus 5.5 on 48 real articles, to decide
-# whether Haiku is good enough to label. Reads the data branch, commits nothing, costs well
+# One-off (2026-11-21): cheaper Claude models against Claude Opus 5.5 on 48 real articles, to
+# decide which labels. Reads the data branch, commits nothing, costs well
 # under a dollar of the API credit. Delete after use.
 on:
   workflow_dispatch:
+    inputs:
+      models:
+        description: "Models to compare with opus_55 (comma-separated names from monitor/config.yaml)"
+        default: "haiku_55"
 
 permissions:
   contents: read
@@ -29,4 +33,5 @@ jobs:
       - name: Compare
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uv run python -m monitor.tools.compare_claude --state-dir state
+          MODELS: ${{ inputs.models }}
+        run: uv run python -m monitor.tools.compare_claude --state-dir state --models "$MODELS"
