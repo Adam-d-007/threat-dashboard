@@ -1,17 +1,16 @@
 # Netlify reads this from the repository root, so no base directory has to be set in the UI.
-# Production branch: main. Branch deploys: dev only (set in the Netlify UI).
-# Production deploys cost 15 of the free plan's 300 monthly credits; keep them to 12 a month
-# so the rest pays for traffic.
+# Production branch: main. Production deploys cost 15 of the free plan's 300 monthly credits;
+# keep them to 12 a month so the rest pays for traffic.
 [build]
   base = "web"
   command = "npm run build"
   publish = "dist"
-  # Skip the build (and the deploy) when nothing the site is built from changed: web/ (apart
-  # from the type-only src/types and the tests) and docs/SCORING.md, which the method page
-  # bundles.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../docs/SCORING.md ':(exclude)src/types' ':(exclude,glob)**/*.test.tsx' ':(exclude)src/test'"
-
-# The dev branch deploy renders the bundled sample data (labelled on every page), so the design
-# can be reviewed before scoring exists. Production always reads the real data branch.
-[context.dev.environment]
-  VITE_SAMPLE_DATA = "true"
+  # Exit 0 skips the build (and the deploy), anything else builds.
+  # - Only production builds. The dev branch deploy showed made-up sample data for design
+  #   review and spent credits on every push.
+  # - Production builds when the merge into main changed what the site is built from: web/
+  #   (apart from the type-only src/types and the tests), docs/SCORING.md, which the method page
+  #   bundles, and this file. It compares with main's previous commit: comparing with the last
+  #   commit Netlify built ($CACHED_COMMIT_REF) skipped the switch-over on 2026-11-21, because
+  #   the dev deploy a minute earlier had built the same files.
+  ignore = "if [ \"$CONTEXT\" != production ]; then exit 0; fi; git diff --quiet HEAD^ HEAD -- . ../docs/SCORING.md ../netlify.toml ':(exclude)src/types' ':(exclude,glob)**/*.test.tsx' ':(exclude)src/test'"
