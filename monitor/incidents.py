@@ -24,6 +24,9 @@ from .models import Article, Correction, Incident, Report
 log = logging.getLogger("monitor.incidents")
 
 REMOVED = "removed"
+# A report about an earlier incident this pipeline does not hold, and cannot date: it is kept as
+# a report but makes no incident (see can_start).
+EARLIER = "earlier"
 SK_RANK = {"none": 0, "indirect": 1, "direct": 2}
 TIER_RANK = {"A": 0, "B": 1, "C": 2}
 UPDATED_DAYS = 14   # an older incident still in the news is offered to the matcher as well
@@ -46,6 +49,22 @@ def event_date(a: Article) -> date:
     published = a.published_at.date()
     stated = date.fromisoformat(a.label.incident_date) if a.label.incident_date else published
     return stated if stated <= published + timedelta(days=1) else published
+
+
+def can_start(a: Article, cfg: dict) -> bool:
+    """Whether a report no known incident fits may start one. Until 2026-11-21 every such
+    report did, dated the day it was published when it gave no date: a police review of
+    September's school attack in Slovakia became a new severity 4 attack on 20 November, a
+    fundraiser for a 2015 Bataclan witness a severity 5 attack in France, and the EU's index
+    rose 11 points above the old pipeline's. So a report starts an incident only when it says
+    when the incident happened and that is recent, or when it reports something new and gives
+    no date (news of the day). An update that gives no date belongs to an incident before this
+    pipeline's time and makes none."""
+    lab = a.label
+    if not lab.incident_date:
+        return lab.kind == "new_incident"
+    stated = date.fromisoformat(lab.incident_date)
+    return stated >= a.published_at.date() - timedelta(days=cfg["candidate_days"])
 
 
 def report_of(a: Article) -> Report:
@@ -135,7 +154,7 @@ def match(articles: dict[str, Article], incidents: list[Incident], ai, cfg: dict
     and, when it stopped early, why."""
     queue = sorted((a for a in articles.values() if needs_match(a, cfg)),
                    key=lambda a: a.published_at)
-    stats = {"attached": 0, "new": 0, "unanswered": 0, "stopped": None}
+    stats = {"attached": 0, "new": 0, "earlier": 0, "unanswered": 0, "stopped": None}
     deadline = ai.clock() + cfg["max_seconds"]
     while queue:
         batch, queue = queue[:cfg["batch_size"]], queue[cfg["batch_size"]:]
@@ -163,6 +182,10 @@ def match(articles: dict[str, Article], incidents: list[Incident], ai, cfg: dict
                 a.match_attempts += 1
                 stats["unanswered"] += 1
                 continue
+            if answer == NEW and not can_start(a, cfg):
+                a.incident_id, a.matched_by = EARLIER, model
+                stats["earlier"] += 1
+                continue
             if answer == NEW and created:
                 again.append(a)
                 continue
@@ -180,6 +203,27 @@ def match(articles: dict[str, Article], incidents: list[Incident], ai, cfg: dict
     stats["waiting"] = sum(1 for a in articles.values() if needs_match(a, cfg))
     log.info("matching: %s", stats)
     return stats
+
+
+def drop_unfounded(incidents: list[Incident], articles: dict[str, Article],
+                   cfg: dict) -> list[str]:
+    """Remove incidents that can_start would not have let any of their reports make, where every
+    report is still in the article store to check (7 days); returns their ids. Repairs those made
+    before 2026-11-21 and is idempotent. Incidents carried over from the old pipeline are left
+    as they are."""
+    gone = []
+    for inc in list(incidents):
+        mine = [articles.get(r.article_id) for r in inc.reports]
+        if inc.seeded_from or not all(a and a.label for a in mine):
+            continue
+        if not any(can_start(a, cfg) for a in mine):
+            incidents.remove(inc)
+            gone.append(inc.id)
+            for a in mine:
+                a.incident_id = EARLIER
+    if gone:
+        log.info("%d incidents made from undated or old follow-ups removed: %s", len(gone), gone)
+    return gone
 
 
 def prune(incidents: list[Incident], now: datetime, keep_days: int) -> list[Incident]:

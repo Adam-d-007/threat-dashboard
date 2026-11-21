@@ -183,6 +183,8 @@ class Status(Strict):
     queue: Queue
     ai: dict[str, dict]
     labelled_by_24h: dict[str, int] = Field(description="Articles labelled per model, 24 hours")
+    ai_month_usd: dict[str, float] = Field(default_factory=dict, description="Estimated spend "
+                                           "on paid models this calendar month, per provider")
     last_scored: str | None
     brief_written_at: datetime | None
     sources: list[SourceHealth]

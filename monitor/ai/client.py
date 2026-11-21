@@ -1,8 +1,12 @@
 """AI access: a fixed list of free models per task, each asked with the provider's strict JSON
 mode, so the answer's shape is enforced by the provider and not hoped for.
 
-Keys come from GEMINI_API_KEY and GROQ_API_KEY. Policy, from the old pipeline's runs and the
-step 0 probe (2026-11-12):
+Keys come from ANTHROPIC_API_KEY, GEMINI_API_KEY and GROQ_API_KEY. Claude (on MCS's API
+credit, from 2026-11-21) is asked first and the free models are the backup: in the week to
+2026-11-20 their daily allowances ran out in 9 of 14 scoring runs. Claude is called through the
+official SDK with a JSON Schema as structured output (output_config.format), which constrains
+its answer to the schema. A monthly cap on its estimated cost keeps it within the credit.
+Policy, from the old pipeline's runs and the step 0 probe (2026-11-12):
 - Models are asked in the task's order. The first usable answer wins; its model is returned
   with it, so every label records who wrote it.
 - Each model has a least interval between calls (Groq: 8,000 tokens a minute).
@@ -25,6 +29,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+import anthropic
 import httpx
 
 from pipeline.adapters.base import TLS, USER_AGENT
@@ -34,7 +39,9 @@ log = logging.getLogger("monitor.ai")
 GEMINI = "https://generativelanguage.googleapis.com/v1beta"
 GROQ = "https://api.groq.com/openai/v1"
 GEMINI_MAX_OUTPUT = 8192
-DONE = {"groq": "stop", "gemini": "STOP"}
+DONE = {"groq": "stop", "gemini": "STOP", "anthropic": "end_turn"}
+# On a refusal Opus 5.5's answer is rerun on another Claude model inside the same call.
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 
 class AiUnavailable(Exception):
@@ -71,6 +78,56 @@ def http_post(url: str, headers: dict, body: dict, timeout: float) -> Reply:
     return Reply(r.status_code, dict(r.headers), text=r.text)
 
 
+def claude_schema(schema: dict) -> dict:
+    """The schema as Claude's structured outputs take it: a list of types (["string", "null"],
+    which Groq and Gemini read) becomes anyOf, which Claude's documented subset includes."""
+    if isinstance(schema.get("type"), list):
+        rest = {k: v for k, v in schema.items() if k not in ("type", "enum")}
+        branches = []
+        for t in schema["type"]:
+            branch = {"type": t}
+            if t != "null" and "enum" in schema:
+                branch["enum"] = [v for v in schema["enum"] if v is not None]
+            branches.append(branch)
+        return {**rest, "anyOf": branches}
+    out = dict(schema)
+    if "properties" in out:
+        out["properties"] = {k: claude_schema(v) for k, v in out["properties"].items()}
+    if "items" in out:
+        out["items"] = claude_schema(out["items"])
+    return out
+
+
+def claude_post(key: str, body: dict, timeout: float) -> Reply:
+    """One Claude call through the SDK, in the same shape as the other providers' replies.
+    The SDK retries a connection error, 429 or 5xx once by itself; anything further is the
+    policy above."""
+    client = anthropic.Anthropic(api_key=key, timeout=timeout, max_retries=1)
+    try:
+        if "fallbacks" in body:
+            msg = client.beta.messages.create(**body, betas=[FALLBACK_BETA])
+        else:
+            msg = client.messages.create(**body)
+    except anthropic.APITimeoutError:
+        return Reply("timeout")
+    except anthropic.APIConnectionError as e:
+        return Reply(type(e).__name__)
+    except anthropic.APIStatusError as e:
+        # The spend limit set in the Console, or the credit used up: no point asking again.
+        spent = isinstance(e, (anthropic.EnforcedSpendLimitReachedError,
+                               anthropic.ContractSpendLimitReachedError,
+                               anthropic.PaymentRequiredError)) or "credit balance" in str(e)
+        return Reply(e.status_code, dict(e.response.headers),
+                     text=("SPENT " if spent else "") + str(e.message))
+    usage = msg.usage
+    return Reply(200, body={
+        "text": "".join(b.text for b in msg.content if b.type == "text"),
+        "stop_reason": msg.stop_reason,
+        "tokens_in": (usage.input_tokens or 0) + (usage.cache_read_input_tokens or 0)
+        + (usage.cache_creation_input_tokens or 0),
+        "tokens_out": usage.output_tokens or 0})
+
+
 @dataclass
 class Model:
     name: str
@@ -79,6 +136,10 @@ class Model:
     interval_s: float
     timeout_s: float
     thinking: str | None = None
+    effort: str | None = None              # Claude: output_config.effort
+    fallbacks: bool = False                # Claude: server-side fallback on a refusal
+    max_output: int | None = None          # overrides the task's, for models that think
+    price: tuple[float, float] = (0.0, 0.0)  # US dollars per million tokens in and out
     last_call: float | None = None
     strikes: int = 0
     out: str | None = None                 # why it is left alone for the rest of the run
@@ -87,10 +148,25 @@ class Model:
     tokens_in: int = 0
     tokens_out: int = 0
 
+    @property
+    def cost_usd(self) -> float:
+        return (self.tokens_in * self.price[0] + self.tokens_out * self.price[1]) / 1e6
+
 
 def request(m: Model, key: str, system: str, user: str, schema: dict, name: str,
             max_output: int) -> tuple[str, dict, dict]:
-    """(url, headers, body) of one strict-JSON call."""
+    """(url, headers, body) of one strict-JSON call. For Claude the body holds the SDK's
+    arguments and the url only names the provider."""
+    if m.provider == "anthropic":
+        body = {"model": m.model, "max_tokens": max_output, "system": system,
+                "messages": [{"role": "user", "content": user}],
+                "output_config": {"format": {"type": "json_schema",
+                                             "schema": claude_schema(schema)}}}
+        if m.effort:
+            body["output_config"]["effort"] = m.effort
+        if m.fallbacks:
+            body["fallbacks"] = "default"
+        return "anthropic", {}, body
     if m.provider == "groq":
         return f"{GROQ}/chat/completions", {"Authorization": f"Bearer {key}"}, {
             "model": m.model, "temperature": 0, "max_completion_tokens": max_output,
@@ -110,6 +186,8 @@ def request(m: Model, key: str, system: str, user: str, schema: dict, name: str,
 
 def answer(provider: str, body: dict) -> tuple[str, str | None, int, int]:
     """(text, finish reason, input tokens, output tokens) of a 200 response."""
+    if provider == "anthropic":
+        return body["text"], body["stop_reason"], body["tokens_in"], body["tokens_out"]
     if provider == "groq":
         choice = body["choices"][0]
         usage = body.get("usage") or {}
@@ -127,16 +205,30 @@ def answer(provider: str, body: dict) -> tuple[str, str | None, int, int]:
 class Ai:
     def __init__(self, cfg: dict, keys: dict[str, str], post: Callable = http_post,
                  clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep):
+                 sleep: Callable[[float], None] = time.sleep,
+                 claude: Callable = claude_post):
         self.cfg, self.keys = cfg, keys
-        self.post, self.clock, self.sleep = post, clock, sleep
-        self.models = {name: Model(name=name, **spec) for name, spec in cfg["models"].items()}
+        self.post, self.clock, self.sleep, self.claude = post, clock, sleep, claude
+        self.models = {name: Model(name=name, **{k: tuple(v) if k == "price" else v
+                                                 for k, v in spec.items()})
+                       for name, spec in cfg["models"].items()}
 
     @classmethod
     def from_env(cls, cfg: dict) -> "Ai":
-        keys = {p: os.environ[f"{p.upper()}_API_KEY"] for p in ("gemini", "groq")
+        keys = {p: os.environ[f"{p.upper()}_API_KEY"] for p in ("anthropic", "gemini", "groq")
                 if os.environ.get(f"{p.upper()}_API_KEY")}
         return cls(cfg, keys)
+
+    def cap(self, provider: str, spent_usd: float) -> None:
+        """Leave a paid provider's models alone for the run once this month's estimated spend
+        has reached the configured cap."""
+        limit = self.cfg.get("monthly_cap_usd", {}).get(provider)
+        if limit is not None and spent_usd >= limit:
+            for m in self.models.values():
+                if m.provider == provider:
+                    m.out = f"monthly cap of ${limit} reached (${spent_usd:.2f} spent)"
+            log.warning("%s left alone: this month's estimated spend $%.2f reached the cap $%s",
+                        provider, spent_usd, limit)
 
     def usable(self, task: str) -> list[Model]:
         return [self.models[n] for n in self.cfg["tasks"][task]["models"]
@@ -146,9 +238,9 @@ class Ai:
             parse: Callable[[str], object], deadline: float | None = None) -> tuple[object, str]:
         """(parse(answer), name of the model that gave it). parse raises ValueError on an
         answer it cannot use."""
-        max_output = self.cfg["tasks"][task]["max_output"]
         last = "no model has a key and is still in use"
         for m in self.usable(task):
+            max_output = m.max_output or self.cfg["tasks"][task]["max_output"]
             url, headers, body = request(m, self.keys[m.provider], system, user, schema, name,
                                          max_output)
             for attempt in (1, 2):
@@ -201,6 +293,8 @@ class Ai:
             self.sleep(wait)
         m.last_call = self.clock()
         m.calls += 1
+        if m.provider == "anthropic":
+            return self.claude(self.keys["anthropic"], body, m.timeout_s)
         return self.post(url, headers, body, m.timeout_s)
 
     @staticmethod
@@ -211,7 +305,12 @@ class Ai:
             return None
 
     def _failed(self, m: Model, reply: Reply) -> None:
-        if reply.status == 413:
+        if reply.text.startswith("SPENT "):
+            for other in self.models.values():
+                if other.provider == m.provider:
+                    other.out = "spend limit or credit reached"
+            log.warning("%s left alone for this run: %s", m.provider, clean(reply.text))
+        elif reply.status == 413:
             log.warning("%s: request too large for this model", m.name)
         elif reply.status == 429:
             m.out = "rate limit reached"
@@ -238,5 +337,12 @@ class Ai:
     def report(self) -> dict[str, dict]:
         """Per model: calls, answers, tokens and why it was dropped, for status.json."""
         return {m.name: {"model": m.model, "calls": m.calls, "answered": m.answered,
-                         "tokens_in": m.tokens_in, "tokens_out": m.tokens_out, "out": m.out}
+                         "tokens_in": m.tokens_in, "tokens_out": m.tokens_out, "out": m.out,
+                         "cost_usd": round(m.cost_usd, 4)}
                 for m in self.models.values() if m.calls}
+
+    def cost_by_provider(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        for m in self.models.values():
+            out[m.provider] = out.get(m.provider, 0.0) + m.cost_usd
+        return out

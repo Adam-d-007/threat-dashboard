@@ -78,7 +78,7 @@ def test_groq_is_asked_first_with_the_schema_in_strict_mode():
     assert timeout == 60
     assert client.report()["groq_120b"] == {
         "model": "openai/gpt-oss-120b", "calls": 1, "answered": 1, "tokens_in": 100,
-        "tokens_out": 20, "out": None}
+        "tokens_out": 20, "out": None, "cost_usd": 0.0}
 
 
 def test_gemini_gets_the_schema_and_minimal_thinking_and_its_thinking_counts_as_output():
@@ -232,8 +232,199 @@ def test_a_theatre_brief_and_an_assessment_are_validated():
         parse_assessment('{"level": 7}')
 
 
-def test_the_shipped_settings_ask_gemini_for_labels_first_and_groq_for_the_rest():
+def test_the_shipped_settings_ask_claude_first_and_keep_the_free_models_as_backup():
     from monitor import settings
-    tasks = settings.load()["ai"]["tasks"]
-    assert tasks["label"]["models"] == ["gemini_36", "groq_120b"]
-    assert all(tasks[t]["models"][0] == "groq_120b" for t in ("match", "assess", "brief"))
+    cfg = settings.load()["ai"]
+    tasks = cfg["tasks"]
+    assert tasks["label"]["models"] == ["haiku_55", "gemini_36", "groq_120b"]
+    assert all(tasks[t]["models"][0] == "opus_55" for t in ("match", "assess", "brief"))
+    assert cfg["models"]["haiku_55"]["model"] == "claude-haiku-5-5"
+    assert cfg["models"]["opus_55"]["model"] == "claude-opus-5-5"
+    assert cfg["monthly_cap_usd"] == {"anthropic": 80}
+
+
+# --- Claude ---------------------------------------------------------------------------------
+
+from monitor.ai import client as client_module  # noqa: E402
+from monitor.ai.client import claude_post, claude_schema  # noqa: E402
+from monitor.ai.labels import BATCH_SCHEMA  # noqa: E402
+
+CLAUDE_CFG = {
+    "models": CFG["models"] | {
+        "haiku_55": {"provider": "anthropic", "model": "claude-haiku-5-5", "effort": "low",
+                     "max_output": 8000, "interval_s": 1, "timeout_s": 120,
+                     "price": [0.10, 0.50]},
+        "opus_55": {"provider": "anthropic", "model": "claude-opus-5-5", "effort": "medium",
+                    "max_output": 16000, "fallbacks": True, "interval_s": 1, "timeout_s": 300,
+                    "price": [4.0, 20.0]},
+    },
+    "tasks": {"label": {"models": ["haiku_55", "groq_120b"], "max_output": 4096},
+              "brief": {"models": ["opus_55", "groq_120b"], "max_output": 3000}},
+    "strikes": 2, "max_wait_s": 90, "monthly_cap_usd": {"anthropic": 80},
+}
+
+
+def claude_ok(text='{"ok": true}', stop="end_turn", tokens_in=1000, tokens_out=500):
+    return Reply(200, body={"text": text, "stop_reason": stop, "tokens_in": tokens_in,
+                            "tokens_out": tokens_out})
+
+
+class FakeClaude(Fake):
+    """Claude's replies come through claude(), the free providers' through post()."""
+
+    def __init__(self, claude_replies=(), post_replies=()):
+        super().__init__(*post_replies)
+        self.claude_replies, self.claude_sent = list(claude_replies), []
+
+    def claude(self, key, body, timeout):
+        self.claude_sent.append((key, body, timeout))
+        return self.claude_replies.pop(0)
+
+
+def claude_ai(fake, keys=None):
+    return Ai(CLAUDE_CFG, keys or {"anthropic": "ak", "groq": "gk"}, post=fake.post,
+              clock=fake.clock, sleep=fake.sleep, claude=fake.claude)
+
+
+def test_claude_is_asked_first_with_the_schema_as_structured_output():
+    fake = FakeClaude([claude_ok()])
+    client = claude_ai(fake)
+    assert ask(client) == ({"ok": True}, "haiku_55")
+    key, body, timeout = fake.claude_sent[0]
+    assert key == "ak" and timeout == 120 and fake.sent == []
+    assert body == {"model": "claude-haiku-5-5", "max_tokens": 8000, "system": "sys",
+                    "messages": [{"role": "user", "content": "user"}],
+                    "output_config": {"effort": "low", "format": {"type": "json_schema",
+                                                                  "schema": SCHEMA}}}
+    report = client.report()["haiku_55"]
+    assert (report["tokens_in"], report["tokens_out"]) == (1000, 500)
+    assert report["cost_usd"] == round((1000 * 0.10 + 500 * 0.50) / 1e6, 4)
+
+
+def test_opus_gets_its_effort_room_to_think_and_the_refusal_fallback():
+    fake = FakeClaude([claude_ok()])
+    client = claude_ai(fake)
+    client.ask("brief", "sys", "user", SCHEMA, "brief", json.loads)
+    body = fake.claude_sent[0][1]
+    assert body["model"] == "claude-opus-5-5" and body["max_tokens"] == 16000
+    assert body["output_config"]["effort"] == "medium" and body["fallbacks"] == "default"
+
+
+def test_a_refusal_or_a_cut_off_answer_goes_to_the_backup_model():
+    for stop in ("refusal", "max_tokens"):
+        fake = FakeClaude([claude_ok(stop=stop)], [groq_ok()])
+        assert ask(claude_ai(fake)) == ({"ok": True}, "groq_120b")
+
+
+def test_without_a_claude_key_the_free_models_do_the_work():
+    fake = FakeClaude([], [groq_ok()])
+    assert ask(claude_ai(fake, {"groq": "gk"})) == ({"ok": True}, "groq_120b")
+    assert fake.claude_sent == []
+
+
+def test_a_spent_credit_or_spend_limit_leaves_every_claude_model_alone():
+    fake = FakeClaude([Reply(429, text="SPENT spend limit reached")], [groq_ok(), groq_ok()])
+    fake.t = 0
+    client = claude_ai(fake)
+    assert ask(client)[1] == "groq_120b"
+    assert client.models["haiku_55"].out == client.models["opus_55"].out == \
+        "spend limit or credit reached"
+    fake.t += 100
+    assert client.ask("brief", "sys", "user", SCHEMA, "b", json.loads)[1] == "groq_120b"
+    assert len(fake.claude_sent) == 1
+
+
+def test_the_monthly_cap_leaves_claude_alone_once_reached():
+    client = claude_ai(FakeClaude())
+    client.cap("anthropic", 79.99)
+    assert client.models["opus_55"].out is None
+    client.cap("anthropic", 80.0)
+    assert client.models["opus_55"].out == "monthly cap of $80 reached ($80.00 spent)"
+    assert client.models["groq_120b"].out is None
+    assert client.cost_by_provider() == {"groq": 0.0, "gemini": 0.0, "anthropic": 0.0}
+
+
+def test_claudes_schema_spells_optional_values_with_anyof():
+    label = claude_schema(BATCH_SCHEMA)["properties"]["items"]["items"]
+    assert label["properties"]["incident_type"]["anyOf"][1] == {"type": "null"}
+    assert None not in label["properties"]["incident_type"]["anyOf"][0]["enum"]
+    assert label["properties"]["incident_date"] == {"anyOf": [{"type": "string"},
+                                                              {"type": "null"}]}
+    assert label["additionalProperties"] is False and label["required"]
+
+    def lists(node):
+        if isinstance(node, dict):
+            return isinstance(node.get("type"), list) or any(lists(v) for v in node.values())
+        return isinstance(node, list) and any(lists(v) for v in node)
+    assert not lists(claude_schema(BATCH_SCHEMA))
+    assert BATCH_SCHEMA["properties"]["items"]["items"]["properties"]["incident_date"][
+        "type"] == ["string", "null"]  # the free models' schema is left as it was
+
+
+class _Usage:
+    input_tokens, output_tokens = 900, 300
+    cache_read_input_tokens = cache_creation_input_tokens = 100
+
+
+class _Message:
+    content = [type("B", (), {"type": "thinking"})(),
+               type("B", (), {"type": "text", "text": '{"ok": true}'})()]
+    stop_reason = "end_turn"
+    usage = _Usage()
+
+
+def _sdk(monkeypatch, raise_=None):
+    """The SDK client, replaced: records what it was asked, answers or raises."""
+    calls = []
+
+    class Messages:
+        def __init__(self, beta):
+            self.beta = beta
+
+        def create(self, **kw):
+            calls.append((self.beta, kw))
+            if raise_:
+                raise raise_
+            return _Message()
+
+    class Client:
+        def __init__(self, **kw):
+            calls.append(("client", kw))
+            self.messages = Messages(False)
+            self.beta = type("Beta", (), {"messages": Messages(True)})()
+
+    monkeypatch.setattr(client_module.anthropic, "Anthropic", Client)
+    return calls
+
+
+def test_claude_post_takes_the_text_and_counts_cached_tokens_as_input(monkeypatch):
+    calls = _sdk(monkeypatch)
+    reply = claude_post("ak", {"model": "m", "max_tokens": 10}, 120)
+    assert reply.status == 200 and reply.body == {
+        "text": '{"ok": true}', "stop_reason": "end_turn", "tokens_in": 1100, "tokens_out": 300}
+    assert calls[0] == ("client", {"api_key": "ak", "timeout": 120, "max_retries": 1})
+    assert calls[1] == (False, {"model": "m", "max_tokens": 10})
+    claude_post("ak", {"model": "m", "fallbacks": "default"}, 120)
+    assert calls[3] == (True, {"model": "m", "fallbacks": "default",
+                               "betas": ["server-side-fallback-2026-07-01"]})
+
+
+def test_claude_post_turns_the_sdks_errors_into_replies(monkeypatch):
+    import anthropic
+    import httpx2
+    req = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+
+    def status(cls, code, message="boom"):
+        return cls(message, response=httpx2.Response(code, request=req,
+                                                     headers={"retry-after": "5"}), body=None)
+
+    _sdk(monkeypatch, anthropic.APITimeoutError(request=req))
+    assert claude_post("ak", {}, 1).status == "timeout"
+    _sdk(monkeypatch, status(anthropic.OverloadedError, 529))
+    assert (r := claude_post("ak", {}, 1)).status == 529 and r.text == "boom"
+    _sdk(monkeypatch, status(anthropic.RateLimitError, 429))
+    assert claude_post("ak", {}, 1).headers["retry-after"] == "5"
+    _sdk(monkeypatch, status(anthropic.EnforcedSpendLimitReachedError, 429))
+    assert claude_post("ak", {}, 1).text.startswith("SPENT ")
+    _sdk(monkeypatch, status(anthropic.BadRequestError, 400, "Your credit balance is too low"))
+    assert claude_post("ak", {}, 1).text.startswith("SPENT ")
