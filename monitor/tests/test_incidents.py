@@ -19,7 +19,7 @@ from pipeline.models import Event
 from pipeline.process.normalize import item_id
 
 CFG = {"domains": ["terrorism", "hybrid"], "batch_size": 8, "max_seconds": 300,
-       "candidate_days": 30, "max_candidates": 60, "max_attempts": 3}
+       "candidate_days": 30, "any_country_days": 3, "max_candidates": 60, "max_attempts": 3}
 
 
 def answer(**matches) -> str:
@@ -292,3 +292,36 @@ def test_incidents_made_from_undated_follow_ups_before_the_fix_are_removed():
 def new_incident_of(a):
     from monitor.incidents import new_incident
     return new_incident(a, NOW)
+
+
+def test_the_matcher_is_offered_the_reports_countries_and_the_last_few_days_only():
+    from monitor.incidents import candidates
+    pl = labelled("Strelec v Krakove", attack(), hours_ago=120)
+    fr_old = labelled("Útok v Paríži", attack(incident_country="FR", incident_place="Paris",
+                                              incident_date="2026-11-01"), hours_ago=24 * 11)
+    de_new = labelled("Útok v Berlíne", attack(incident_country="DE", incident_place="Berlin",
+                                               incident_date="2026-11-11"), hours_ago=20)
+    incidents = []
+    for a in (pl, fr_old, de_new):
+        run([a], incidents, answer(r1="new"))
+    offered = candidates(incidents, NOW, CFG, {"PL"})
+    # Poland's incident, and Germany's from yesterday in case a report names the wrong country;
+    # not France's from 11 days ago.
+    assert sorted(i.country for i in offered) == ["DE", "PL"]
+    report = labelled("Strelec z Krakova zomrel", update(), hours_ago=2)
+    _, ai = run([report], incidents, answer(r1=incidents[0].id))
+    sent = json.loads(ai.asked[0]["user"].split("\n", 1)[1].rsplit("\n", 1)[0])
+    assert sorted(i["country"] for i in sent["incidents"]) == ["DE", "PL"]
+
+
+def test_each_call_matches_the_reports_of_one_country():
+    pl = labelled("Útok v Krakove", attack(), hours_ago=6)
+    de = labelled("Útok v Berlíne", attack(incident_country="DE", incident_place="Berlin"),
+                  hours_ago=5)
+    pl2 = labelled("Útok v Lubline", attack(incident_place="Lublin"), hours_ago=4)
+    incidents = []
+    _, ai = run([pl, de, pl2], incidents, answer(r1="new"), answer(r1="new", r2="new"),
+                answer(r1="new"))
+    countries = [[r["country"] for r in json.loads(q["user"].split("\n", 1)[1].rsplit(
+        "\n", 1)[0])["reports"]] for q in ai.asked]
+    assert countries[0] == ["DE"] and countries[1] == ["PL", "PL"]

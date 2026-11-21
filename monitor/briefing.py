@@ -91,7 +91,7 @@ def brief(articles: dict[str, Article], previous: GeopoliticsFile | None, baseli
     specs = yaml.safe_load((config_dir / "theatres.yaml").read_text())["theatres"]
     countries = old.theatre_countries(config_dir)
     before = {t.id: t for t in previous.theatres} if previous else {}
-    stats = {"written": [], "carried": [], "failed": {}, "stale": []}
+    stats = {"written": [], "unchanged": [], "carried": [], "failed": {}, "stale": []}
     theatres, found = [], []
     for spec in specs:
         act, spark = old.activity(baselines, spec["activity"], now, cfg_score)
@@ -100,7 +100,15 @@ def brief(articles: dict[str, Article], previous: GeopoliticsFile | None, baseli
                       tone=old.tone(baselines, spec["activity"], now, cfg_score), sparkline=spark)
         reports = theatre_reports(articles, countries[t.id], cfg["theatres"][t.id], now, cfg)
         by_short = {str(n): a for n, a in enumerate(reports, 1)}
-        if write and ai is not None and reports:
+        # A theatre with nothing new since its text was written, less than a day ago, keeps
+        # that text: rewriting it from the same reports costs a model call and says the same.
+        prev = before.get(t.id)
+        unchanged = bool(prev and prev.lines and prev.written_at
+                         and now - prev.written_at < timedelta(hours=cfg["rewrite_after_hours"])
+                         and all(a.first_seen <= prev.written_at for a in reports))
+        if unchanged and write:
+            stats["unchanged"].append(t.id)
+        if write and ai is not None and reports and not unchanged:
             earlier = [line.text_en for line in before[t.id].lines] if t.id in before else []
             try:
                 out, model = ai.ask(
@@ -117,7 +125,7 @@ def brief(articles: dict[str, Article], previous: GeopoliticsFile | None, baseli
             _carried(t, before.get(t.id), now, cfg["keep_hours"])
             if t.written_at:
                 stats["carried"].append(t.id)
-        if write and reports and t.written_at != now:
+        if write and reports and t.written_at != now and not unchanged:
             stats["stale"].append(t.id)
         theatres.append(t)
     # A report can belong to several theatres (a loan to Ukraine is Russia and Ukraine, Slovak

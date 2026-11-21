@@ -127,11 +127,17 @@ def add_report(inc: Incident, a: Article, now: datetime) -> None:
     recompute(inc)
 
 
-def candidates(incidents: list[Incident], now: datetime, cfg: dict) -> list[Incident]:
-    """Incidents a new report could be about: recent ones, and older ones still in the news."""
+def candidates(incidents: list[Incident], now: datetime, cfg: dict,
+               countries: set[str]) -> list[Incident]:
+    """Incidents a batch's reports could be about: recent ones, and older ones still in the
+    news, in a country one of the reports names; and any incident of the last few days, in case
+    a report names the wrong country."""
     recent = (now - timedelta(days=cfg["candidate_days"])).date()
     active = now - timedelta(days=UPDATED_DAYS)
-    live = [i for i in incidents if i.date >= recent or i.last_updated >= active]
+    fresh = (now - timedelta(days=cfg["any_country_days"])).date()
+    live = [i for i in incidents
+            if (i.country in countries and (i.date >= recent or i.last_updated >= active))
+            or i.date >= fresh]
     return sorted(live, key=lambda i: i.date, reverse=True)[:cfg["max_candidates"]]
 
 
@@ -152,14 +158,18 @@ def match(articles: dict[str, Article], incidents: list[Incident], ai, cfg: dict
           now: datetime) -> dict:
     """Put each waiting report on an incident's timeline, or make its incident. Returns counts
     and, when it stopped early, why."""
+    # One country per call, so the matcher is offered only that country's incidents: on the
+    # reports of 14 to 21 November this halved what it reads.
     queue = sorted((a for a in articles.values() if needs_match(a, cfg)),
-                   key=lambda a: a.published_at)
+                   key=lambda a: (a.label.incident_country, a.published_at))
     stats = {"attached": 0, "new": 0, "earlier": 0, "unanswered": 0, "stopped": None}
     deadline = ai.clock() + cfg["max_seconds"]
     while queue:
-        batch, queue = queue[:cfg["batch_size"]], queue[cfg["batch_size"]:]
+        country = queue[0].label.incident_country
+        same = [a for a in queue[:cfg["batch_size"]] if a.label.incident_country == country]
+        batch, queue = same, queue[len(same):]
         by_short = {f"r{n}": a for n, a in enumerate(batch, 1)}
-        offered = candidates(incidents, now, cfg)
+        offered = candidates(incidents, now, cfg, {a.label.incident_country for a in batch})
         by_id = {i.id: i for i in offered}
         try:
             answers, model = ai.ask(
