@@ -135,7 +135,7 @@ class Model:
     model: str
     interval_s: float
     timeout_s: float
-    thinking: str | None = None            # Gemini: thinkingLevel; Claude: thinking.type
+    thinking: str | None = None            # Gemini: thinkingLevel
     effort: str | None = None              # Claude: output_config.effort
     fallbacks: bool = False                # Claude: server-side fallback on a refusal
     max_output: int | None = None          # overrides the task's, for models that think
@@ -164,9 +164,6 @@ def request(m: Model, key: str, system: str, user: str, schema: dict, name: str,
                                              "schema": claude_schema(schema)}}}
         if m.effort:
             body["output_config"]["effort"] = m.effort
-        if m.thinking:
-            # Sonnet 5.5's lowest setting, "between_tools": no thinking before the answer.
-            body["thinking"] = {"type": m.thinking}
         if m.fallbacks:
             body["fallbacks"] = "default"
         return "anthropic", {}, body
