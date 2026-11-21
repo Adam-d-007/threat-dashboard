@@ -3,6 +3,7 @@ import { ComponentBreakdown } from "../charts/ComponentBreakdown";
 import { Banner, Card, LevelBadge, Muted, Segmented, StatusPill } from "../components/ui";
 import { useLang } from "../i18n";
 import { fmtDate } from "../lib/format";
+import type { RunV2 } from "../lib/v2";
 import type { AnchorReading, Event, RegionAssessment, Run, Timeseries } from "../types/run";
 import { BaseRates } from "../terrorism/BaseRates";
 import { SisAnnualPoints } from "../terrorism/SisAnnual";
@@ -44,6 +45,9 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
       s.status === "stale" ||
       (s.status === "failed" && (!s.last_success || runAt - new Date(s.last_success).getTime() > 24 * 3_600_000)),
   ).length;
+  // Articles the models have not got to for more than three hours (the rebuilt pipeline).
+  const queue = (run as RunV2).status?.queue;
+  const late = queue && (queue.oldest_waiting_hours ?? 0) > 3 ? queue : null;
   const newHere = (run.diff?.new_event_ids ?? []).filter((id) => events.some((e) => e.id === id)).length;
   const rows = timeseries?.rows.filter((r) => r.region === region) ?? [];
   // National levels: Poland's for Slovakia, every published one for the EU. Travel advice: each
@@ -116,6 +120,11 @@ export function TerrorismPage({ run, region, timeseries }: { run: Run; region: R
         {failing > 0 && (
           <Banner tone="warn">
             <a href="#sources">{t.banners.sourcesFailing(failing)}</a>
+          </Banner>
+        )}
+        {late && (
+          <Banner tone="warn">
+            <a href="#sources">{t.v2.late(late.waiting_label, Math.round(late.oldest_waiting_hours!))}</a>
           </Banner>
         )}
       </div>
