@@ -53,7 +53,8 @@ def test_each_theatre_with_news_is_written_by_its_own_small_call():
     ai = FakeAi(answer("1", "2", "9", upcoming=[("2026-12-03", "Summit"), ("2026-11-01", "Past")]))
     geo, stats = run([a, b], ai)
     t = theatre(geo)
-    assert stats == {"written": ["russia_ukraine"], "carried": [], "failed": {}, "stale": []}
+    assert stats == {"written": ["russia_ukraine"], "unchanged": [], "carried": [], "failed": {},
+                     "stale": []}
     assert len(ai.asked) == 1 and len(geo.theatres) == 6
     # Short ids map back to the articles; a report that was not sent is not cited.
     assert t.lines[0].item_ids == [a.id, b.id] and t.lines[0].urls == [a.url, b.url]
@@ -115,3 +116,21 @@ def test_a_development_two_theatres_share_is_told_once():
     geo2, _ = run([shared, only_sk], FakeAi(), geo, write=False, now=NOW + timedelta(hours=1))
     assert [line.text_en for line in theatre(geo2, "sk_policy").lines] == ["Embassy."]
     assert len(theatre(geo2).lines) == 1
+
+
+def test_a_theatre_with_nothing_new_keeps_its_text_without_a_call():
+    a = ua("Ukraine talks", hours_ago=3)
+    geo, _ = run([a], FakeAi(answer("1")), now=NOW)
+    # Twelve hours later, at the next scoring slot, no new report has come in.
+    ai = FakeAi()
+    geo2, stats = run([a], ai, geo, now=NOW + timedelta(hours=12))
+    assert ai.asked == [] and stats["unchanged"] == ["russia_ukraine"] and stats["stale"] == []
+    assert theatre(geo2).lines == theatre(geo).lines and theatre(geo2).written_at == NOW
+    # A new report arrives: the theatre is written again.
+    b = ua("New strike", hours_ago=-11)
+    b.first_seen = NOW + timedelta(hours=11)
+    geo3, stats = run([a, b], FakeAi(answer("1", "2")), geo2, now=NOW + timedelta(hours=12))
+    assert stats["written"] == ["russia_ukraine"]
+    # And text older than a day is rewritten even without anything new.
+    _, stats = run([a], FakeAi(answer("1")), geo, now=NOW + timedelta(hours=21))
+    assert stats["written"] == ["russia_ukraine"]
