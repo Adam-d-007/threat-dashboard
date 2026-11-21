@@ -3,8 +3,10 @@ from datetime import UTC, date, datetime, timedelta
 
 from monitor.ai.client import AiUnavailable
 from monitor.incidents import (
+    EARLIER,
     REMOVED,
     apply_overrides,
+    drop_unfounded,
     incident_id,
     match,
     needs_match,
@@ -40,7 +42,8 @@ def test_a_report_of_something_new_makes_an_incident_from_its_facts():
     incidents = []
     stats, ai = run([a], incidents, (answer(r1="new"), "groq_120b"))
     (inc,) = incidents
-    assert stats == {"attached": 0, "new": 1, "unanswered": 0, "stopped": None, "waiting": 0}
+    assert stats == {"attached": 0, "new": 1, "earlier": 0, "unanswered": 0, "stopped": None,
+                     "waiting": 0}
     assert inc.id == incident_id(a.id) and a.incident_id == inc.id and a.matched_by == "groq_120b"
     assert (inc.type, inc.severity, inc.country, inc.topic) == ("attack", 5, "PL", "terrorism")
     assert inc.date == date(2026, 11, 7)  # the day it happened, not the day of the article
@@ -227,3 +230,65 @@ def test_the_incident_is_dated_the_day_most_of_its_reports_give():
     assert incidents[0].date == date(2026, 11, 6)  # one against one: the first report's day
     run(others[1:], incidents, answer(r1=incidents[0].id))
     assert incidents[0].date == date(2026, 11, 7)
+
+
+def test_a_follow_up_that_gives_no_date_makes_no_incident_of_its_own():
+    # 2026-11-20: "Police are investigating their own conduct after the September attack at a
+    # primary school" became a new severity 4 attack in Slovakia, dated that day.
+    review = labelled("Polícia preveruje svoj postup po septembrovom útoku na škole", attack(
+        kind="update", incident_country="SK", incident_place=None, incident_date=None,
+        severity=4), hours_ago=5)
+    incidents = []
+    stats, _ = run([review], incidents, answer(r1="new"))
+    assert incidents == [] and review.incident_id == EARLIER
+    assert stats["earlier"] == 1 and stats["new"] == 0
+    assert not needs_match(review, CFG)  # not asked about again
+
+
+def test_a_report_dated_long_before_it_was_published_makes_no_incident():
+    # A fundraiser for a 2015 Bataclan witness, labelled with the attack's own date.
+    bataclan = labelled("Zbierka pre svedka útoku v Bataclane", attack(
+        kind="update", incident_country="FR", incident_place="Paris",
+        incident_date="2015-11-13"), hours_ago=5)
+    incidents = []
+    run([bataclan], incidents, answer(r1="new"))
+    assert incidents == [] and bataclan.incident_id == EARLIER
+
+
+def test_news_of_the_day_without_a_date_still_makes_an_incident():
+    today = labelled("Streľba v Lubline", attack(incident_place="Lublin", incident_date=None),
+                     hours_ago=3)
+    incidents = []
+    run([today], incidents, answer(r1="new"))
+    assert [i.date for i in incidents] == [today.published_at.date()]
+
+
+def test_a_follow_up_without_a_date_still_joins_an_incident_it_fits():
+    first = labelled("Strelec v Krakove", attack(), hours_ago=120)
+    later = labelled("Strelec z Krakova zomrel", update(incident_date=None), hours_ago=70)
+    incidents = []
+    run([first], incidents, answer(r1="new"))
+    run([later], incidents, answer(r1=incidents[0].id))
+    assert len(incidents[0].reports) == 2 and later.incident_id == incidents[0].id
+
+
+def test_incidents_made_from_undated_follow_ups_before_the_fix_are_removed():
+    good = labelled("Streľba v Lubline", attack(incident_place="Lublin"), hours_ago=3)
+    bad = labelled("Polícia preveruje septembrový útok", attack(
+        kind="update", incident_country="SK", incident_place=None, incident_date=None))
+    articles = {a.id: a for a in (good, bad)}
+    incidents = [new_incident_of(a) for a in (good, bad)]
+    seeded = seed([v1_event("evt_aaa", 5)], [], NOW, 90, item_id)
+    incidents += seeded
+    bad_id = incidents[1].id
+    assert drop_unfounded(incidents, articles, CFG) == [bad_id]
+    assert [i.id for i in incidents] == [incident_id(good.id), seeded[0].id]
+    assert bad.incident_id == EARLIER
+    assert drop_unfounded(incidents, articles, CFG) == []
+    # An incident whose reports have left the article store is left alone: it cannot be checked.
+    assert drop_unfounded(incidents, {}, CFG) == []
+
+
+def new_incident_of(a):
+    from monitor.incidents import new_incident
+    return new_incident(a, NOW)

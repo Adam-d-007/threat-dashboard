@@ -1,0 +1,32 @@
+name: compare-claude
+
+# One-off (2026-11-21): Claude Haiku 5.5 against Claude Opus 5.5 on 48 real articles, to decide
+# whether Haiku is good enough to label. Reads the data branch, commits nothing, costs well
+# under a dollar of the API credit. Delete after use.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the data branch into ./state
+        uses: actions/checkout@v7
+        with:
+          ref: data
+          path: state
+
+      - uses: astral-sh/setup-uv@v10.3.0 # no floating major tag exists
+
+      - run: uv sync --frozen --no-dev
+
+      - name: Compare
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run python -m monitor.tools.compare_claude --state-dir state

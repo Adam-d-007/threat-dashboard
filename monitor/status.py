@@ -65,7 +65,8 @@ def reasons(q: Queue, sources: list[SourceHealth], terrorism: Terrorism | None,
 def build(now: datetime, started: datetime, git_sha: str | None, stages: dict[str, Stage],
           articles: dict[str, Article], sources: list[SourceHealth],
           terrorism: Terrorism | None, scored_at: datetime | None, last_scored: str | None,
-          stale_theatres: list[str], brief_written_at: datetime | None, ai, cfg: dict) -> Status:
+          stale_theatres: list[str], brief_written_at: datetime | None, ai, cfg: dict,
+          month_usd: dict[str, float] | None = None) -> Status:
     q = queue(articles, cfg["match"], now)
     why = reasons(q, sources, terrorism, scored_at, stale_theatres, ai is not None, now,
                   cfg["status"])
@@ -75,7 +76,8 @@ def build(now: datetime, started: datetime, git_sha: str | None, stages: dict[st
         overall="failed" if crashed else ("degraded" if why else "ok"), reasons=crashed + why,
         stages=stages, queue=q, ai=ai.report() if ai is not None else {},
         labelled_by_24h=labelled_by(articles, now), last_scored=last_scored,
-        brief_written_at=brief_written_at, sources=sources)
+        brief_written_at=brief_written_at, sources=sources,
+        ai_month_usd={k: round(v, 2) for k, v in (month_usd or {}).items()})
 
 
 def alert_due(log: list[dict], now: datetime, hours: float) -> bool:

@@ -132,12 +132,24 @@ def main(argv: list[str] | None = None) -> int:
         return new
     new_articles = _stage(stages, "ingest", do_ingest) or 0
 
-    quiet = now.hour in cfg["quiet_hours"]
-    resting = "left for the next hour: the old pipeline is using the AI allowance now"
+    # This month's estimated spend on paid models, and the cap on it.
+    month = now.strftime("%Y-%m")
+    spend = store.load_json(d, "spend.json", {})
+    resting = None
+    if ai is not None:
+        for provider, usd in spend.get(month, {}).items():
+            ai.cap(provider, usd)
+        if now.hour in cfg["quiet_hours"]:
+            # The old pipeline uses the free allowances in these hours: only Claude works now.
+            for m in ai.models.values():
+                if m.provider != "anthropic" and not m.out:
+                    m.out = "quiet hour: the old pipeline is using the free allowance"
+            if not any(not m.out and m.provider in ai.keys for m in ai.models.values()):
+                resting = "left for the next hour: the old pipeline is using the AI allowance now"
 
     def do_label():
-        if ai is None or quiet:
-            stages["label"] = Stage(status="skipped", detail=resting if quiet else "no AI")
+        if ai is None or resting:
+            stages["label"] = Stage(status="skipped", detail=resting or "no AI")
             return {}
         stats = label(articles, ai, cfg["label"], now)
         stages["label"] = _queue_stage(stats, f"{stats['labelled']} labelled, "
@@ -146,8 +158,8 @@ def main(argv: list[str] | None = None) -> int:
     lstats = _stage(stages, "label", do_label) or {}
 
     def do_match():
-        if ai is None or quiet:
-            stages["match"] = Stage(status="skipped", detail=resting if quiet else "no AI")
+        if ai is None or resting:
+            stages["match"] = Stage(status="skipped", detail=resting or "no AI")
             return {}
         stats = inc.match(articles, incidents, ai, cfg["match"], now)
         stages["match"] = _queue_stage(stats, f"{stats['new']} new incidents, "
@@ -155,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
                                        f"{stats['waiting']} waiting")
         return stats
     mstats = _stage(stages, "match", do_match) or {}
+    inc.drop_unfounded(incidents, articles, cfg["match"])
     corrections = inc.apply_overrides(incidents, articles, settings.overrides(), removed, now)
     incidents = inc.prune(incidents, now, cfg["incidents"]["keep_days"])
 
@@ -208,6 +221,12 @@ def main(argv: list[str] | None = None) -> int:
     store.save_incidents(d, incidents, removed, now)
     store.save_json(d, "scoring.json", scoring)
     publish.history_file(d, rows)
+    if ai is not None:
+        this = spend.setdefault(month, {})
+        for provider, usd in ai.cost_by_provider().items():
+            if usd:
+                this[provider] = round(this.get(provider, 0.0) + usd, 4)
+        store.save_json(d, "spend.json", spend)
 
     geo, bstats = geo_out if geo_out else (None, {"stale": []})
     written = [t.written_at for t in geo.theatres if t.written_at] if geo else []
@@ -215,7 +234,8 @@ def main(argv: list[str] | None = None) -> int:
     st = status.build(
         finished, now, args.git_sha, stages, articles, health,
         summary.terrorism if summary else None, summary.scored_at if summary else None,
-        summary.run_id if summary else None, bstats["stale"], min(written, default=None), ai, cfg)
+        summary.run_id if summary else None, bstats["stale"], min(written, default=None), ai, cfg,
+        spend.get(month, {}))
     store.write_public(d, "status.json", st)
     runs.append({"at": finished.isoformat(), "overall": st.overall, "reasons": st.reasons,
                  "new": new_articles, "labelled": lstats.get("labelled", 0),

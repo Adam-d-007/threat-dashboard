@@ -2040,6 +2040,14 @@
           "title": "Labelled By 24H",
           "type": "object"
         },
+        "ai_month_usd": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Estimated spend on paid models this calendar month, per provider",
+          "title": "Ai Month Usd",
+          "type": "object"
+        },
         "last_scored": {
           "anyOf": [
             {
@@ -2082,6 +2090,7 @@
         "queue",
         "ai",
         "labelled_by_24h",
+        "ai_month_usd",
         "last_scored",
         "brief_written_at",
         "sources"
