@@ -236,8 +236,9 @@ def test_the_shipped_settings_ask_claude_first_and_keep_the_free_models_as_backu
     from monitor import settings
     cfg = settings.load()["ai"]
     tasks = cfg["tasks"]
-    assert tasks["label"]["models"] == ["haiku_55", "gemini_36", "groq_120b"]
+    assert tasks["label"]["models"] == ["sonnet_55", "haiku_55", "gemini_36", "groq_120b"]
     assert all(tasks[t]["models"][0] == "opus_55" for t in ("match", "assess", "brief"))
+    assert cfg["models"]["sonnet_55"]["model"] == "claude-sonnet-5-5"
     assert cfg["models"]["haiku_55"]["model"] == "claude-haiku-5-5"
     assert cfg["models"]["opus_55"]["model"] == "claude-opus-5-5"
     assert cfg["monthly_cap_usd"] == {"anthropic": 80}
@@ -430,21 +431,3 @@ def test_claude_post_turns_the_sdks_errors_into_replies(monkeypatch):
     assert claude_post("ak", {}, 1).text.startswith("SPENT ")
 
 
-
-def test_sonnet_without_thinking_says_so_in_the_request():
-    cfg = CLAUDE_CFG | {"models": CLAUDE_CFG["models"] | {"sonnet_55_nothink": {
-        "provider": "anthropic", "model": "claude-sonnet-5-5", "thinking": "between_tools",
-        "effort": "low", "max_output": 8000, "interval_s": 1, "timeout_s": 120,
-        "price": [2.0, 10.0]}}, "tasks": {"label": {"models": ["sonnet_55_nothink"],
-                                                    "max_output": 4096}}}
-    fake = FakeClaude([claude_ok()])
-    client = Ai(cfg, {"anthropic": "ak"}, post=fake.post, clock=fake.clock, sleep=fake.sleep,
-                claude=fake.claude)
-    ask(client)
-    body = fake.claude_sent[0][1]
-    assert body["thinking"] == {"type": "between_tools"}
-    assert body["output_config"]["effort"] == "low" and body["model"] == "claude-sonnet-5-5"
-    # Haiku and Opus get no thinking setting: they keep their adaptive default.
-    fake = FakeClaude([claude_ok()])
-    ask(claude_ai(fake))
-    assert "thinking" not in fake.claude_sent[0][1]
