@@ -21,7 +21,7 @@ FIELDS = ("kind", "domain", "incident_type", "severity", "incident_date", "incid
           "sk_link")
 
 
-def short(x: dict) -> str:
+def facts(x: dict) -> str:
     return (f"{x['kind']} {x['domain']} {x['incident_type']} s{x['severity']} "
             f"{x['incident_date']} {x['incident_country']}")
 
@@ -51,8 +51,8 @@ def main(argv: list[str] | None = None) -> int:
             except AiUnavailable as e:
                 print(f"{name}: a batch failed: {e}")
                 continue
-            for short, lab in got.items():
-                labels[name][batch[int(short) - 1].id] = lab.model_dump()
+            for n, lab in got.items():
+                labels[name][batch[int(n) - 1].id] = lab.model_dump()
             print(f"{name}: {len(got)} of {len(batch)} labelled", flush=True)
 
     both = [a for a in articles if a.id in labels["haiku_55"] and a.id in labels["opus_55"]]
@@ -68,8 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     for a in both:
         h, o = labels["haiku_55"][a.id], labels["opus_55"][a.id]
         if any(h[f] != o[f] for f in FIELDS[:6]):
-            print(f"  [{a.lang}] {a.title[:90]}\n      haiku: {short(h)}\n      opus:  {short(o)}"
-                  f"\n      [{a.labelled_by}: {short(a.label.model_dump())}]")
+            print(f"  [{a.lang}] {a.title[:90]}\n      haiku: {facts(h)}\n      opus:  {facts(o)}"
+                  f"\n      [{a.labelled_by}: {facts(a.label.model_dump())}]")
     print("\nJSON", json.dumps({"labels": labels}, ensure_ascii=False)[:200], "...")
     return 0
 
