@@ -187,3 +187,22 @@ describe("the embeddable badge", () => {
     expect(link.rel).toBe("noopener");
   });
 });
+
+describe("the switch between the two layouts", () => {
+  it("reads the v2 files when VITE_DATA_LAYOUT is v2", async () => {
+    vi.stubEnv("VITE_DATA_LAYOUT", "v2");
+    const { loadLatest } = await import("./lib/data");
+    const fetch = vi.fn(async (url: string) => {
+      const name = url.split("/v2/")[1]?.split("?")[0];
+      const bodies: Record<string, unknown> = {
+        "status.json": status, "summary.json": summary, "incidents/current.json": incidents,
+        "reports.json": reports, "geopolitics.json": geopolitics,
+      };
+      return new Response(JSON.stringify(bodies[name]));
+    });
+    vi.stubGlobal("fetch", fetch);
+    expect((await loadLatest(new Date("2026-11-12T15:10:00Z"))).kind).toBe("ok");
+    expect(fetch.mock.calls.every((c) => String(c[0]).includes("/v2/"))).toBe(true);
+    vi.unstubAllEnvs();
+  });
+});

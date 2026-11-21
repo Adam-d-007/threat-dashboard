@@ -37,8 +37,13 @@ function renderAt(iso: string, lang: Lang = "en") {
 
 beforeEach(() => {
   window.location.hash = "";
+  // These tests feed the old pipeline's latest.json; the v2 files have their own (v2.test.tsx).
+  vi.stubEnv("VITE_DATA_LAYOUT", "v1");
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("dataAge", () => {
   const now = new Date("2026-10-22T21:00:00Z");
