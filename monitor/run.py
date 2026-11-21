@@ -21,12 +21,12 @@ from pathlib import Path
 import yaml
 
 from pipeline import main as old_main
-from pipeline.models import AnchorReading, SourceHealth
+from pipeline.models import SourceHealth
 from pipeline.process.normalize import item_id
 from pipeline.store import state as old_state
 
+from . import collecting, publish, settings, status, store
 from . import incidents as inc
-from . import publish, settings, status, store
 from .ai.client import Ai
 from .briefing import brief
 from .ingest import ingest, prune
@@ -73,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--force", action="store_true", help="run even if the last run was recent")
     p.add_argument("--force-score", action="store_true", help="score now, whatever the hour")
     p.add_argument("--now", help="pretend it is this moment (ISO, for tests)")
+    p.add_argument("--no-fetch", action="store_true",
+                   help="fetch nothing: work from the buffer and readings already stored")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -86,17 +88,10 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = settings.load()
     cfg_score = yaml.safe_load((old_main.CONFIG / "scoring.yaml").read_text())
-    sources, _ = old_main.load_config()
+    sources, queries = old_main.load_config()
     groups = {s["id"]: s["group"] for s in sources}
     prefilter_cfg = yaml.safe_load((old_main.CONFIG / "keywords.yaml").read_text())["prefilter"]
     stages: dict[str, Stage] = {}
-
-    # What the old pipeline collected.
-    old_latest = old_state.load(d)["latest"] or {}
-    anchors = [AnchorReading.model_validate(a) for a in old_latest.get("anchors", [])]
-    health = [SourceHealth.model_validate(s) for s in
-              (store.read(d / "source_health.json") or {"sources": []})["sources"]]
-    baselines = old_state.load_baselines(d)
 
     articles = store.load_articles(d)
     incidents = store.load_incidents(d)
@@ -118,6 +113,30 @@ def main(argv: list[str] | None = None) -> int:
         ai = None
 
     runs = store.load_json(d, "log.json", [])
+    slot = due_slot(now, cfg["score"]["slots"], rows)
+    if args.force_score and slot is None:
+        # Score the latest slot again: its rows are replaced, so the history keeps one value
+        # per slot.
+        slot = latest_slot(now, cfg["score"]["slots"])
+        rows[:] = [r for r in rows if r["run_id"] != slot]
+
+    def do_collect():
+        if args.no_fetch:
+            stages["collect"] = Stage(status="skipped", detail="--no-fetch")
+            return None
+        health, anchors, stats = collecting.collect(d, sources, queries, now, slot is not None)
+        stages["collect"] = Stage(
+            status="degraded" if stats["buffer_reset"] else "ok",
+            detail=f"{stats['new']} new items, {stats['buffered']} in the buffer"
+                   + (f"; failed: {' '.join(stats['failed'])}" if stats["failed"] else "")
+                   + ("; the buffer was invalid and was started again" if stats["buffer_reset"]
+                      else ""))
+        return health, anchors
+    # Without a collection (switched off, or it crashed) the run works from what is stored.
+    health, anchors = _stage(stages, "collect", do_collect) or (
+        [SourceHealth.model_validate(h) for h in collecting.load_health(d).values()],
+        collecting.load_anchors(d))
+    baselines = old_state.load_baselines(d)
 
     def do_ingest():
         # Nothing older than the labelling window, and nothing from more than a few hours
@@ -135,21 +154,13 @@ def main(argv: list[str] | None = None) -> int:
     # This month's estimated spend on paid models, and the cap on it.
     month = now.strftime("%Y-%m")
     spend = store.load_json(d, "spend.json", {})
-    resting = None
     if ai is not None:
         for provider, usd in spend.get(month, {}).items():
             ai.cap(provider, usd)
-        if now.hour in cfg["quiet_hours"]:
-            # The old pipeline uses the free allowances in these hours: only Claude works now.
-            for m in ai.models.values():
-                if m.provider != "anthropic" and not m.out:
-                    m.out = "quiet hour: the old pipeline is using the free allowance"
-            if not any(not m.out and m.provider in ai.keys for m in ai.models.values()):
-                resting = "left for the next hour: the old pipeline is using the AI allowance now"
 
     def do_label():
-        if ai is None or resting:
-            stages["label"] = Stage(status="skipped", detail=resting or "no AI")
+        if ai is None:
+            stages["label"] = Stage(status="skipped", detail="no AI")
             return {}
         stats = label(articles, ai, cfg["label"], now)
         stages["label"] = _queue_stage(stats, f"{stats['labelled']} labelled, "
@@ -158,8 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     lstats = _stage(stages, "label", do_label) or {}
 
     def do_match():
-        if ai is None or resting:
-            stages["match"] = Stage(status="skipped", detail=resting or "no AI")
+        if ai is None:
+            stages["match"] = Stage(status="skipped", detail="no AI")
             return {}
         stats = inc.match(articles, incidents, ai, cfg["match"], now)
         stages["match"] = _queue_stage(stats, f"{stats['new']} new incidents, "
@@ -170,13 +181,6 @@ def main(argv: list[str] | None = None) -> int:
     inc.drop_unfounded(incidents, articles, cfg["match"])
     corrections = inc.apply_overrides(incidents, articles, settings.overrides(), removed, now)
     incidents = inc.prune(incidents, now, cfg["incidents"]["keep_days"])
-
-    slot = due_slot(now, cfg["score"]["slots"], rows)
-    if args.force_score and slot is None:
-        # Score the latest slot again: its rows are replaced, so the history keeps one value
-        # per slot.
-        slot = latest_slot(now, cfg["score"]["slots"])
-        rows[:] = [r for r in rows if r["run_id"] != slot]
 
     def do_score():
         if slot is None:

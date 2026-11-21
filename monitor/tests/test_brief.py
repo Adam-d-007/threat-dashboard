@@ -134,3 +134,16 @@ def test_a_theatre_with_nothing_new_keeps_its_text_without_a_call():
     # And text older than a day is rewritten even without anything new.
     _, stats = run([a], FakeAi(answer("1")), geo, now=NOW + timedelta(hours=21))
     assert stats["written"] == ["russia_ukraine"]
+
+
+def test_one_incident_told_from_different_articles_is_told_once():
+    reaction = labelled("EU condemns the Russian plot in Denmark", label_dict(
+        kind="update", domain="hybrid", countries=["DK", "UA", "RU"], incident_type="plot_disrupted",
+        severity=1, incident_country="DK", summary_en="EU reaction"))
+    police = labelled("Danish police foiled a Russian plot", label_dict(
+        kind="new_incident", domain="hybrid", countries=["DK", "RU"], incident_type="plot_disrupted",
+        severity=1, incident_country="DK", summary_en="Danish police"), hours_ago=2)
+    reaction.incident_id = police.incident_id = "inc_dk_plot"
+    geo, stats = run([reaction, police], FakeAi(answer("1"), answer("1")))
+    told = [t.id for t in geo.theatres if t.lines]
+    assert stats["written"] == ["russia_ukraine", "hybrid_eu"] and told == ["russia_ukraine"]

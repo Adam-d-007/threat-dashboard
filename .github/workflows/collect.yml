@@ -1,25 +1,35 @@
-name: collect
+name: hourly
 
-# Hourly fetch of RSS and GDELT DOC into rss_buffer.json on the data branch, so items that
-# scroll off shallow feeds between the twice-daily pipeline runs are not lost. It also starts
-# the pipeline when GitHub skipped its slot. Free on a public repo.
+# The whole pipeline, once an hour (docs/plans/2026-11-12-rebuild-design.md): fetch the news,
+# and twice a day the official levels, the slower official pages and the media counts; label
+# articles, match them to incidents, score and write the brief with Claude (Gemini and Groq as
+# backup); publish under v2/ on the data branch, which the website reads.
+# cron-job.org starts it each hour through workflow_dispatch on this file, so the file keeps
+# the name collect.yml. GitHub's own schedule is a backup; a run that comes within 40 minutes
+# of the last one does nothing.
 on:
   schedule:
-    - cron: "35 * * * *" # half past, clear of the pipeline's :05 runs
+    - cron: "35 * * * *"
   workflow_dispatch:
+    inputs:
+      force_score:
+        description: "Score the latest slot again and rewrite the brief"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
-  actions: write  # the watchdog starts the pipeline when GitHub skipped its slot
+  issues: write
 
+# Shared with squash-data, so the two never write the data branch at once.
 concurrency:
-  group: collect
+  group: pipeline
   cancel-in-progress: false
 
 jobs:
-  collect:
+  run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # GDELT back-off can take several minutes
+    timeout-minutes: 45  # GDELT's back-off can take minutes; labelling stops after 7
     steps:
       - uses: actions/checkout@v7
 
@@ -33,24 +43,27 @@ jobs:
 
       - run: uv sync --frozen --no-dev
 
-      - name: Collect RSS items
-        run: uv run python -m pipeline.collect --state-dir state --commit-msg-file "$RUNNER_TEMP/commit_msg.txt"
+      - name: Run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          RELIEFWEB_APPNAME: ${{ vars.RELIEFWEB_APPNAME }}
+          FORCE: ${{ inputs.force_score && '--force --force-score' || '' }}
+        run: |
+          uv run python -m monitor --state-dir state --git-sha "${{ github.sha }}" \
+            --commit-msg-file "$RUNNER_TEMP/commit_msg.txt" $FORCE
 
+      # Also after a failed run: what was fetched and labelled before the failure is kept.
       - name: Commit to the data branch
+        if: always()
         working-directory: state
-        run: $GITHUB_WORKSPACE/.github/scripts/commit_data.sh "$RUNNER_TEMP/commit_msg.txt"
+        run: |
+          [ -f "$RUNNER_TEMP/commit_msg.txt" ] || { echo "The run wrote nothing"; exit 0; }
+          $GITHUB_WORKSPACE/.github/scripts/commit_data.sh "$RUNNER_TEMP/commit_msg.txt"
 
-      - name: Start the pipeline if its slot is overdue
-        if: always() && github.ref == 'refs/heads/main'
+      - name: Open or close the alert issue
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/pipeline_watchdog.py
-
-      # The rebuilt pipeline reads the buffer this job has just written. A failure to start it
-      # must not fail the collector.
-      - name: Start the rebuilt pipeline's hourly run
-        if: always() && github.ref == 'refs/heads/main'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run monitor.yml --ref main
+        run: uv run python -m monitor.alerts state "${{ job.status }}"
