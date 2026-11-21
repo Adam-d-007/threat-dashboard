@@ -7,6 +7,17 @@ ai:
   # Groq's 20b model cut answers off and contradicted itself, so it only does the small
   # matching call; Gemini 3.8-flash answered 503 throughout.
   models:
+    # Claude, on MCS's monthly API credit (from 2026-11-21; Adam chose these two). Haiku 5.5
+    # labels: short, structured sorting of up to 350 articles a day. Opus 5.5 makes the
+    # judgement calls: which incident a report belongs to, a region's level, the brief.
+    # price: US dollars per million tokens in and out (Anthropic's list prices, 2026-11-03);
+    # used to estimate this month's spend against monthly_cap_usd. Opus 5.5 always thinks
+    # before it answers, so it gets room for that; fallbacks reruns a refused request on
+    # another Claude model inside the same call.
+    haiku_55: {provider: anthropic, model: claude-haiku-5-5, effort: low, max_output: 8000,
+               interval_s: 1, timeout_s: 120, price: [0.10, 0.50]}
+    opus_55: {provider: anthropic, model: claude-opus-5-5, effort: medium, max_output: 16000,
+              fallbacks: true, interval_s: 1, timeout_s: 300, price: [4.0, 20.0]}
     # interval_s: least time between two calls. Groq allows these models 8,000 tokens a minute
     # (response headers, 2026-11-12) and one call can reserve most of that.
     groq_120b: {provider: groq, model: openai/gpt-oss-120b, interval_s: 62, timeout_s: 60}
@@ -22,10 +33,14 @@ ai:
   # (slower, which an hourly queue does not mind) and Groq when Gemini is busy; Groq's
   # allowance is kept for matching, the assessments and the brief.
   tasks:
-    label: {models: [gemini_36, groq_120b], max_output: 4096}
-    match: {models: [groq_120b, groq_20b, gemini_36], max_output: 2048}
-    assess: {models: [groq_120b, gemini_36], max_output: 3000}
-    brief: {models: [groq_120b, gemini_36], max_output: 3000}
+    label: {models: [haiku_55, gemini_36, groq_120b], max_output: 4096}
+    match: {models: [opus_55, groq_120b, groq_20b, gemini_36], max_output: 2048}
+    assess: {models: [opus_55, groq_120b, gemini_36], max_output: 3000}
+    brief: {models: [opus_55, groq_120b, gemini_36], max_output: 3000}
+  # Estimated spend in a calendar month after which Claude is left alone until the next
+  # month and the free models carry on. The credit is $100; this leaves a margin for the
+  # estimate. Set a spend limit in the Claude Console as well: that one is enforced.
+  monthly_cap_usd: {anthropic: 80}
   strikes: 2          # failures in a row after which a model is left alone for the run
   max_wait_s: 90      # a rate limit that asks for at most this long is waited out
 

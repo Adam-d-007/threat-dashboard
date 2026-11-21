@@ -3,6 +3,7 @@ rules, so every stage and every published file is exercised without a network.""
 
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -29,14 +30,19 @@ class RuleAi:
 
     def __init__(self):
         self.asked = []
+        self.models = {"groq_120b": SimpleNamespace(model="openai/gpt-oss-120b", provider="groq",
+                                                    out=None)}
+        self.capped = []
 
     @classmethod
     def from_env(cls, cfg):
         return cls()
 
-    @property
-    def models(self):
-        return {"groq_120b": type("M", (), {"model": "openai/gpt-oss-120b"})()}
+    def cap(self, provider, usd):
+        self.capped.append((provider, usd))
+
+    def cost_by_provider(self):
+        return {"groq": 0.0}
 
     def clock(self):
         return 0.0
@@ -282,3 +288,31 @@ def test_the_second_run_does_not_reach_back_before_the_pipeline_started(state):
     st = public(state, "status.json", Status)
     # The article from 20 hours before the first run is never taken in.
     assert st.queue.labelled_24h == 3 and st.queue.waiting_label == 0
+
+
+def test_the_months_claude_spend_is_tallied_and_capped(state, monkeypatch):
+    monkeypatch.setattr(RuleAi, "cost_by_provider", lambda self: {"anthropic": 1.25, "groq": 0.0})
+    made = []
+    monkeypatch.setattr(RuleAi, "from_env", classmethod(lambda cls, cfg: made.append(cls()) or made[-1]))
+    go(state)
+    go(state, at=AT + timedelta(hours=1))
+    spend = json.loads((state / "v2" / "state" / "spend.json").read_text())
+    assert spend == {"2026-11": {"anthropic": 2.5}}
+    assert public(state, "status.json", Status).ai_month_usd == {"anthropic": 2.5}
+    # The second run was told how much had been spent before it started.
+    assert made[1].capped == [("anthropic", 1.25)]
+    go(state, at=AT.replace(month=12, day=1))
+    assert made[2].capped == []  # a new month starts from nothing
+
+
+def test_in_a_quiet_hour_claude_still_works(state, monkeypatch):
+    def with_claude(cls, cfg):
+        ai = cls()
+        ai.models["haiku_55"] = SimpleNamespace(model="claude-haiku-5-5", provider="anthropic",
+                                                out=None)
+        ai.keys = {"groq": "k", "anthropic": "k"}
+        return ai
+    monkeypatch.setattr(RuleAi, "from_env", classmethod(with_claude))
+    go(state, at=AT.replace(hour=13))
+    st = public(state, "status.json", Status)
+    assert st.stages["label"].status == "ok" and st.queue.waiting_label == 0
